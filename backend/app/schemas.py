@@ -160,3 +160,48 @@ class ExpensePublic(ExpenseBase):
     @field_serializer("amount")
     def serialize_amount(self, value: Decimal) -> str:
         return f"{value:.2f}"
+
+
+class FinancialDailySummary(BaseModel):
+    date: date
+    gross_revenue: Decimal
+    expenses: Decimal
+    estimated_net_profit: Decimal
+
+    @field_serializer("gross_revenue", "expenses", "estimated_net_profit")
+    def serialize_money(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class FinancialSummary(BaseModel):
+    gross_revenue: Decimal
+    total_expenses: Decimal
+    estimated_net_profit: Decimal
+    total_distance_km: Decimal
+    total_worked_minutes: int
+    total_trip_count: int
+    gross_per_hour: Decimal | None
+    net_per_hour: Decimal | None
+    gross_per_km: Decimal | None
+    net_per_km: Decimal | None
+    expense_per_km: Decimal | None
+    average_ticket: Decimal | None
+    daily: list[FinancialDailySummary]
+
+    @field_serializer(
+        "gross_revenue",
+        "total_expenses",
+        "estimated_net_profit",
+        "total_distance_km",
+        "gross_per_hour",
+        "net_per_hour",
+        "gross_per_km",
+        "net_per_km",
+        "expense_per_km",
+        "average_ticket",
+    )
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
