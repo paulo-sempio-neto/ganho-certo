@@ -7,6 +7,7 @@ const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 
 type AuthMode = "login" | "register";
 type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
+type OwnershipType = "owned" | "financed" | "rented";
 type DashboardPeriod = "today" | "last7" | "month" | "custom";
 
 type User = {
@@ -74,6 +75,38 @@ type VehicleForm = {
   fuel_type: FuelType;
 };
 
+type VehicleCostProfile = {
+  id: number;
+  vehicle_id: number;
+  ownership_type: OwnershipType;
+  rental_monthly: string | null;
+  financing_monthly: string | null;
+  insurance_monthly: string | null;
+  ipva_annual: string | null;
+  other_fixed_monthly: string | null;
+  maintenance_per_km: string | null;
+  tires_per_km: string | null;
+  oil_per_km: string | null;
+  depreciation_per_km: string | null;
+  fuel_efficiency_km_per_liter: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type VehicleCostProfileForm = {
+  ownership_type: OwnershipType;
+  rental_monthly: string;
+  financing_monthly: string;
+  insurance_monthly: string;
+  ipva_annual: string;
+  other_fixed_monthly: string;
+  maintenance_per_km: string;
+  tires_per_km: string;
+  oil_per_km: string;
+  depreciation_per_km: string;
+  fuel_efficiency_km_per_liter: string;
+};
+
 type WorkSessionForm = {
   work_date: string;
   vehicle_id: string;
@@ -125,6 +158,12 @@ const fuelOptions: Array<{ label: string; value: FuelType }> = [
   { label: "Outro", value: "other" },
 ];
 
+const ownershipOptions: Array<{ label: string; value: OwnershipType }> = [
+  { label: "Proprio", value: "owned" },
+  { label: "Financiado", value: "financed" },
+  { label: "Alugado", value: "rented" },
+];
+
 const expenseCategoryOptions: Array<{ label: string; value: ExpenseCategory }> = [
   { label: "Combustível", value: "fuel" },
   { label: "Recarga elétrica", value: "charging" },
@@ -144,6 +183,20 @@ const emptyVehicleForm: VehicleForm = {
   model: "",
   year: "",
   fuel_type: "flex",
+};
+
+const emptyCostProfileForm: VehicleCostProfileForm = {
+  ownership_type: "owned",
+  rental_monthly: "",
+  financing_monthly: "",
+  insurance_monthly: "",
+  ipva_annual: "",
+  other_fixed_monthly: "",
+  maintenance_per_km: "",
+  tires_per_km: "",
+  oil_per_km: "",
+  depreciation_per_km: "",
+  fuel_efficiency_km_per_liter: "",
 };
 
 const emptyWorkSessionForm: WorkSessionForm = {
@@ -243,10 +296,34 @@ function moneyInputToApi(value: string): string {
   return `${safeReais}.${safeCents}`;
 }
 
+function optionalMoneyInputToApi(value: string): string | null {
+  if (!value.trim()) {
+    return null;
+  }
+
+  return moneyInputToApi(value);
+}
+
+function optionalDecimalInputToApi(value: string): string | null {
+  if (!value.trim()) {
+    return null;
+  }
+
+  return normalizeDecimalInput(value);
+}
+
 function formatMoney(value: string): string {
   const [reais, cents = "00"] = value.split(".");
   const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `R$ ${groupedReais},${`${cents}00`.slice(0, 2)}`;
+}
+
+function formatOptionalMoneyForInput(value: string | null): string {
+  return value ? formatMoney(value).replace("R$ ", "") : "";
+}
+
+function formatOptionalDecimalForInput(value: string | null): string {
+  return value ? value.replace(".", ",") : "";
 }
 
 function formatDistance(value: string): string {
@@ -306,10 +383,13 @@ function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
+  const [costProfileForm, setCostProfileForm] =
+    useState<VehicleCostProfileForm>(emptyCostProfileForm);
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
+  const [costProfileVehicleId, setCostProfileVehicleId] = useState<number | null>(null);
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
@@ -324,7 +404,9 @@ function App() {
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
   const [isExpensesLoading, setIsExpensesLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
+  const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
 
@@ -337,9 +419,11 @@ function App() {
     setExpenses([]);
     setFinancialSummary(null);
     setEditingVehicleId(null);
+    setCostProfileVehicleId(null);
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
     setVehicleForm(emptyVehicleForm);
+    setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
     setExpenseForm(emptyExpenseForm);
     setMode("login");
@@ -356,6 +440,28 @@ function App() {
   function getVehicleLabel(vehicleId: number): string {
     const vehicle = vehicles.find((item) => item.id === vehicleId);
     return vehicle ? `${vehicle.name} · ${vehicle.brand} ${vehicle.model}` : "Veiculo removido";
+  }
+
+  function getCostProfileVehicle(): Vehicle | null {
+    return vehicles.find((vehicle) => vehicle.id === costProfileVehicleId) ?? null;
+  }
+
+  function costProfileToForm(profile: VehicleCostProfile): VehicleCostProfileForm {
+    return {
+      ownership_type: profile.ownership_type,
+      rental_monthly: formatOptionalMoneyForInput(profile.rental_monthly),
+      financing_monthly: formatOptionalMoneyForInput(profile.financing_monthly),
+      insurance_monthly: formatOptionalMoneyForInput(profile.insurance_monthly),
+      ipva_annual: formatOptionalMoneyForInput(profile.ipva_annual),
+      other_fixed_monthly: formatOptionalMoneyForInput(profile.other_fixed_monthly),
+      maintenance_per_km: formatOptionalDecimalForInput(profile.maintenance_per_km),
+      tires_per_km: formatOptionalDecimalForInput(profile.tires_per_km),
+      oil_per_km: formatOptionalDecimalForInput(profile.oil_per_km),
+      depreciation_per_km: formatOptionalDecimalForInput(profile.depreciation_per_km),
+      fuel_efficiency_km_per_liter: formatOptionalDecimalForInput(
+        profile.fuel_efficiency_km_per_liter,
+      ),
+    };
   }
 
   function getMetricValue(value: string | null, formatter: (metric: string) => string): string {
@@ -494,6 +600,36 @@ function App() {
     }
   }
 
+  async function loadVehicleCostProfile(vehicleId: number, currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsCostProfileLoading(true);
+    setMessage("");
+    try {
+      const profile = await requestApi<VehicleCostProfile>(
+        `/vehicles/${vehicleId}/cost-profile`,
+        {
+          headers: getAuthHeaders(currentToken),
+        },
+      );
+      setCostProfileForm(costProfileToForm(profile));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else if (error instanceof Error && error.message.includes("Registro nao encontrado")) {
+        setCostProfileForm(emptyCostProfileForm);
+      } else {
+        setMessage(
+          error instanceof Error ? error.message : "Erro ao carregar perfil de custos.",
+        );
+      }
+    } finally {
+      setIsCostProfileLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!token) {
       setUser(null);
@@ -501,6 +637,8 @@ function App() {
       setWorkSessions([]);
       setExpenses([]);
       setFinancialSummary(null);
+      setCostProfileVehicleId(null);
+      setCostProfileForm(emptyCostProfileForm);
       return;
     }
 
@@ -603,6 +741,20 @@ function App() {
     setVehicleForm(emptyVehicleForm);
   }
 
+  function closeCostProfileForm() {
+    setCostProfileVehicleId(null);
+    setCostProfileForm(emptyCostProfileForm);
+    setMessage("");
+  }
+
+  async function handleOpenCostProfile(vehicle: Vehicle) {
+    setCostProfileVehicleId(vehicle.id);
+    setCostProfileForm(emptyCostProfileForm);
+    setMessage("");
+    setSuccessMessage("");
+    await loadVehicleCostProfile(vehicle.id);
+  }
+
   async function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsVehicleSaving(true);
@@ -662,6 +814,9 @@ function App() {
         headers: getAuthHeaders(),
       });
       setSuccessMessage("Veiculo excluido com sucesso.");
+      if (costProfileVehicleId === vehicle.id) {
+        closeCostProfileForm();
+      }
       await loadVehicles();
       await loadWorkSessions();
       await loadExpenses();
@@ -672,6 +827,55 @@ function App() {
       } else {
         setMessage(error instanceof Error ? error.message : "Erro ao excluir veiculo.");
       }
+    }
+  }
+
+  async function handleCostProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!costProfileVehicleId) {
+      return;
+    }
+
+    setIsCostProfileSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = {
+        ownership_type: costProfileForm.ownership_type,
+        rental_monthly: optionalMoneyInputToApi(costProfileForm.rental_monthly),
+        financing_monthly: optionalMoneyInputToApi(costProfileForm.financing_monthly),
+        insurance_monthly: optionalMoneyInputToApi(costProfileForm.insurance_monthly),
+        ipva_annual: optionalMoneyInputToApi(costProfileForm.ipva_annual),
+        other_fixed_monthly: optionalMoneyInputToApi(costProfileForm.other_fixed_monthly),
+        maintenance_per_km: optionalDecimalInputToApi(costProfileForm.maintenance_per_km),
+        tires_per_km: optionalDecimalInputToApi(costProfileForm.tires_per_km),
+        oil_per_km: optionalDecimalInputToApi(costProfileForm.oil_per_km),
+        depreciation_per_km: optionalDecimalInputToApi(costProfileForm.depreciation_per_km),
+        fuel_efficiency_km_per_liter: optionalDecimalInputToApi(
+          costProfileForm.fuel_efficiency_km_per_liter,
+        ),
+      };
+
+      const profile = await requestApi<VehicleCostProfile>(
+        `/vehicles/${costProfileVehicleId}/cost-profile`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        },
+      );
+      setCostProfileForm(costProfileToForm(profile));
+      setSuccessMessage("Perfil de custos salvo com sucesso.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao salvar perfil de custos.");
+      }
+    } finally {
+      setIsCostProfileSaving(false);
     }
   }
 
@@ -862,6 +1066,8 @@ function App() {
       }
     }
   }
+
+  const selectedCostProfileVehicle = getCostProfileVehicle();
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -1664,6 +1870,13 @@ function App() {
                         <button
                           className="text-button"
                           type="button"
+                          onClick={() => void handleOpenCostProfile(vehicle)}
+                        >
+                          Configurar custos
+                        </button>
+                        <button
+                          className="text-button"
+                          type="button"
                           onClick={() => handleEditVehicle(vehicle)}
                         >
                           Editar
@@ -1680,6 +1893,270 @@ function App() {
                   ))}
                 </div>
               </div>
+
+              {selectedCostProfileVehicle ? (
+                <form
+                  className="auth-form cost-profile-panel"
+                  onSubmit={handleCostProfileSubmit}
+                >
+                  <div className="section-title">
+                    <p className="eyebrow">Custo real do veiculo</p>
+                    <h3>Custos de {selectedCostProfileVehicle.name}</h3>
+                    <p className="subtle-note">
+                      Esses valores ajudam o GanhoCerto a estimar custos que nem sempre aparecem
+                      como despesas no dia a dia.
+                    </p>
+                    <p className="subtle-note">
+                      Combustivel e recarga continuam sendo lancados em Despesas. Estes dados ainda
+                      nao alteram o dashboard financeiro.
+                    </p>
+                  </div>
+
+                  {isCostProfileLoading ? (
+                    <p className="empty-state">Carregando perfil de custos...</p>
+                  ) : null}
+
+                  <fieldset className="form-group" disabled={isCostProfileLoading}>
+                    <legend>Tipo de posse</legend>
+                    <label>
+                      Tipo de posse
+                      <select
+                        name="ownership-type"
+                        onChange={(event) =>
+                          setCostProfileForm({
+                            ...costProfileForm,
+                            ownership_type: event.target.value as OwnershipType,
+                          })
+                        }
+                        value={costProfileForm.ownership_type}
+                      >
+                        {ownershipOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </fieldset>
+
+                  <fieldset className="form-group" disabled={isCostProfileLoading}>
+                    <legend>Custos fixos</legend>
+                    <div className="form-grid">
+                      <label
+                        className={
+                          costProfileForm.ownership_type === "rented"
+                            ? "cost-field cost-field-active"
+                            : "cost-field"
+                        }
+                      >
+                        Aluguel mensal
+                        <input
+                          inputMode="decimal"
+                          name="rental-monthly"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              rental_monthly: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 2.200,00"
+                          type="text"
+                          value={costProfileForm.rental_monthly}
+                        />
+                      </label>
+
+                      <label
+                        className={
+                          costProfileForm.ownership_type === "financed"
+                            ? "cost-field cost-field-active"
+                            : "cost-field"
+                        }
+                      >
+                        Financiamento mensal
+                        <input
+                          inputMode="decimal"
+                          name="financing-monthly"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              financing_monthly: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 1.800,00"
+                          type="text"
+                          value={costProfileForm.financing_monthly}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="form-grid form-grid-three">
+                      <label>
+                        Seguro mensal
+                        <input
+                          inputMode="decimal"
+                          name="insurance-monthly"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              insurance_monthly: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 250,00"
+                          type="text"
+                          value={costProfileForm.insurance_monthly}
+                        />
+                      </label>
+
+                      <label>
+                        IPVA anual
+                        <input
+                          inputMode="decimal"
+                          name="ipva-annual"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              ipva_annual: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 1.450,00"
+                          type="text"
+                          value={costProfileForm.ipva_annual}
+                        />
+                      </label>
+
+                      <label>
+                        Outros fixos mensais
+                        <input
+                          inputMode="decimal"
+                          name="other-fixed-monthly"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              other_fixed_monthly: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 75,00"
+                          type="text"
+                          value={costProfileForm.other_fixed_monthly}
+                        />
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <fieldset className="form-group" disabled={isCostProfileLoading}>
+                    <legend>Provisoes por km</legend>
+                    <div className="form-grid">
+                      <label>
+                        Manutencao por km
+                        <input
+                          inputMode="decimal"
+                          name="maintenance-per-km"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              maintenance_per_km: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 0,18"
+                          type="text"
+                          value={costProfileForm.maintenance_per_km}
+                        />
+                      </label>
+
+                      <label>
+                        Pneus por km
+                        <input
+                          inputMode="decimal"
+                          name="tires-per-km"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              tires_per_km: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 0,05"
+                          type="text"
+                          value={costProfileForm.tires_per_km}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="form-grid">
+                      <label>
+                        Oleo por km
+                        <input
+                          inputMode="decimal"
+                          name="oil-per-km"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              oil_per_km: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 0,03"
+                          type="text"
+                          value={costProfileForm.oil_per_km}
+                        />
+                      </label>
+
+                      <label>
+                        Depreciacao por km
+                        <input
+                          inputMode="decimal"
+                          name="depreciation-per-km"
+                          onChange={(event) =>
+                            setCostProfileForm({
+                              ...costProfileForm,
+                              depreciation_per_km: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: 0,21"
+                          type="text"
+                          value={costProfileForm.depreciation_per_km}
+                        />
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <fieldset className="form-group" disabled={isCostProfileLoading}>
+                    <legend>Adicional</legend>
+                    <label>
+                      Consumo medio em km/l
+                      <input
+                        inputMode="decimal"
+                        name="fuel-efficiency"
+                        onChange={(event) =>
+                          setCostProfileForm({
+                            ...costProfileForm,
+                            fuel_efficiency_km_per_liter: event.target.value,
+                          })
+                        }
+                        placeholder="Ex: 10,5"
+                        type="text"
+                        value={costProfileForm.fuel_efficiency_km_per_liter}
+                      />
+                    </label>
+                  </fieldset>
+
+                  <div className="form-actions">
+                    <button
+                      className="button"
+                      disabled={isCostProfileSaving || isCostProfileLoading}
+                      type="submit"
+                    >
+                      {isCostProfileSaving ? "Salvando..." : "Salvar perfil de custos"}
+                    </button>
+                    <button
+                      className="button button-ghost"
+                      disabled={isCostProfileSaving}
+                      type="button"
+                      onClick={closeCostProfileForm}
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </form>
+              ) : null}
             </section>
           </div>
         ) : (

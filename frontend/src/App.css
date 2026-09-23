@@ -441,6 +441,40 @@ select:focus {
   font-size: 1.15rem;
 }
 
+.cost-profile-panel {
+  border: 1px solid #e4e8e1;
+  border-radius: 10px;
+  background: #fbfcfa;
+  padding: 18px;
+}
+
+.form-group {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  border: 1px solid #e4e8e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.form-group legend {
+  color: #26734d;
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0 6px;
+}
+
+.cost-field {
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.cost-field-active {
+  background: #edf8ef;
+  box-shadow: inset 0 0 0 1px #b9dec8;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
