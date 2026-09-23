@@ -1,0 +1,1 @@
+"""GanhoCerto backend application package."""
