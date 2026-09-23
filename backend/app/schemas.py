@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 
 FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid", "other"]
 
@@ -77,3 +78,34 @@ class VehiclePublic(VehicleBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WorkSessionBase(BaseModel):
+    vehicle_id: int = Field(gt=0)
+    work_date: date
+    gross_revenue: Decimal = Field(ge=Decimal("0"))
+    distance_km: Decimal = Field(ge=Decimal("0"))
+    worked_minutes: int = Field(gt=0)
+    trip_count: int = Field(ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class WorkSessionCreate(WorkSessionBase):
+    pass
+
+
+class WorkSessionUpdate(WorkSessionBase):
+    pass
+
+
+class WorkSessionPublic(WorkSessionBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("gross_revenue")
+    def serialize_gross_revenue(self, value: Decimal) -> str:
+        return f"{value:.2f}"
