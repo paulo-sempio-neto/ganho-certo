@@ -5,6 +5,18 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 
 FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid", "other"]
+ExpenseCategory = Literal[
+    "fuel",
+    "charging",
+    "maintenance",
+    "parking",
+    "toll",
+    "insurance",
+    "rental",
+    "financing",
+    "washing",
+    "other",
+]
 
 
 class UserRegister(BaseModel):
@@ -108,4 +120,43 @@ class WorkSessionPublic(WorkSessionBase):
 
     @field_serializer("gross_revenue")
     def serialize_gross_revenue(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class ExpenseBase(BaseModel):
+    vehicle_id: int | None = Field(default=None, gt=0)
+    expense_date: date
+    category: ExpenseCategory
+    amount: Decimal = Field(gt=Decimal("0"))
+    description: str | None = Field(default=None, max_length=255)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
+
+class ExpenseCreate(ExpenseBase):
+    pass
+
+
+class ExpenseUpdate(ExpenseBase):
+    pass
+
+
+class ExpensePublic(ExpenseBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal) -> str:
         return f"{value:.2f}"

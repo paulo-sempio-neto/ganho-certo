@@ -23,6 +23,7 @@ class User(Base):
     )
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
+    expenses: Mapped[list[Expense]] = relationship(back_populates="user")
 
 
 class Vehicle(Base):
@@ -42,6 +43,7 @@ class Vehicle(Base):
     )
     user: Mapped[User] = relationship(back_populates="vehicles")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="vehicle")
+    expenses: Mapped[list[Expense]] = relationship(back_populates="vehicle")
 
 
 class WorkSession(Base):
@@ -72,3 +74,36 @@ class WorkSession(Base):
     @property
     def gross_revenue(self) -> Decimal:
         return Decimal(self.gross_revenue_cents) / Decimal("100")
+
+
+class Expense(Base):
+    __tablename__ = "expenses"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    vehicle_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vehicles.id"),
+        nullable=True,
+        index=True,
+    )
+    expense_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(30), nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer(), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="expenses")
+    vehicle: Mapped[Vehicle | None] = relationship(back_populates="expenses")
+
+    @property
+    def amount(self) -> Decimal:
+        return Decimal(self.amount_cents) / Decimal("100")
