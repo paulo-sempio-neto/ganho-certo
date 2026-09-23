@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
 
 FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid", "other"]
+OwnershipType = Literal["owned", "financed", "rented"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -90,6 +91,67 @@ class VehiclePublic(VehicleBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VehicleCostProfileBase(BaseModel):
+    ownership_type: OwnershipType
+    rental_monthly: Decimal | None = Field(default=None, ge=Decimal("0"))
+    financing_monthly: Decimal | None = Field(default=None, ge=Decimal("0"))
+    insurance_monthly: Decimal | None = Field(default=None, ge=Decimal("0"))
+    ipva_annual: Decimal | None = Field(default=None, ge=Decimal("0"))
+    other_fixed_monthly: Decimal | None = Field(default=None, ge=Decimal("0"))
+    maintenance_per_km: Decimal | None = Field(default=None, ge=Decimal("0"))
+    tires_per_km: Decimal | None = Field(default=None, ge=Decimal("0"))
+    oil_per_km: Decimal | None = Field(default=None, ge=Decimal("0"))
+    depreciation_per_km: Decimal | None = Field(default=None, ge=Decimal("0"))
+    fuel_efficiency_km_per_liter: Decimal | None = Field(default=None, ge=Decimal("0"))
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class VehicleCostProfileUpdate(VehicleCostProfileBase):
+    pass
+
+
+class VehicleCostProfilePublic(VehicleCostProfileBase):
+    id: int
+    vehicle_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer(
+        "rental_monthly",
+        "financing_monthly",
+        "insurance_monthly",
+        "ipva_annual",
+        "other_fixed_monthly",
+    )
+    def serialize_money(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+    @field_serializer(
+        "maintenance_per_km",
+        "tires_per_km",
+        "oil_per_km",
+        "depreciation_per_km",
+    )
+    def serialize_per_km(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.4f}"
+
+    @field_serializer("fuel_efficiency_km_per_liter")
+    def serialize_fuel_efficiency(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
 
 
 class WorkSessionBase(BaseModel):

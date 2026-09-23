@@ -44,6 +44,75 @@ class Vehicle(Base):
     user: Mapped[User] = relationship(back_populates="vehicles")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="vehicle")
     expenses: Mapped[list[Expense]] = relationship(back_populates="vehicle")
+    cost_profile: Mapped[VehicleCostProfile | None] = relationship(
+        back_populates="vehicle",
+        uselist=False,
+    )
+
+
+class VehicleCostProfile(Base):
+    __tablename__ = "vehicle_cost_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    vehicle_id: Mapped[int] = mapped_column(
+        ForeignKey("vehicles.id"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    ownership_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    rental_monthly_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    financing_monthly_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    insurance_monthly_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    ipva_annual_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    other_fixed_monthly_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    maintenance_per_km: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    tires_per_km: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    oil_per_km: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    depreciation_per_km: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
+    fuel_efficiency_km_per_liter: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    vehicle: Mapped[Vehicle] = relationship(back_populates="cost_profile")
+
+    @staticmethod
+    def _cents_to_money(value: int | None) -> Decimal | None:
+        if value is None:
+            return None
+
+        return Decimal(value) / Decimal("100")
+
+    @property
+    def rental_monthly(self) -> Decimal | None:
+        return self._cents_to_money(self.rental_monthly_cents)
+
+    @property
+    def financing_monthly(self) -> Decimal | None:
+        return self._cents_to_money(self.financing_monthly_cents)
+
+    @property
+    def insurance_monthly(self) -> Decimal | None:
+        return self._cents_to_money(self.insurance_monthly_cents)
+
+    @property
+    def ipva_annual(self) -> Decimal | None:
+        return self._cents_to_money(self.ipva_annual_cents)
+
+    @property
+    def other_fixed_monthly(self) -> Decimal | None:
+        return self._cents_to_money(self.other_fixed_monthly_cents)
 
 
 class WorkSession(Base):
