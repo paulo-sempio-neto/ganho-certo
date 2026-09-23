@@ -7,6 +7,7 @@ const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 
 type AuthMode = "login" | "register";
 type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
+type DashboardPeriod = "today" | "last7" | "month" | "custom";
 
 type User = {
   id: number;
@@ -91,6 +92,29 @@ type ExpenseForm = {
   description: string;
 };
 
+type FinancialDailySummary = {
+  date: string;
+  gross_revenue: string;
+  expenses: string;
+  estimated_net_profit: string;
+};
+
+type FinancialSummary = {
+  gross_revenue: string;
+  total_expenses: string;
+  estimated_net_profit: string;
+  total_distance_km: string;
+  total_worked_minutes: number;
+  total_trip_count: number;
+  gross_per_hour: string | null;
+  net_per_hour: string | null;
+  gross_per_km: string | null;
+  net_per_km: string | null;
+  expense_per_km: string | null;
+  average_ticket: string | null;
+  daily: FinancialDailySummary[];
+};
+
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
   { label: "Gasolina", value: "gasoline" },
   { label: "Etanol", value: "ethanol" },
@@ -139,6 +163,35 @@ const emptyExpenseForm: ExpenseForm = {
   vehicle_id: "",
   description: "",
 };
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getPeriodDates(period: DashboardPeriod, customStartDate: string, customEndDate: string) {
+  const today = new Date();
+
+  if (period === "today") {
+    const todayValue = toDateInputValue(today);
+    return { startDate: todayValue, endDate: todayValue };
+  }
+
+  if (period === "last7") {
+    const start = new Date(today);
+    start.setDate(today.getDate() - 6);
+    return { startDate: toDateInputValue(start), endDate: toDateInputValue(today) };
+  }
+
+  if (period === "month") {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { startDate: toDateInputValue(start), endDate: toDateInputValue(today) };
+  }
+
+  return { startDate: customStartDate, endDate: customEndDate };
+}
 
 function getFuelLabel(value: FuelType): string {
   return fuelOptions.find((option) => option.value === value)?.label ?? value;
@@ -251,6 +304,7 @@ function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
@@ -258,12 +312,18 @@ function App() {
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
+  const [dashboardVehicleId, setDashboardVehicleId] = useState("");
+  const [customStartDate, setCustomStartDate] = useState(toDateInputValue(new Date()));
+  const [customEndDate, setCustomEndDate] = useState(toDateInputValue(new Date()));
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [dashboardError, setDashboardError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
   const [isExpensesLoading, setIsExpensesLoading] = useState(false);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
@@ -275,6 +335,7 @@ function App() {
     setVehicles([]);
     setWorkSessions([]);
     setExpenses([]);
+    setFinancialSummary(null);
     setEditingVehicleId(null);
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
@@ -284,6 +345,7 @@ function App() {
     setMode("login");
     setPassword("");
     setSuccessMessage("");
+    setDashboardError("");
     setMessage(nextMessage);
   }
 
@@ -294,6 +356,47 @@ function App() {
   function getVehicleLabel(vehicleId: number): string {
     const vehicle = vehicles.find((item) => item.id === vehicleId);
     return vehicle ? `${vehicle.name} · ${vehicle.brand} ${vehicle.model}` : "Veiculo removido";
+  }
+
+  function getMetricValue(value: string | null, formatter: (metric: string) => string): string {
+    return value === null ? "—" : formatter(value);
+  }
+
+  function getChartValue(value: string): number {
+    return Math.max(0, Number(value));
+  }
+
+  function getChartMax(summary: FinancialSummary): number {
+    const values = summary.daily.flatMap((dailyItem) => [
+      getChartValue(dailyItem.gross_revenue),
+      getChartValue(dailyItem.expenses),
+      getChartValue(dailyItem.estimated_net_profit),
+    ]);
+    return Math.max(...values, 1);
+  }
+
+  function buildFinancialSummaryPath() {
+    const params = new URLSearchParams();
+    const { startDate, endDate } = getPeriodDates(
+      dashboardPeriod,
+      customStartDate,
+      customEndDate,
+    );
+
+    if (startDate) {
+      params.set("start_date", startDate);
+    }
+
+    if (endDate) {
+      params.set("end_date", endDate);
+    }
+
+    if (dashboardVehicleId) {
+      params.set("vehicle_id", dashboardVehicleId);
+    }
+
+    const query = params.toString();
+    return `/financial-summary${query ? `?${query}` : ""}`;
   }
 
   async function loadVehicles(currentToken = token) {
@@ -366,12 +469,38 @@ function App() {
     }
   }
 
+  async function loadFinancialSummary(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsDashboardLoading(true);
+    setDashboardError("");
+    try {
+      const summary = await requestApi<FinancialSummary>(buildFinancialSummaryPath(), {
+        headers: getAuthHeaders(currentToken),
+      });
+      setFinancialSummary(summary);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setDashboardError(
+          error instanceof Error ? error.message : "Erro ao carregar resumo financeiro.",
+        );
+      }
+    } finally {
+      setIsDashboardLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!token) {
       setUser(null);
       setVehicles([]);
       setWorkSessions([]);
       setExpenses([]);
+      setFinancialSummary(null);
       return;
     }
 
@@ -385,6 +514,7 @@ function App() {
         await loadVehicles(token);
         await loadWorkSessions(token);
         await loadExpenses(token);
+        await loadFinancialSummary(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
       }
@@ -392,6 +522,14 @@ function App() {
 
     void loadSession();
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !user) {
+      return;
+    }
+
+    void loadFinancialSummary(token);
+  }, [dashboardPeriod, dashboardVehicleId, customStartDate, customEndDate]);
 
   function resetForm(nextMode: AuthMode) {
     setMode(nextMode);
@@ -527,6 +665,7 @@ function App() {
       await loadVehicles();
       await loadWorkSessions();
       await loadExpenses();
+      await loadFinancialSummary();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -597,6 +736,7 @@ function App() {
 
       resetWorkSessionForm();
       await loadWorkSessions();
+      await loadFinancialSummary();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -624,6 +764,7 @@ function App() {
       });
       setSuccessMessage("Jornada excluida com sucesso.");
       await loadWorkSessions();
+      await loadFinancialSummary();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -684,6 +825,7 @@ function App() {
 
       resetExpenseForm();
       await loadExpenses();
+      await loadFinancialSummary();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -711,6 +853,7 @@ function App() {
       });
       setSuccessMessage("Despesa excluida com sucesso.");
       await loadExpenses();
+      await loadFinancialSummary();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -755,7 +898,194 @@ function App() {
             {message ? <p className="form-message">{message}</p> : null}
             {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
-            <section className="manager-section">
+            <nav className="dashboard-nav" aria-label="Navegacao principal">
+              <a href="#dashboard">Dashboard</a>
+              <a href="#jornadas">Jornadas</a>
+              <a href="#despesas">Despesas</a>
+              <a href="#veiculos">Veículos</a>
+            </nav>
+
+            <section className="manager-section dashboard-section" id="dashboard">
+              <div className="section-title">
+                <p className="eyebrow">Dashboard</p>
+                <h3>Resumo financeiro</h3>
+                <p className="subtle-note">
+                  Lucro líquido estimado com base nas despesas registradas.
+                </p>
+              </div>
+
+              <div className="dashboard-filters">
+                <label>
+                  Período
+                  <select
+                    onChange={(event) => setDashboardPeriod(event.target.value as DashboardPeriod)}
+                    value={dashboardPeriod}
+                  >
+                    <option value="today">Hoje</option>
+                    <option value="last7">Últimos 7 dias</option>
+                    <option value="month">Este mês</option>
+                    <option value="custom">Personalizado</option>
+                  </select>
+                </label>
+
+                {dashboardPeriod === "custom" ? (
+                  <>
+                    <label>
+                      Início
+                      <input
+                        onChange={(event) => setCustomStartDate(event.target.value)}
+                        type="date"
+                        value={customStartDate}
+                      />
+                    </label>
+                    <label>
+                      Fim
+                      <input
+                        onChange={(event) => setCustomEndDate(event.target.value)}
+                        type="date"
+                        value={customEndDate}
+                      />
+                    </label>
+                  </>
+                ) : null}
+
+                <label>
+                  Veículo
+                  <select
+                    onChange={(event) => setDashboardVehicleId(event.target.value)}
+                    value={dashboardVehicleId}
+                  >
+                    <option value="">Todos</option>
+                    {vehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name} - {vehicle.brand} {vehicle.model}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {isDashboardLoading ? <p className="empty-state">Carregando dashboard...</p> : null}
+              {dashboardError ? <p className="form-message">{dashboardError}</p> : null}
+
+              {!isDashboardLoading && financialSummary ? (
+                <>
+                  <div className="metric-grid highlights">
+                    <article className="metric-card metric-profit">
+                      <span>Lucro líquido estimado</span>
+                      <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Faturamento bruto</span>
+                      <strong>{formatMoney(financialSummary.gross_revenue)}</strong>
+                    </article>
+                    <article className="metric-card metric-expense">
+                      <span>Despesas</span>
+                      <strong>{formatMoney(financialSummary.total_expenses)}</strong>
+                    </article>
+                  </div>
+
+                  <div className="metric-grid">
+                    <article className="metric-card">
+                      <span>Ganho bruto por hora</span>
+                      <strong>
+                        {getMetricValue(financialSummary.gross_per_hour, formatMoney)}
+                      </strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Ganho líquido por hora</span>
+                      <strong>{getMetricValue(financialSummary.net_per_hour, formatMoney)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Ganho bruto por km</span>
+                      <strong>{getMetricValue(financialSummary.gross_per_km, formatMoney)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Ganho líquido por km</span>
+                      <strong>{getMetricValue(financialSummary.net_per_km, formatMoney)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Custo por km</span>
+                      <strong>
+                        {getMetricValue(financialSummary.expense_per_km, formatMoney)}
+                      </strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Ticket médio</span>
+                      <strong>
+                        {getMetricValue(financialSummary.average_ticket, formatMoney)}
+                      </strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Total de corridas</span>
+                      <strong>{financialSummary.total_trip_count}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Horas trabalhadas</span>
+                      <strong>{formatWorkTime(financialSummary.total_worked_minutes)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Km rodados</span>
+                      <strong>{formatDistance(financialSummary.total_distance_km)} km</strong>
+                    </article>
+                  </div>
+
+                  <div className="daily-breakdown">
+                    <div className="list-header">
+                      <h3>Evolução diária</h3>
+                    </div>
+
+                    {financialSummary.daily.length === 0 ? (
+                      <p className="empty-state">Nenhum dado no período selecionado.</p>
+                    ) : (
+                      financialSummary.daily.map((dailyItem) => {
+                        const chartMax = getChartMax(financialSummary);
+                        return (
+                          <article className="daily-row" key={dailyItem.date}>
+                            <h4>{formatDate(dailyItem.date)}</h4>
+                            <div className="bar-line">
+                              <span>Faturamento</span>
+                              <div>
+                                <i
+                                  style={{
+                                    width: `${(getChartValue(dailyItem.gross_revenue) / chartMax) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <strong>{formatMoney(dailyItem.gross_revenue)}</strong>
+                            </div>
+                            <div className="bar-line expense-bar">
+                              <span>Despesas</span>
+                              <div>
+                                <i
+                                  style={{
+                                    width: `${(getChartValue(dailyItem.expenses) / chartMax) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <strong>{formatMoney(dailyItem.expenses)}</strong>
+                            </div>
+                            <div className="bar-line profit-bar">
+                              <span>Lucro est.</span>
+                              <div>
+                                <i
+                                  style={{
+                                    width: `${(getChartValue(dailyItem.estimated_net_profit) / chartMax) * 100}%`,
+                                  }}
+                                />
+                              </div>
+                              <strong>{formatMoney(dailyItem.estimated_net_profit)}</strong>
+                            </div>
+                          </article>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </section>
+
+            <section className="manager-section" id="jornadas">
               <div className="section-title">
                 <p className="eyebrow">Jornadas</p>
                 <h3>Registro diario de trabalho</h3>
@@ -996,7 +1326,7 @@ function App() {
               </div>
             </section>
 
-            <section className="manager-section">
+            <section className="manager-section" id="despesas">
               <div className="section-title">
                 <p className="eyebrow">Despesas</p>
                 <h3>Custos da operação</h3>
@@ -1190,7 +1520,7 @@ function App() {
               </div>
             </section>
 
-            <section className="manager-section">
+            <section className="manager-section" id="veiculos">
               <div className="section-title">
                 <p className="eyebrow">Veículos</p>
                 <h3>Carros disponíveis para jornadas</h3>
