@@ -254,6 +254,24 @@ select:focus {
   padding-top: 24px;
 }
 
+.manager-section {
+  display: grid;
+  gap: 18px;
+  border-top: 1px solid #e4e8e1;
+  padding-top: 24px;
+}
+
+.section-title {
+  display: grid;
+  gap: 4px;
+}
+
+.section-title h3 {
+  margin: 0;
+  color: #111812;
+  font-size: 1.35rem;
+}
+
 .vehicle-form {
   align-content: start;
 }
@@ -269,6 +287,10 @@ select:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+}
+
+.form-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .form-actions {
@@ -337,6 +359,40 @@ select:focus {
   gap: 12px;
 }
 
+.session-card {
+  align-items: stretch;
+}
+
+.session-card > div:first-child {
+  width: 100%;
+}
+
+.session-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.session-metrics div {
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.session-metrics dt {
+  color: #677069;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.session-metrics dd {
+  margin: 4px 0 0;
+  color: #18201a;
+  font-weight: 800;
+}
+
 @media (max-width: 860px) {
   .page {
     grid-template-columns: 1fr;
@@ -346,7 +402,9 @@ select:focus {
 
   .vehicles-layout,
   .user-data,
-  .form-grid {
+  .form-grid,
+  .form-grid-three,
+  .session-metrics {
     grid-template-columns: 1fr;
   }
 

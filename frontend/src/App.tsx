@@ -30,12 +30,34 @@ type Vehicle = {
   created_at: string;
 };
 
+type WorkSession = {
+  id: number;
+  vehicle_id: number;
+  work_date: string;
+  gross_revenue: string;
+  distance_km: string;
+  worked_minutes: number;
+  trip_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type VehicleForm = {
   name: string;
   brand: string;
   model: string;
   year: string;
   fuel_type: FuelType;
+};
+
+type WorkSessionForm = {
+  work_date: string;
+  vehicle_id: string;
+  gross_revenue: string;
+  distance_km: string;
+  worked_hours: string;
+  worked_minutes: string;
+  trip_count: string;
 };
 
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
@@ -54,6 +76,16 @@ const emptyVehicleForm: VehicleForm = {
   model: "",
   year: "",
   fuel_type: "flex",
+};
+
+const emptyWorkSessionForm: WorkSessionForm = {
+  work_date: new Date().toISOString().slice(0, 10),
+  vehicle_id: "",
+  gross_revenue: "",
+  distance_km: "",
+  worked_hours: "",
+  worked_minutes: "",
+  trip_count: "",
 };
 
 function getFuelLabel(value: FuelType): string {
@@ -78,6 +110,49 @@ function getErrorMessage(status: number): string {
   }
 
   return "Nao foi possivel concluir a solicitacao.";
+}
+
+function normalizeDecimalInput(value: string): string {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error("Verifique os campos numericos informados.");
+  }
+
+  return normalized;
+}
+
+function moneyInputToApi(value: string): string {
+  const cleaned = value.trim().replace(/R\$/gi, "").replace(/\s/g, "").replace(/\./g, "");
+  const normalized = cleaned.replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+    throw new Error("Informe o faturamento em reais, por exemplo 250,50.");
+  }
+
+  const [reais, cents = ""] = normalized.split(".");
+  const safeReais = reais.replace(/^0+(?=\d)/, "") || "0";
+  const safeCents = `${cents}00`.slice(0, 2);
+  return `${safeReais}.${safeCents}`;
+}
+
+function formatMoney(value: string): string {
+  const [reais, cents = "00"] = value.split(".");
+  const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `R$ ${groupedReais},${`${cents}00`.slice(0, 2)}`;
+}
+
+function formatDistance(value: string): string {
+  return value.replace(".", ",");
+}
+
+function formatWorkTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h ${minutes.toString().padStart(2, "0")}min`;
+}
+
+function formatDate(value: string): string {
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -118,21 +193,30 @@ function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY));
   const [user, setUser] = useState<User | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
+  const [workSessionForm, setWorkSessionForm] =
+    useState<WorkSessionForm>(emptyWorkSessionForm);
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
+  const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
+  const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
+  const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
     setVehicles([]);
+    setWorkSessions([]);
     setEditingVehicleId(null);
+    setEditingWorkSessionId(null);
     setVehicleForm(emptyVehicleForm);
+    setWorkSessionForm(emptyWorkSessionForm);
     setMode("login");
     setPassword("");
     setSuccessMessage("");
@@ -141,6 +225,11 @@ function App() {
 
   function getAuthHeaders(currentToken = token): HeadersInit {
     return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
+  }
+
+  function getVehicleLabel(vehicleId: number): string {
+    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    return vehicle ? `${vehicle.name} · ${vehicle.brand} ${vehicle.model}` : "Veiculo removido";
   }
 
   async function loadVehicles(currentToken = token) {
@@ -154,6 +243,10 @@ function App() {
         headers: getAuthHeaders(currentToken),
       });
       setVehicles(nextVehicles);
+      setWorkSessionForm((currentForm) => ({
+        ...currentForm,
+        vehicle_id: currentForm.vehicle_id || String(nextVehicles[0]?.id ?? ""),
+      }));
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -165,10 +258,33 @@ function App() {
     }
   }
 
+  async function loadWorkSessions(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsWorkSessionsLoading(true);
+    try {
+      const nextWorkSessions = await requestApi<WorkSession[]>("/work-sessions", {
+        headers: getAuthHeaders(currentToken),
+      });
+      setWorkSessions(nextWorkSessions);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao carregar jornadas.");
+      }
+    } finally {
+      setIsWorkSessionsLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!token) {
       setUser(null);
       setVehicles([]);
+      setWorkSessions([]);
       return;
     }
 
@@ -180,6 +296,7 @@ function App() {
         setUser(currentUser);
         setMessage("");
         await loadVehicles(token);
+        await loadWorkSessions(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
       }
@@ -320,11 +437,109 @@ function App() {
       });
       setSuccessMessage("Veiculo excluido com sucesso.");
       await loadVehicles();
+      await loadWorkSessions();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
       } else {
         setMessage(error instanceof Error ? error.message : "Erro ao excluir veiculo.");
+      }
+    }
+  }
+
+  function resetWorkSessionForm() {
+    setEditingWorkSessionId(null);
+    setWorkSessionForm({
+      ...emptyWorkSessionForm,
+      vehicle_id: String(vehicles[0]?.id ?? ""),
+    });
+  }
+
+  function handleEditWorkSession(workSession: WorkSession) {
+    setEditingWorkSessionId(workSession.id);
+    setWorkSessionForm({
+      work_date: workSession.work_date,
+      vehicle_id: String(workSession.vehicle_id),
+      gross_revenue: formatMoney(workSession.gross_revenue).replace("R$ ", ""),
+      distance_km: formatDistance(workSession.distance_km),
+      worked_hours: String(Math.floor(workSession.worked_minutes / 60)),
+      worked_minutes: String(workSession.worked_minutes % 60),
+      trip_count: String(workSession.trip_count),
+    });
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  async function handleWorkSessionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsWorkSessionSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    const workedHours = Number(workSessionForm.worked_hours || "0");
+    const workedMinutes = Number(workSessionForm.worked_minutes || "0");
+    const totalWorkedMinutes = workedHours * 60 + workedMinutes;
+
+    try {
+      const payload = {
+        vehicle_id: Number(workSessionForm.vehicle_id),
+        work_date: workSessionForm.work_date,
+        gross_revenue: moneyInputToApi(workSessionForm.gross_revenue),
+        distance_km: normalizeDecimalInput(workSessionForm.distance_km),
+        worked_minutes: totalWorkedMinutes,
+        trip_count: Number(workSessionForm.trip_count),
+      };
+
+      if (editingWorkSessionId) {
+        await requestApi<WorkSession>(`/work-sessions/${editingWorkSessionId}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Jornada atualizada com sucesso.");
+      } else {
+        await requestApi<WorkSession>("/work-sessions", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Jornada cadastrada com sucesso.");
+      }
+
+      resetWorkSessionForm();
+      await loadWorkSessions();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao salvar jornada.");
+      }
+    } finally {
+      setIsWorkSessionSaving(false);
+    }
+  }
+
+  async function handleDeleteWorkSession(workSession: WorkSession) {
+    const shouldDelete = window.confirm(`Excluir a jornada de ${formatDate(workSession.work_date)}?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<void>(`/work-sessions/${workSession.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setSuccessMessage("Jornada excluida com sucesso.");
+      await loadWorkSessions();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao excluir jornada.");
       }
     }
   }
@@ -361,161 +576,411 @@ function App() {
               </div>
             </dl>
 
-            <div className="vehicles-layout">
-              <form className="auth-form vehicle-form" onSubmit={handleVehicleSubmit}>
-                <h3>{editingVehicleId ? "Editar veiculo" : "Cadastrar veiculo"}</h3>
+            {message ? <p className="form-message">{message}</p> : null}
+            {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
-                <label>
-                  Nome
-                  <input
-                    name="vehicle-name"
-                    onChange={(event) =>
-                      setVehicleForm({ ...vehicleForm, name: event.target.value })
-                    }
-                    required
-                    type="text"
-                    value={vehicleForm.name}
-                  />
-                </label>
-
-                <div className="form-grid">
-                  <label>
-                    Marca
-                    <input
-                      name="brand"
-                      onChange={(event) =>
-                        setVehicleForm({ ...vehicleForm, brand: event.target.value })
-                      }
-                      required
-                      type="text"
-                      value={vehicleForm.brand}
-                    />
-                  </label>
-
-                  <label>
-                    Modelo
-                    <input
-                      name="model"
-                      onChange={(event) =>
-                        setVehicleForm({ ...vehicleForm, model: event.target.value })
-                      }
-                      required
-                      type="text"
-                      value={vehicleForm.model}
-                    />
-                  </label>
-                </div>
-
-                <div className="form-grid">
-                  <label>
-                    Ano
-                    <input
-                      max="2100"
-                      min="1900"
-                      name="year"
-                      onChange={(event) =>
-                        setVehicleForm({ ...vehicleForm, year: event.target.value })
-                      }
-                      required
-                      type="number"
-                      value={vehicleForm.year}
-                    />
-                  </label>
-
-                  <label>
-                    Combustivel
-                    <select
-                      name="fuel-type"
-                      onChange={(event) =>
-                        setVehicleForm({
-                          ...vehicleForm,
-                          fuel_type: event.target.value as FuelType,
-                        })
-                      }
-                      value={vehicleForm.fuel_type}
-                    >
-                      {fuelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="form-actions">
-                  <button className="button" disabled={isVehicleSaving} type="submit">
-                    {isVehicleSaving
-                      ? "Salvando..."
-                      : editingVehicleId
-                        ? "Salvar alteracoes"
-                        : "Cadastrar veiculo"}
-                  </button>
-                  {editingVehicleId ? (
-                    <button
-                      className="button button-ghost"
-                      type="button"
-                      onClick={resetVehicleForm}
-                    >
-                      Cancelar
-                    </button>
-                  ) : null}
-                </div>
-              </form>
-
-              <div className="vehicles-list" aria-busy={isVehiclesLoading}>
-                <div className="list-header">
-                  <h3>Meus veiculos</h3>
-                  <button
-                    className="text-button"
-                    disabled={isVehiclesLoading}
-                    type="button"
-                    onClick={() => void loadVehicles()}
-                  >
-                    Atualizar
-                  </button>
-                </div>
-
-                {message ? <p className="form-message">{message}</p> : null}
-                {successMessage ? <p className="success-message">{successMessage}</p> : null}
-
-                {isVehiclesLoading ? <p className="empty-state">Carregando veiculos...</p> : null}
-
-                {!isVehiclesLoading && vehicles.length === 0 ? (
-                  <p className="empty-state">
-                    Nenhum veiculo cadastrado ainda. Adicione o carro que voce usa para dirigir.
-                  </p>
-                ) : null}
-
-                {vehicles.map((vehicle) => (
-                  <article className="vehicle-card" key={vehicle.id}>
-                    <div>
-                      <h4>{vehicle.name}</h4>
-                      <p>
-                        {vehicle.brand} {vehicle.model} · {vehicle.year}
-                      </p>
-                      <span>{getFuelLabel(vehicle.fuel_type)}</span>
-                    </div>
-                    <div className="card-actions">
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() => handleEditVehicle(vehicle)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className="text-button danger"
-                        type="button"
-                        onClick={() => void handleDeleteVehicle(vehicle)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </article>
-                ))}
+            <section className="manager-section">
+              <div className="section-title">
+                <p className="eyebrow">Jornadas</p>
+                <h3>Registro diario de trabalho</h3>
               </div>
-            </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleWorkSessionSubmit}>
+                  <h3>{editingWorkSessionId ? "Editar jornada" : "Cadastrar jornada"}</h3>
+
+                  <div className="form-grid">
+                    <label>
+                      Data
+                      <input
+                        name="work-date"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            work_date: event.target.value,
+                          })
+                        }
+                        required
+                        type="date"
+                        value={workSessionForm.work_date}
+                      />
+                    </label>
+
+                    <label>
+                      Veículo
+                      <select
+                        name="work-vehicle"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            vehicle_id: event.target.value,
+                          })
+                        }
+                        required
+                        value={workSessionForm.vehicle_id}
+                      >
+                        <option value="">Selecione</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Faturamento bruto
+                      <input
+                        inputMode="decimal"
+                        name="gross-revenue"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            gross_revenue: event.target.value,
+                          })
+                        }
+                        placeholder="250,50"
+                        required
+                        type="text"
+                        value={workSessionForm.gross_revenue}
+                      />
+                    </label>
+
+                    <label>
+                      Km rodados
+                      <input
+                        inputMode="decimal"
+                        name="distance-km"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            distance_km: event.target.value,
+                          })
+                        }
+                        placeholder="87,5"
+                        required
+                        type="text"
+                        value={workSessionForm.distance_km}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid form-grid-three">
+                    <label>
+                      Horas trabalhadas
+                      <input
+                        min="0"
+                        name="worked-hours"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            worked_hours: event.target.value,
+                          })
+                        }
+                        required
+                        type="number"
+                        value={workSessionForm.worked_hours}
+                      />
+                    </label>
+
+                    <label>
+                      Minutos trabalhados
+                      <input
+                        max="59"
+                        min="0"
+                        name="worked-minutes"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            worked_minutes: event.target.value,
+                          })
+                        }
+                        required
+                        type="number"
+                        value={workSessionForm.worked_minutes}
+                      />
+                    </label>
+
+                    <label>
+                      Número de corridas
+                      <input
+                        min="0"
+                        name="trip-count"
+                        onChange={(event) =>
+                          setWorkSessionForm({
+                            ...workSessionForm,
+                            trip_count: event.target.value,
+                          })
+                        }
+                        required
+                        type="number"
+                        value={workSessionForm.trip_count}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-actions">
+                    <button
+                      className="button"
+                      disabled={isWorkSessionSaving || vehicles.length === 0}
+                      type="submit"
+                    >
+                      {isWorkSessionSaving
+                        ? "Salvando..."
+                        : editingWorkSessionId
+                          ? "Salvar jornada"
+                          : "Cadastrar jornada"}
+                    </button>
+                    {editingWorkSessionId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetWorkSessionForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isWorkSessionsLoading}>
+                  <div className="list-header">
+                    <h3>Minhas jornadas</h3>
+                    <button
+                      className="text-button"
+                      disabled={isWorkSessionsLoading}
+                      type="button"
+                      onClick={() => void loadWorkSessions()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isWorkSessionsLoading ? (
+                    <p className="empty-state">Carregando jornadas...</p>
+                  ) : null}
+
+                  {!isWorkSessionsLoading && vehicles.length === 0 ? (
+                    <p className="empty-state">
+                      Cadastre um veículo antes de registrar sua primeira jornada.
+                    </p>
+                  ) : null}
+
+                  {!isWorkSessionsLoading && vehicles.length > 0 && workSessions.length === 0 ? (
+                    <p className="empty-state">
+                      Nenhuma jornada registrada ainda. Adicione seu dia de trabalho.
+                    </p>
+                  ) : null}
+
+                  {workSessions.map((workSession) => (
+                    <article className="vehicle-card session-card" key={workSession.id}>
+                      <div>
+                        <h4>{formatDate(workSession.work_date)}</h4>
+                        <p>{getVehicleLabel(workSession.vehicle_id)}</p>
+                        <dl className="session-metrics">
+                          <div>
+                            <dt>Faturamento</dt>
+                            <dd>{formatMoney(workSession.gross_revenue)}</dd>
+                          </div>
+                          <div>
+                            <dt>Km</dt>
+                            <dd>{formatDistance(workSession.distance_km)}</dd>
+                          </div>
+                          <div>
+                            <dt>Tempo</dt>
+                            <dd>{formatWorkTime(workSession.worked_minutes)}</dd>
+                          </div>
+                          <div>
+                            <dt>Corridas</dt>
+                            <dd>{workSession.trip_count}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                      <div className="card-actions">
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => handleEditWorkSession(workSession)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={() => void handleDeleteWorkSession(workSession)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-section">
+              <div className="section-title">
+                <p className="eyebrow">Veículos</p>
+                <h3>Carros disponíveis para jornadas</h3>
+              </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleVehicleSubmit}>
+                  <h3>{editingVehicleId ? "Editar veiculo" : "Cadastrar veiculo"}</h3>
+
+                  <label>
+                    Nome
+                    <input
+                      name="vehicle-name"
+                      onChange={(event) =>
+                        setVehicleForm({ ...vehicleForm, name: event.target.value })
+                      }
+                      required
+                      type="text"
+                      value={vehicleForm.name}
+                    />
+                  </label>
+
+                  <div className="form-grid">
+                    <label>
+                      Marca
+                      <input
+                        name="brand"
+                        onChange={(event) =>
+                          setVehicleForm({ ...vehicleForm, brand: event.target.value })
+                        }
+                        required
+                        type="text"
+                        value={vehicleForm.brand}
+                      />
+                    </label>
+
+                    <label>
+                      Modelo
+                      <input
+                        name="model"
+                        onChange={(event) =>
+                          setVehicleForm({ ...vehicleForm, model: event.target.value })
+                        }
+                        required
+                        type="text"
+                        value={vehicleForm.model}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Ano
+                      <input
+                        max="2100"
+                        min="1900"
+                        name="year"
+                        onChange={(event) =>
+                          setVehicleForm({ ...vehicleForm, year: event.target.value })
+                        }
+                        required
+                        type="number"
+                        value={vehicleForm.year}
+                      />
+                    </label>
+
+                    <label>
+                      Combustivel
+                      <select
+                        name="fuel-type"
+                        onChange={(event) =>
+                          setVehicleForm({
+                            ...vehicleForm,
+                            fuel_type: event.target.value as FuelType,
+                          })
+                        }
+                        value={vehicleForm.fuel_type}
+                      >
+                        {fuelOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isVehicleSaving} type="submit">
+                      {isVehicleSaving
+                        ? "Salvando..."
+                        : editingVehicleId
+                          ? "Salvar alteracoes"
+                          : "Cadastrar veiculo"}
+                    </button>
+                    {editingVehicleId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetVehicleForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isVehiclesLoading}>
+                  <div className="list-header">
+                    <h3>Meus veiculos</h3>
+                    <button
+                      className="text-button"
+                      disabled={isVehiclesLoading}
+                      type="button"
+                      onClick={() => void loadVehicles()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isVehiclesLoading ? (
+                    <p className="empty-state">Carregando veiculos...</p>
+                  ) : null}
+
+                  {!isVehiclesLoading && vehicles.length === 0 ? (
+                    <p className="empty-state">
+                      Nenhum veiculo cadastrado ainda. Adicione o carro que voce usa para dirigir.
+                    </p>
+                  ) : null}
+
+                  {vehicles.map((vehicle) => (
+                    <article className="vehicle-card" key={vehicle.id}>
+                      <div>
+                        <h4>{vehicle.name}</h4>
+                        <p>
+                          {vehicle.brand} {vehicle.model} · {vehicle.year}
+                        </p>
+                        <span>{getFuelLabel(vehicle.fuel_type)}</span>
+                      </div>
+                      <div className="card-actions">
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => handleEditVehicle(vehicle)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={() => void handleDeleteVehicle(vehicle)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
           </div>
         ) : (
           <>
