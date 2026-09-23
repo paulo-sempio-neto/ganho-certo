@@ -393,6 +393,17 @@ select:focus {
   font-weight: 800;
 }
 
+.expense-metrics {
+  grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
+}
+
+.expense-description {
+  margin: 12px 0 0;
+  border-left: 3px solid #cbd3ca;
+  color: #465048;
+  padding-left: 10px;
+}
+
 @media (max-width: 860px) {
   .page {
     grid-template-columns: 1fr;

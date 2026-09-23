@@ -42,6 +42,29 @@ type WorkSession = {
   updated_at: string;
 };
 
+type ExpenseCategory =
+  | "fuel"
+  | "charging"
+  | "maintenance"
+  | "parking"
+  | "toll"
+  | "insurance"
+  | "rental"
+  | "financing"
+  | "washing"
+  | "other";
+
+type Expense = {
+  id: number;
+  vehicle_id: number | null;
+  expense_date: string;
+  category: ExpenseCategory;
+  amount: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type VehicleForm = {
   name: string;
   brand: string;
@@ -60,6 +83,14 @@ type WorkSessionForm = {
   trip_count: string;
 };
 
+type ExpenseForm = {
+  expense_date: string;
+  category: ExpenseCategory;
+  amount: string;
+  vehicle_id: string;
+  description: string;
+};
+
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
   { label: "Gasolina", value: "gasoline" },
   { label: "Etanol", value: "ethanol" },
@@ -68,6 +99,19 @@ const fuelOptions: Array<{ label: string; value: FuelType }> = [
   { label: "Elétrico", value: "electric" },
   { label: "Híbrido", value: "hybrid" },
   { label: "Outro", value: "other" },
+];
+
+const expenseCategoryOptions: Array<{ label: string; value: ExpenseCategory }> = [
+  { label: "Combustível", value: "fuel" },
+  { label: "Recarga elétrica", value: "charging" },
+  { label: "Manutenção", value: "maintenance" },
+  { label: "Estacionamento", value: "parking" },
+  { label: "Pedágio", value: "toll" },
+  { label: "Seguro", value: "insurance" },
+  { label: "Aluguel", value: "rental" },
+  { label: "Financiamento", value: "financing" },
+  { label: "Lavagem", value: "washing" },
+  { label: "Outros", value: "other" },
 ];
 
 const emptyVehicleForm: VehicleForm = {
@@ -88,8 +132,20 @@ const emptyWorkSessionForm: WorkSessionForm = {
   trip_count: "",
 };
 
+const emptyExpenseForm: ExpenseForm = {
+  expense_date: new Date().toISOString().slice(0, 10),
+  category: "fuel",
+  amount: "",
+  vehicle_id: "",
+  description: "",
+};
+
 function getFuelLabel(value: FuelType): string {
   return fuelOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function getExpenseCategoryLabel(value: ExpenseCategory): string {
+  return expenseCategoryOptions.find((option) => option.value === value)?.label ?? value;
 }
 
 function getErrorMessage(status: number): string {
@@ -194,18 +250,23 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
+  const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
+  const [isExpensesLoading, setIsExpensesLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
+  const [isExpenseSaving, setIsExpenseSaving] = useState(false);
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -213,10 +274,13 @@ function App() {
     setUser(null);
     setVehicles([]);
     setWorkSessions([]);
+    setExpenses([]);
     setEditingVehicleId(null);
     setEditingWorkSessionId(null);
+    setEditingExpenseId(null);
     setVehicleForm(emptyVehicleForm);
     setWorkSessionForm(emptyWorkSessionForm);
+    setExpenseForm(emptyExpenseForm);
     setMode("login");
     setPassword("");
     setSuccessMessage("");
@@ -280,11 +344,34 @@ function App() {
     }
   }
 
+  async function loadExpenses(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsExpensesLoading(true);
+    try {
+      const nextExpenses = await requestApi<Expense[]>("/expenses", {
+        headers: getAuthHeaders(currentToken),
+      });
+      setExpenses(nextExpenses);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao carregar despesas.");
+      }
+    } finally {
+      setIsExpensesLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!token) {
       setUser(null);
       setVehicles([]);
       setWorkSessions([]);
+      setExpenses([]);
       return;
     }
 
@@ -297,6 +384,7 @@ function App() {
         setMessage("");
         await loadVehicles(token);
         await loadWorkSessions(token);
+        await loadExpenses(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
       }
@@ -438,6 +526,7 @@ function App() {
       setSuccessMessage("Veiculo excluido com sucesso.");
       await loadVehicles();
       await loadWorkSessions();
+      await loadExpenses();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -540,6 +629,93 @@ function App() {
         endSession(error.message);
       } else {
         setMessage(error instanceof Error ? error.message : "Erro ao excluir jornada.");
+      }
+    }
+  }
+
+  function resetExpenseForm() {
+    setEditingExpenseId(null);
+    setExpenseForm(emptyExpenseForm);
+  }
+
+  function handleEditExpense(expense: Expense) {
+    setEditingExpenseId(expense.id);
+    setExpenseForm({
+      expense_date: expense.expense_date,
+      category: expense.category,
+      amount: formatMoney(expense.amount).replace("R$ ", ""),
+      vehicle_id: expense.vehicle_id ? String(expense.vehicle_id) : "",
+      description: expense.description ?? "",
+    });
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  async function handleExpenseSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsExpenseSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = {
+        expense_date: expenseForm.expense_date,
+        category: expenseForm.category,
+        amount: moneyInputToApi(expenseForm.amount),
+        description: expenseForm.description.trim() || null,
+        ...(expenseForm.vehicle_id ? { vehicle_id: Number(expenseForm.vehicle_id) } : {}),
+      };
+
+      if (editingExpenseId) {
+        await requestApi<Expense>(`/expenses/${editingExpenseId}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Despesa atualizada com sucesso.");
+      } else {
+        await requestApi<Expense>("/expenses", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Despesa cadastrada com sucesso.");
+      }
+
+      resetExpenseForm();
+      await loadExpenses();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao salvar despesa.");
+      }
+    } finally {
+      setIsExpenseSaving(false);
+    }
+  }
+
+  async function handleDeleteExpense(expense: Expense) {
+    const shouldDelete = window.confirm(`Excluir a despesa de ${formatDate(expense.expense_date)}?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<void>(`/expenses/${expense.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setSuccessMessage("Despesa excluida com sucesso.");
+      await loadExpenses();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao excluir despesa.");
       }
     }
   }
@@ -810,6 +986,200 @@ function App() {
                           className="text-button danger"
                           type="button"
                           onClick={() => void handleDeleteWorkSession(workSession)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-section">
+              <div className="section-title">
+                <p className="eyebrow">Despesas</p>
+                <h3>Custos da operação</h3>
+              </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleExpenseSubmit}>
+                  <h3>{editingExpenseId ? "Editar despesa" : "Cadastrar despesa"}</h3>
+
+                  <div className="form-grid">
+                    <label>
+                      Data
+                      <input
+                        name="expense-date"
+                        onChange={(event) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            expense_date: event.target.value,
+                          })
+                        }
+                        required
+                        type="date"
+                        value={expenseForm.expense_date}
+                      />
+                    </label>
+
+                    <label>
+                      Categoria
+                      <select
+                        name="expense-category"
+                        onChange={(event) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            category: event.target.value as ExpenseCategory,
+                          })
+                        }
+                        required
+                        value={expenseForm.category}
+                      >
+                        {expenseCategoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Valor
+                      <input
+                        inputMode="decimal"
+                        name="expense-amount"
+                        onChange={(event) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            amount: event.target.value,
+                          })
+                        }
+                        placeholder="89,90"
+                        required
+                        type="text"
+                        value={expenseForm.amount}
+                      />
+                    </label>
+
+                    <label>
+                      Veículo
+                      <select
+                        name="expense-vehicle"
+                        onChange={(event) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            vehicle_id: event.target.value,
+                          })
+                        }
+                        value={expenseForm.vehicle_id}
+                      >
+                        <option value="">Sem veículo</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <label>
+                    Descrição
+                    <input
+                      maxLength={255}
+                      name="expense-description"
+                      onChange={(event) =>
+                        setExpenseForm({
+                          ...expenseForm,
+                          description: event.target.value,
+                        })
+                      }
+                      placeholder="Opcional"
+                      type="text"
+                      value={expenseForm.description}
+                    />
+                  </label>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isExpenseSaving} type="submit">
+                      {isExpenseSaving
+                        ? "Salvando..."
+                        : editingExpenseId
+                          ? "Salvar despesa"
+                          : "Cadastrar despesa"}
+                    </button>
+                    {editingExpenseId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetExpenseForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isExpensesLoading}>
+                  <div className="list-header">
+                    <h3>Minhas despesas</h3>
+                    <button
+                      className="text-button"
+                      disabled={isExpensesLoading}
+                      type="button"
+                      onClick={() => void loadExpenses()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isExpensesLoading ? <p className="empty-state">Carregando despesas...</p> : null}
+
+                  {!isExpensesLoading && expenses.length === 0 ? (
+                    <p className="empty-state">
+                      Nenhuma despesa registrada ainda. Adicione combustível, manutenção e outros
+                      custos conforme eles acontecerem.
+                    </p>
+                  ) : null}
+
+                  {expenses.map((expense) => (
+                    <article className="vehicle-card session-card" key={expense.id}>
+                      <div>
+                        <h4>{formatDate(expense.expense_date)}</h4>
+                        <p>{getExpenseCategoryLabel(expense.category)}</p>
+                        <dl className="session-metrics expense-metrics">
+                          <div>
+                            <dt>Valor</dt>
+                            <dd>{formatMoney(expense.amount)}</dd>
+                          </div>
+                          <div>
+                            <dt>Veículo</dt>
+                            <dd>
+                              {expense.vehicle_id
+                                ? getVehicleLabel(expense.vehicle_id)
+                                : "Sem veículo"}
+                            </dd>
+                          </div>
+                        </dl>
+                        {expense.description ? (
+                          <p className="expense-description">{expense.description}</p>
+                        ) : null}
+                      </div>
+                      <div className="card-actions">
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => handleEditExpense(expense)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={() => void handleDeleteExpense(expense)}
                         >
                           Excluir
                         </button>
