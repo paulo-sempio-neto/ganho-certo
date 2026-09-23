@@ -20,7 +20,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -31,6 +32,11 @@ input {
   gap: 56px;
   align-items: center;
   padding: 48px;
+}
+
+.page-dashboard {
+  grid-template-columns: minmax(280px, 0.6fr) minmax(0, 1.4fr);
+  align-items: start;
 }
 
 .intro {
@@ -67,6 +73,10 @@ h1 {
   background: #ffffff;
   box-shadow: 0 24px 60px rgb(29 39 31 / 10%);
   padding: 28px;
+}
+
+.vehicle-panel {
+  max-height: none;
 }
 
 .tabs {
@@ -116,7 +126,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 48px;
   border: 1px solid #cbd3ca;
@@ -127,7 +138,8 @@ input {
   outline: none;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: #26734d;
   box-shadow: 0 0 0 3px rgb(38 115 77 / 16%);
 }
@@ -151,11 +163,44 @@ input:focus {
   background: #18201a;
 }
 
+.button-ghost {
+  border: 1px solid #cbd3ca;
+  background: #ffffff;
+  color: #18201a;
+}
+
+.text-button {
+  border: 0;
+  background: transparent;
+  color: #26734d;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0;
+}
+
+.text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.danger {
+  color: #a33a2b;
+}
+
 .form-message {
   margin: 0;
   border-radius: 6px;
   background: #fff4df;
   color: #76510d;
+  padding: 12px 14px;
+  line-height: 1.4;
+}
+
+.success-message {
+  margin: 0;
+  border-radius: 6px;
+  background: #edf8ef;
+  color: #21643f;
   padding: 12px 14px;
   line-height: 1.4;
 }
@@ -171,6 +216,7 @@ input:focus {
 
 .user-data {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
 }
@@ -193,10 +239,123 @@ input:focus {
   overflow-wrap: anywhere;
 }
 
+.session-header {
+  display: flex;
+  gap: 16px;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.vehicles-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  border-top: 1px solid #e4e8e1;
+  padding-top: 24px;
+}
+
+.vehicle-form {
+  align-content: start;
+}
+
+.vehicle-form h3,
+.vehicles-list h3 {
+  margin: 0;
+  color: #111812;
+  font-size: 1.15rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.vehicles-list {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.list-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.empty-state {
+  margin: 0;
+  border: 1px dashed #cbd3ca;
+  border-radius: 8px;
+  color: #58625a;
+  padding: 18px;
+  line-height: 1.45;
+}
+
+.vehicle-card {
+  display: flex;
+  gap: 16px;
+  align-items: start;
+  justify-content: space-between;
+  border: 1px solid #e4e8e1;
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 16px;
+}
+
+.vehicle-card h4 {
+  margin: 0;
+  color: #111812;
+  font-size: 1rem;
+}
+
+.vehicle-card p {
+  margin: 6px 0 10px;
+  color: #465048;
+  line-height: 1.4;
+}
+
+.vehicle-card span {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #eef3ed;
+  color: #26734d;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 10px;
+}
+
+.card-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
 @media (max-width: 860px) {
   .page {
     grid-template-columns: 1fr;
     gap: 36px;
     padding: 32px 20px;
+  }
+
+  .vehicles-layout,
+  .user-data,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .session-header,
+  .vehicle-card {
+    flex-direction: column;
+  }
+
+  .session-header .button {
+    width: 100%;
   }
 }
