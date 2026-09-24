@@ -235,10 +235,38 @@ class FinancialDailySummary(BaseModel):
         return f"{value:.2f}"
 
 
+class FinancialStructuralCosts(BaseModel):
+    ownership: Decimal
+    insurance: Decimal
+    ipva: Decimal
+    other_fixed: Decimal
+    maintenance: Decimal
+    tires: Decimal
+    oil: Decimal
+    depreciation: Decimal
+
+    @field_serializer(
+        "ownership",
+        "insurance",
+        "ipva",
+        "other_fixed",
+        "maintenance",
+        "tires",
+        "oil",
+        "depreciation",
+    )
+    def serialize_money(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
 class FinancialSummary(BaseModel):
     gross_revenue: Decimal
     total_expenses: Decimal
     estimated_net_profit: Decimal
+    estimated_structural_costs: Decimal
+    estimated_economic_costs: Decimal
+    estimated_economic_result: Decimal
+    structural_costs: FinancialStructuralCosts
     total_distance_km: Decimal
     total_worked_minutes: int
     total_trip_count: int
@@ -254,6 +282,9 @@ class FinancialSummary(BaseModel):
         "gross_revenue",
         "total_expenses",
         "estimated_net_profit",
+        "estimated_structural_costs",
+        "estimated_economic_costs",
+        "estimated_economic_result",
         "total_distance_km",
         "gross_per_hour",
         "net_per_hour",
