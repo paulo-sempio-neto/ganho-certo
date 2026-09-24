@@ -3,7 +3,16 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -121,6 +130,13 @@ class VehicleCostProfile(Base):
 
 class WorkSession(Base):
     __tablename__ = "work_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "import_fingerprint",
+            name="uq_work_sessions_user_import_fingerprint",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -130,6 +146,7 @@ class WorkSession(Base):
     distance_km: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     worked_minutes: Mapped[int] = mapped_column(nullable=False)
     trip_count: Mapped[int] = mapped_column(nullable=False)
+    import_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

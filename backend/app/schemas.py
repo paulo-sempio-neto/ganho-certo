@@ -196,6 +196,44 @@ class WorkSessionPublic(WorkSessionBase):
         return f"{value:.2f}"
 
 
+class WorkSessionImportRow(BaseModel):
+    row: int
+    date: date
+    gross_revenue: Decimal
+    distance_km: Decimal
+    worked_minutes: int
+    trip_count: int
+
+    @field_serializer("gross_revenue")
+    def serialize_gross_revenue(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+    @field_serializer("distance_km")
+    def serialize_distance_km(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class WorkSessionImportError(BaseModel):
+    row: int
+    field: str
+    message: str
+
+
+class WorkSessionImportPreview(BaseModel):
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    rows: list[WorkSessionImportRow]
+    errors: list[WorkSessionImportError]
+
+
+class WorkSessionImportResult(BaseModel):
+    imported: int
+    duplicates_skipped: int
+    failed: int
+    errors: list[WorkSessionImportError] = Field(default_factory=list)
+
+
 class ExpenseBase(BaseModel):
     vehicle_id: int | None = Field(default=None, gt=0)
     expense_date: date
