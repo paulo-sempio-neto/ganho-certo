@@ -2,10 +2,19 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_serializer, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid", "other"]
 OwnershipType = Literal["owned", "financed", "rented"]
+RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -213,6 +222,55 @@ class ExpenseUpdate(ExpenseBase):
 
 
 class ExpensePublic(ExpenseBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class RecurringExpenseBase(BaseModel):
+    vehicle_id: int | None = Field(default=None, gt=0)
+    category: ExpenseCategory
+    amount: Decimal = Field(gt=Decimal("0"))
+    frequency: RecurringExpenseFrequency
+    start_date: date
+    end_date: date | None = None
+    description: str | None = Field(default=None, max_length=255)
+    active: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "RecurringExpenseBase":
+        if self.end_date is not None and self.end_date < self.start_date:
+            raise ValueError("end_date cannot be earlier than start_date.")
+
+        return self
+
+
+class RecurringExpenseCreate(RecurringExpenseBase):
+    pass
+
+
+class RecurringExpenseUpdate(RecurringExpenseBase):
+    pass
+
+
+class RecurringExpensePublic(RecurringExpenseBase):
     id: int
     created_at: datetime
     updated_at: datetime
