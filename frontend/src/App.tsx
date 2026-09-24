@@ -10,6 +10,7 @@ type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybri
 type OwnershipType = "owned" | "financed" | "rented";
 type DashboardPeriod = "today" | "last7" | "month" | "custom";
 type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
+type FinancialGoalType = "net" | "projected";
 
 type User = {
   id: number;
@@ -82,6 +83,34 @@ type RecurringExpense = {
   updated_at: string;
 };
 
+type FinancialGoal = {
+  id: number;
+  vehicle_id: number | null;
+  goal_type: FinancialGoalType;
+  target_amount: string;
+  start_date: string;
+  end_date: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type FinancialGoalProgress = {
+  target_amount: string;
+  current_amount: string;
+  remaining_amount: string;
+  progress_percentage: string;
+  days_total: number;
+  days_elapsed: number;
+  days_remaining: number;
+  required_daily_amount: string;
+  projected_completion_amount: string;
+  on_track: boolean;
+  average_net_per_hour: string | null;
+  average_projected_per_hour: string | null;
+  estimated_hours_remaining: string | null;
+};
+
 type VehicleForm = {
   name: string;
   brand: string;
@@ -149,6 +178,14 @@ type RecurringExpenseForm = {
   vehicle_id: string;
   description: string;
   active: boolean;
+};
+
+type FinancialGoalForm = {
+  goal_type: FinancialGoalType;
+  target_amount: string;
+  start_date: string;
+  end_date: string;
+  vehicle_id: string;
 };
 
 type QuickStartForm = {
@@ -285,6 +322,11 @@ const recurringFrequencyOptions: Array<{ label: string; value: RecurringExpenseF
   { label: "Anual", value: "yearly" },
 ];
 
+const financialGoalTypeOptions: Array<{ label: string; value: FinancialGoalType }> = [
+  { label: "Meta de sobra apos despesas", value: "net" },
+  { label: "Meta de resultado projetado", value: "projected" },
+];
+
 const emptyVehicleForm: VehicleForm = {
   name: "",
   brand: "",
@@ -334,6 +376,14 @@ const emptyRecurringExpenseForm: RecurringExpenseForm = {
   vehicle_id: "",
   description: "",
   active: true,
+};
+
+const emptyFinancialGoalForm: FinancialGoalForm = {
+  goal_type: "net",
+  target_amount: "",
+  start_date: new Date().toISOString().slice(0, 10),
+  end_date: new Date().toISOString().slice(0, 10),
+  vehicle_id: "",
 };
 
 const emptyQuickStartForm: QuickStartForm = {
@@ -398,6 +448,10 @@ function getExpenseCategoryLabel(value: ExpenseCategory): string {
 
 function getRecurringFrequencyLabel(value: RecurringExpenseFrequency): string {
   return recurringFrequencyOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function getFinancialGoalTypeLabel(value: FinancialGoalType): string {
+  return financialGoalTypeOptions.find((option) => option.value === value)?.label ?? value;
 }
 
 function getErrorMessage(status: number): string {
@@ -487,6 +541,36 @@ function formatDate(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function formatPercent(value: string | null): string {
+  if (value === null) {
+    return "—";
+  }
+
+  const normalized = value.replace(".", ",");
+  return normalized.endsWith(",00") ? `${normalized.slice(0, -3)}%` : `${normalized}%`;
+}
+
+function getProgressWidth(value: string | null): string {
+  if (value === null) {
+    return "0%";
+  }
+
+  const percentage = Number(value);
+  if (!Number.isFinite(percentage)) {
+    return "0%";
+  }
+
+  return `${Math.min(100, Math.max(0, percentage))}%`;
+}
+
+function formatHours(value: string | null): string {
+  if (value === null) {
+    return "—";
+  }
+
+  return `${value.replace(".", ",")} h`;
+}
+
 function moneyInputToCents(value: string): bigint {
   return BigInt(moneyInputToApi(value).replace(".", ""));
 }
@@ -567,6 +651,10 @@ function App() {
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
+  const [financialGoalProgressById, setFinancialGoalProgressById] = useState<
+    Record<number, FinancialGoalProgress>
+  >({});
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [costProfileForm, setCostProfileForm] =
@@ -576,6 +664,8 @@ function App() {
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [recurringExpenseForm, setRecurringExpenseForm] =
     useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
+  const [financialGoalForm, setFinancialGoalForm] =
+    useState<FinancialGoalForm>(emptyFinancialGoalForm);
   const [quickStartForm, setQuickStartForm] = useState<QuickStartForm>(emptyQuickStartForm);
   const [quickStartResult, setQuickStartResult] = useState<QuickStartResult | null>(null);
   const [quickStartVisible, setQuickStartVisible] = useState(false);
@@ -595,6 +685,7 @@ function App() {
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [editingRecurringExpenseId, setEditingRecurringExpenseId] = useState<number | null>(null);
+  const [editingFinancialGoalId, setEditingFinancialGoalId] = useState<number | null>(null);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
   const [dashboardVehicleId, setDashboardVehicleId] = useState("");
   const [customStartDate, setCustomStartDate] = useState(toDateInputValue(new Date()));
@@ -607,6 +698,7 @@ function App() {
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
   const [isExpensesLoading, setIsExpensesLoading] = useState(false);
   const [isRecurringExpensesLoading, setIsRecurringExpensesLoading] = useState(false);
+  const [isFinancialGoalsLoading, setIsFinancialGoalsLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
@@ -614,6 +706,7 @@ function App() {
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
+  const [isFinancialGoalSaving, setIsFinancialGoalSaving] = useState(false);
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
 
@@ -625,17 +718,21 @@ function App() {
     setWorkSessions([]);
     setExpenses([]);
     setRecurringExpenses([]);
+    setFinancialGoals([]);
+    setFinancialGoalProgressById({});
     setFinancialSummary(null);
     setEditingVehicleId(null);
     setCostProfileVehicleId(null);
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
     setEditingRecurringExpenseId(null);
+    setEditingFinancialGoalId(null);
     setVehicleForm(emptyVehicleForm);
     setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
+    setFinancialGoalForm(emptyFinancialGoalForm);
     setQuickStartForm(emptyQuickStartForm);
     setQuickStartResult(null);
     setQuickStartVisible(false);
@@ -858,6 +955,40 @@ function App() {
     }
   }
 
+  async function loadFinancialGoals(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsFinancialGoalsLoading(true);
+    try {
+      const nextFinancialGoals = await requestApi<FinancialGoal[]>("/financial-goals", {
+        headers: getAuthHeaders(currentToken),
+      });
+      const progressEntries = await Promise.all(
+        nextFinancialGoals.map(async (goal) => {
+          const progress = await requestApi<FinancialGoalProgress>(
+            `/financial-goals/${goal.id}/progress`,
+            {
+              headers: getAuthHeaders(currentToken),
+            },
+          );
+          return [goal.id, progress] as const;
+        }),
+      );
+      setFinancialGoals(nextFinancialGoals);
+      setFinancialGoalProgressById(Object.fromEntries(progressEntries));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao carregar metas.");
+      }
+    } finally {
+      setIsFinancialGoalsLoading(false);
+    }
+  }
+
   async function loadFinancialSummary(currentToken = token) {
     if (!currentToken) {
       return;
@@ -920,6 +1051,8 @@ function App() {
       setWorkSessions([]);
       setExpenses([]);
       setRecurringExpenses([]);
+      setFinancialGoals([]);
+      setFinancialGoalProgressById({});
       setFinancialSummary(null);
       setCostProfileVehicleId(null);
       setCostProfileForm(emptyCostProfileForm);
@@ -937,6 +1070,7 @@ function App() {
         await loadWorkSessions(token);
         await loadExpenses(token);
         await loadRecurringExpenses(token);
+        await loadFinancialGoals(token);
         await loadFinancialSummary(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
@@ -1838,6 +1972,127 @@ function App() {
     }
   }
 
+  function resetFinancialGoalForm() {
+    setEditingFinancialGoalId(null);
+    setFinancialGoalForm(emptyFinancialGoalForm);
+  }
+
+  function handleEditFinancialGoal(goal: FinancialGoal) {
+    setEditingFinancialGoalId(goal.id);
+    setFinancialGoalForm({
+      goal_type: goal.goal_type,
+      target_amount: formatMoney(goal.target_amount).replace("R$ ", ""),
+      start_date: goal.start_date,
+      end_date: goal.end_date,
+      vehicle_id: goal.vehicle_id ? String(goal.vehicle_id) : "",
+    });
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  function buildFinancialGoalPayload(form: FinancialGoalForm, active = true) {
+    return {
+      goal_type: form.goal_type,
+      target_amount: moneyInputToApi(form.target_amount),
+      start_date: form.start_date,
+      end_date: form.end_date,
+      active,
+      ...(form.vehicle_id ? { vehicle_id: Number(form.vehicle_id) } : {}),
+    };
+  }
+
+  async function handleFinancialGoalSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsFinancialGoalSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const currentGoal = financialGoals.find((goal) => goal.id === editingFinancialGoalId);
+      const payload = buildFinancialGoalPayload(financialGoalForm, currentGoal?.active ?? true);
+
+      if (editingFinancialGoalId) {
+        await requestApi<FinancialGoal>(`/financial-goals/${editingFinancialGoalId}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Meta atualizada com sucesso.");
+      } else {
+        await requestApi<FinancialGoal>("/financial-goals", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Meta cadastrada com sucesso.");
+      }
+
+      resetFinancialGoalForm();
+      await loadFinancialGoals();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao salvar meta.");
+      }
+    } finally {
+      setIsFinancialGoalSaving(false);
+    }
+  }
+
+  async function handleToggleFinancialGoal(goal: FinancialGoal) {
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<FinancialGoal>(`/financial-goals/${goal.id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          goal_type: goal.goal_type,
+          target_amount: goal.target_amount,
+          start_date: goal.start_date,
+          end_date: goal.end_date,
+          active: !goal.active,
+          ...(goal.vehicle_id ? { vehicle_id: goal.vehicle_id } : {}),
+        }),
+      });
+      setSuccessMessage(goal.active ? "Meta desativada." : "Meta ativada.");
+      await loadFinancialGoals();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao alterar meta.");
+      }
+    }
+  }
+
+  async function handleDeleteFinancialGoal(goal: FinancialGoal) {
+    const shouldDelete = window.confirm(`Excluir a meta de ${formatMoney(goal.target_amount)}?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<void>(`/financial-goals/${goal.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setSuccessMessage("Meta excluida com sucesso.");
+      await loadFinancialGoals();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao excluir meta.");
+      }
+    }
+  }
+
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
 
@@ -1901,6 +2156,7 @@ function App() {
                   Simular um dia
                 </button>
               ) : null}
+              <a href="#metas">Metas</a>
               <a href="#jornadas">Jornadas</a>
               <a href="#despesas">Despesas</a>
               <a href="#despesas-recorrentes">Recorrentes</a>
@@ -2437,6 +2693,304 @@ function App() {
                 )}
               </section>
             ) : null}
+
+            <section className="manager-section" id="metas">
+              <div className="section-title">
+                <p className="eyebrow">Metas</p>
+                <h3>Metas inteligentes</h3>
+                <p className="subtle-note">
+                  Acompanhe quanto falta, o ritmo necessario e uma estimativa simples de esforco
+                  para chegar ao seu objetivo.
+                </p>
+              </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleFinancialGoalSubmit}>
+                  <h3>{editingFinancialGoalId ? "Editar meta" : "Criar meta"}</h3>
+
+                  <label>
+                    Tipo de meta
+                    <select
+                      name="financial-goal-type"
+                      onChange={(event) =>
+                        setFinancialGoalForm({
+                          ...financialGoalForm,
+                          goal_type: event.target.value as FinancialGoalType,
+                        })
+                      }
+                      required
+                      value={financialGoalForm.goal_type}
+                    >
+                      {financialGoalTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <p className="subtle-note">
+                    Meta de sobra apos despesas usa somente despesas registradas.
+                  </p>
+                  <p className="subtle-note">
+                    Meta de resultado projetado considera tambem custos estruturais e despesas
+                    recorrentes previstas.
+                  </p>
+
+                  <label>
+                    Valor da meta
+                    <input
+                      inputMode="decimal"
+                      name="financial-goal-target"
+                      onChange={(event) =>
+                        setFinancialGoalForm({
+                          ...financialGoalForm,
+                          target_amount: event.target.value,
+                        })
+                      }
+                      placeholder="4000,00"
+                      required
+                      type="text"
+                      value={financialGoalForm.target_amount}
+                    />
+                  </label>
+
+                  <div className="form-grid">
+                    <label>
+                      Data inicial
+                      <input
+                        name="financial-goal-start"
+                        onChange={(event) =>
+                          setFinancialGoalForm({
+                            ...financialGoalForm,
+                            start_date: event.target.value,
+                          })
+                        }
+                        required
+                        type="date"
+                        value={financialGoalForm.start_date}
+                      />
+                    </label>
+
+                    <label>
+                      Data final
+                      <input
+                        name="financial-goal-end"
+                        onChange={(event) =>
+                          setFinancialGoalForm({
+                            ...financialGoalForm,
+                            end_date: event.target.value,
+                          })
+                        }
+                        required
+                        type="date"
+                        value={financialGoalForm.end_date}
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    Veiculo <span className="optional-label">(opcional)</span>
+                    <select
+                      name="financial-goal-vehicle"
+                      onChange={(event) =>
+                        setFinancialGoalForm({
+                          ...financialGoalForm,
+                          vehicle_id: event.target.value,
+                        })
+                      }
+                      value={financialGoalForm.vehicle_id}
+                    >
+                      <option value="">Todos / sem veiculo especifico</option>
+                      {vehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.name} - {vehicle.brand} {vehicle.model}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isFinancialGoalSaving} type="submit">
+                      {isFinancialGoalSaving
+                        ? "Salvando..."
+                        : editingFinancialGoalId
+                          ? "Salvar meta"
+                          : "Criar meta"}
+                    </button>
+                    {editingFinancialGoalId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetFinancialGoalForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isFinancialGoalsLoading}>
+                  <div className="list-header">
+                    <h3>Minhas metas</h3>
+                    <button
+                      className="text-button"
+                      disabled={isFinancialGoalsLoading}
+                      type="button"
+                      onClick={() => void loadFinancialGoals()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isFinancialGoalsLoading ? <p className="empty-state">Carregando metas...</p> : null}
+
+                  {!isFinancialGoalsLoading && financialGoals.length === 0 ? (
+                    <p className="empty-state">
+                      Nenhuma meta cadastrada ainda. Crie uma meta para acompanhar seu progresso.
+                    </p>
+                  ) : null}
+
+                  {financialGoals.map((goal) => {
+                    const progress = financialGoalProgressById[goal.id];
+                    const isReached = progress?.remaining_amount === "0.00";
+                    const averagePerHour =
+                      goal.goal_type === "net"
+                        ? progress?.average_net_per_hour
+                        : progress?.average_projected_per_hour;
+
+                    return (
+                      <article className="vehicle-card session-card goal-card" key={goal.id}>
+                        <div>
+                          <div className="recurring-card-title">
+                            <h4>{getFinancialGoalTypeLabel(goal.goal_type)}</h4>
+                            <span
+                              className={
+                                goal.active
+                                  ? "status-pill status-active"
+                                  : "status-pill status-inactive"
+                              }
+                            >
+                              {goal.active ? "Ativa" : "Inativa"}
+                            </span>
+                          </div>
+
+                          <p>
+                            {formatMoney(goal.target_amount)} de {formatDate(goal.start_date)} ate{" "}
+                            {formatDate(goal.end_date)}
+                          </p>
+
+                          {progress ? (
+                            <div className="goal-progress-panel">
+                              <div className="goal-progress-main">
+                                <span>{isReached ? "Status" : "Faltam"}</span>
+                                <strong>
+                                  {isReached ? "Meta atingida" : formatMoney(progress.remaining_amount)}
+                                </strong>
+                                {!isReached ? (
+                                  <small>
+                                    Voce precisa de aproximadamente{" "}
+                                    {formatMoney(progress.required_daily_amount)} por dia ate{" "}
+                                    {formatDate(goal.end_date)}.
+                                  </small>
+                                ) : null}
+                                {!isReached && progress.estimated_hours_remaining ? (
+                                  <small>
+                                    Estimativa: {formatHours(progress.estimated_hours_remaining)} de
+                                    trabalho no seu ritmo atual.
+                                  </small>
+                                ) : null}
+                              </div>
+
+                              <div className="goal-progress-bar" aria-label="Progresso da meta">
+                                <i style={{ width: getProgressWidth(progress.progress_percentage) }} />
+                              </div>
+                              <p className="goal-progress-status">
+                                {progress.estimated_hours_remaining === null && averagePerHour == null
+                                  ? "Ainda nao ha dados suficientes para estimar seu ritmo."
+                                  : progress.on_track
+                                    ? "Voce esta no ritmo necessario para esta meta."
+                                    : "Seu ritmo atual esta abaixo do necessario para esta meta."}
+                              </p>
+
+                              <dl className="session-metrics goal-metrics">
+                                <div>
+                                  <dt>Valor atual</dt>
+                                  <dd>{formatMoney(progress.current_amount)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Progresso</dt>
+                                  <dd>{formatPercent(progress.progress_percentage)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Dias restantes</dt>
+                                  <dd>{progress.days_remaining}</dd>
+                                </div>
+                                <div>
+                                  <dt>Ritmo por dia</dt>
+                                  <dd>{isReached ? "—" : formatMoney(progress.required_daily_amount)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Horas restantes</dt>
+                                  <dd>{isReached ? "—" : formatHours(progress.estimated_hours_remaining)}</dd>
+                                </div>
+                                <div>
+                                  <dt>Projecao de fechamento</dt>
+                                  <dd>{formatMoney(progress.projected_completion_amount)}</dd>
+                                </div>
+                              </dl>
+                            </div>
+                          ) : (
+                            <p className="empty-state compact-empty-state">Carregando progresso...</p>
+                          )}
+
+                          <dl className="session-metrics goal-summary-metrics">
+                            <div>
+                              <dt>Veiculo</dt>
+                              <dd>
+                                {goal.vehicle_id ? getVehicleLabel(goal.vehicle_id) : "Todos / sem veiculo"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Resumo</dt>
+                              <dd>
+                                {progress
+                                  ? `${formatPercent(progress.progress_percentage)} concluida`
+                                  : "—"}
+                              </dd>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <div className="card-actions">
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => handleEditFinancialGoal(goal)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => void handleToggleFinancialGoal(goal)}
+                          >
+                            {goal.active ? "Desativar" : "Ativar"}
+                          </button>
+                          <button
+                            className="text-button danger"
+                            type="button"
+                            onClick={() => void handleDeleteFinancialGoal(goal)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
 
             {workSessions.length > 0 ? (
               <section className="manager-section dashboard-section" id="dashboard">
