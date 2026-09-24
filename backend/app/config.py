@@ -18,6 +18,32 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JWT_SECRET", "JWT_SECRET_KEY"),
     )
     jwt_access_token_expire_minutes: int = 30
+    auth_login_rate_limit: int = Field(default=10, ge=0, validation_alias="AUTH_LOGIN_RATE_LIMIT")
+    auth_login_ip_rate_limit: int = Field(
+        default=60,
+        ge=0,
+        validation_alias="AUTH_LOGIN_IP_RATE_LIMIT",
+    )
+    auth_login_rate_window_seconds: int = Field(
+        default=60,
+        ge=1,
+        validation_alias="AUTH_LOGIN_RATE_WINDOW_SECONDS",
+    )
+    auth_register_rate_limit: int = Field(
+        default=5,
+        ge=0,
+        validation_alias="AUTH_REGISTER_RATE_LIMIT",
+    )
+    auth_register_rate_window_seconds: int = Field(
+        default=300,
+        ge=1,
+        validation_alias="AUTH_REGISTER_RATE_WINDOW_SECONDS",
+    )
+    auth_rate_limit_max_entries: int = Field(
+        default=5000,
+        ge=100,
+        validation_alias="AUTH_RATE_LIMIT_MAX_ENTRIES",
+    )
     cors_allowed_origins: str = Field(
         default="http://localhost:5173,http://127.0.0.1:5173",
         validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS"),

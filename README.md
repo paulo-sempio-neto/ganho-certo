@@ -86,6 +86,9 @@ Arquitetura planejada:
 - Backend FastAPI no Render
 - Banco PostgreSQL gerenciado
 
+Antes de convidar usuários reais para a beta fechada, siga o checklist em
+[`docs/BETA_CHECKLIST.md`](docs/BETA_CHECKLIST.md).
+
 ### Backend no Render
 
 Configure o servico apontando para a pasta `backend`.
