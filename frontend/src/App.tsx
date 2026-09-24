@@ -18,6 +18,11 @@ type WorkSessionImportField =
   | "distance_km"
   | "worked_minutes"
   | "trip_count";
+type ExpenseImportField = "expense_date" | "amount" | "category" | "description";
+type CsvImportType = "work_sessions" | "expenses";
+type CsvImportColumnMapping = Partial<
+  Record<WorkSessionImportField | ExpenseImportField, string>
+>;
 
 type User = {
   id: number;
@@ -88,12 +93,40 @@ type WorkSessionImportResult = {
   errors: WorkSessionImportError[];
 };
 
+type ExpenseImportRow = {
+  row: number;
+  expense_date: string;
+  amount: string;
+  category: ExpenseCategory;
+  description: string | null;
+};
+
+type ExpenseImportPreview = {
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  columns_found: string[];
+  suggested_mapping: Partial<Record<ExpenseImportField, string>>;
+  column_mapping: Partial<Record<ExpenseImportField, string>>;
+  rows: ExpenseImportRow[];
+  errors: WorkSessionImportError[];
+};
+
+type ExpenseImportMapping = Record<ExpenseImportField, string>;
+
+type ExpenseImportResult = {
+  imported: number;
+  duplicates_skipped: number;
+  failed: number;
+  errors: WorkSessionImportError[];
+};
+
 type CsvImportProfile = {
   id: number;
   name: string;
-  import_type: "work_sessions";
+  import_type: CsvImportType;
   header_signature: string;
-  column_mapping: Partial<Record<WorkSessionImportField, string>>;
+  column_mapping: CsvImportColumnMapping;
   vehicle_id: number | null;
   created_at: string;
   updated_at: string;
@@ -101,7 +134,7 @@ type CsvImportProfile = {
 
 type CsvImportProfileMatchResponse = {
   profile: CsvImportProfile | null;
-  column_mapping: Partial<Record<WorkSessionImportField, string>> | null;
+  column_mapping: CsvImportColumnMapping | null;
   vehicle_id: number | null;
 };
 
@@ -437,6 +470,13 @@ const emptyWorkSessionImportMapping: WorkSessionImportMapping = {
   trip_count: "",
 };
 
+const emptyExpenseImportMapping: ExpenseImportMapping = {
+  expense_date: "",
+  amount: "",
+  category: "",
+  description: "",
+};
+
 const workSessionImportMappingFields: Array<{
   field: WorkSessionImportField;
   label: string;
@@ -447,6 +487,17 @@ const workSessionImportMappingFields: Array<{
   { field: "distance_km", label: "Km" },
   { field: "worked_minutes", label: "Tempo trabalhado" },
   { field: "trip_count", label: "Corridas", optional: true },
+];
+
+const expenseImportMappingFields: Array<{
+  field: ExpenseImportField;
+  label: string;
+  optional?: boolean;
+}> = [
+  { field: "expense_date", label: "Data" },
+  { field: "amount", label: "Valor" },
+  { field: "category", label: "Categoria", optional: true },
+  { field: "description", label: "Descricao", optional: true },
 ];
 
 const emptyExpenseForm: ExpenseForm = {
@@ -645,11 +696,19 @@ function getImportFieldLabel(field: string): string {
     distance_km: "Km rodados",
     worked_minutes: "Minutos trabalhados",
     trip_count: "Corridas",
+    expense_date: "Data",
+    amount: "Valor",
+    category: "Categoria",
+    description: "Descricao",
     header: "Cabeçalho",
     file: "Arquivo",
   };
 
   return labels[field] ?? field;
+}
+
+function getImportProfileTypeLabel(importType: CsvImportType): string {
+  return importType === "expenses" ? "Despesas" : "Jornadas";
 }
 
 function formatDate(value: string): string {
@@ -794,6 +853,20 @@ function App() {
     useState<CsvImportProfile | null>(null);
   const [isWorkSessionImportVisible, setIsWorkSessionImportVisible] = useState(false);
   const [isWorkSessionImportDragging, setIsWorkSessionImportDragging] = useState(false);
+  const [expenseImportVehicleId, setExpenseImportVehicleId] = useState("");
+  const [expenseImportFile, setExpenseImportFile] = useState<File | null>(null);
+  const [expenseImportPreview, setExpenseImportPreview] =
+    useState<ExpenseImportPreview | null>(null);
+  const [expenseImportColumns, setExpenseImportColumns] = useState<string[]>([]);
+  const [expenseImportMapping, setExpenseImportMapping] =
+    useState<ExpenseImportMapping>(emptyExpenseImportMapping);
+  const [expenseImportResult, setExpenseImportResult] = useState<ExpenseImportResult | null>(null);
+  const [expenseImportError, setExpenseImportError] = useState("");
+  const [expenseImportProfileName, setExpenseImportProfileName] = useState("");
+  const [matchedExpenseImportProfile, setMatchedExpenseImportProfile] =
+    useState<CsvImportProfile | null>(null);
+  const [isExpenseImportVisible, setIsExpenseImportVisible] = useState(false);
+  const [isExpenseImportDragging, setIsExpenseImportDragging] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [recurringExpenseForm, setRecurringExpenseForm] =
     useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
@@ -842,6 +915,8 @@ function App() {
   const [isWorkSessionImportPreviewLoading, setIsWorkSessionImportPreviewLoading] =
     useState(false);
   const [isWorkSessionImportSaving, setIsWorkSessionImportSaving] = useState(false);
+  const [isExpenseImportPreviewLoading, setIsExpenseImportPreviewLoading] = useState(false);
+  const [isExpenseImportSaving, setIsExpenseImportSaving] = useState(false);
   const [isImportProfilesLoading, setIsImportProfilesLoading] = useState(false);
   const [isImportProfileSaving, setIsImportProfileSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
@@ -883,6 +958,17 @@ function App() {
     setMatchedWorkSessionImportProfile(null);
     setIsWorkSessionImportVisible(false);
     setIsWorkSessionImportDragging(false);
+    setExpenseImportVehicleId("");
+    setExpenseImportFile(null);
+    setExpenseImportPreview(null);
+    setExpenseImportColumns([]);
+    setExpenseImportMapping(emptyExpenseImportMapping);
+    setExpenseImportResult(null);
+    setExpenseImportError("");
+    setExpenseImportProfileName("");
+    setMatchedExpenseImportProfile(null);
+    setIsExpenseImportVisible(false);
+    setIsExpenseImportDragging(false);
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
     setFinancialGoalForm(emptyFinancialGoalForm);
@@ -1043,6 +1129,13 @@ function App() {
           return String(nextVehicles[0].id);
         }
 
+        if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
+          return currentVehicleId;
+        }
+
+        return "";
+      });
+      setExpenseImportVehicleId((currentVehicleId) => {
         if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
           return currentVehicleId;
         }
@@ -1297,6 +1390,17 @@ function App() {
       setMatchedWorkSessionImportProfile(null);
       setIsWorkSessionImportVisible(false);
       setIsWorkSessionImportDragging(false);
+      setExpenseImportVehicleId("");
+      setExpenseImportFile(null);
+      setExpenseImportPreview(null);
+      setExpenseImportColumns([]);
+      setExpenseImportMapping(emptyExpenseImportMapping);
+      setExpenseImportResult(null);
+      setExpenseImportError("");
+      setExpenseImportProfileName("");
+      setMatchedExpenseImportProfile(null);
+      setIsExpenseImportVisible(false);
+      setIsExpenseImportDragging(false);
       return;
     }
 
@@ -2010,20 +2114,45 @@ function App() {
     };
   }
 
-  function profileToImportMapping(
-    mapping: Partial<Record<WorkSessionImportField, string>> | null,
+  function profileToWorkSessionImportMapping(
+    mapping: CsvImportColumnMapping | null,
   ): WorkSessionImportMapping {
     return {
       ...emptyWorkSessionImportMapping,
-      ...(mapping ?? {}),
+      date: mapping?.date ?? "",
+      gross_revenue: mapping?.gross_revenue ?? "",
+      distance_km: mapping?.distance_km ?? "",
+      worked_minutes: mapping?.worked_minutes ?? "",
+      trip_count: mapping?.trip_count ?? "",
+    };
+  }
+
+  function profileToExpenseImportMapping(
+    mapping: CsvImportColumnMapping | null,
+  ): ExpenseImportMapping {
+    return {
+      ...emptyExpenseImportMapping,
+      expense_date: mapping?.expense_date ?? "",
+      amount: mapping?.amount ?? "",
+      category: mapping?.category ?? "",
+      description: mapping?.description ?? "",
     };
   }
 
   function areImportMappingsEqual(
     first: Partial<Record<WorkSessionImportField, string>>,
-    second: Partial<Record<WorkSessionImportField, string>>,
+    second: CsvImportColumnMapping,
   ): boolean {
     return workSessionImportMappingFields.every(
+      (item) => (first[item.field] ?? "") === (second[item.field] ?? ""),
+    );
+  }
+
+  function areExpenseImportMappingsEqual(
+    first: Partial<Record<ExpenseImportField, string>>,
+    second: CsvImportColumnMapping,
+  ): boolean {
+    return expenseImportMappingFields.every(
       (item) => (first[item.field] ?? "") === (second[item.field] ?? ""),
     );
   }
@@ -2130,7 +2259,7 @@ function App() {
       }
 
       setMatchedWorkSessionImportProfile(match.profile);
-      setWorkSessionImportMapping(profileToImportMapping(match.column_mapping));
+      setWorkSessionImportMapping(profileToWorkSessionImportMapping(match.column_mapping));
       if (
         match.column_mapping &&
         !areImportMappingsEqual(preview.column_mapping, match.column_mapping)
@@ -2162,6 +2291,7 @@ function App() {
 
     setIsImportProfileSaving(true);
     setWorkSessionImportError("");
+    setExpenseImportError("");
 
     try {
       const profile = await requestApi<CsvImportProfile>("/import-profiles", {
@@ -2216,14 +2346,18 @@ function App() {
       if (matchedWorkSessionImportProfile?.id === updatedProfile.id) {
         setMatchedWorkSessionImportProfile(updatedProfile);
       }
+      if (matchedExpenseImportProfile?.id === updatedProfile.id) {
+        setMatchedExpenseImportProfile(updatedProfile);
+      }
       setSuccessMessage("Configuracao renomeada.");
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
       } else {
-        setWorkSessionImportError(
-          error instanceof Error ? error.message : "Nao foi possivel renomear a configuracao.",
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : "Nao foi possivel renomear a configuracao.";
+        setWorkSessionImportError(errorMessage);
+        setExpenseImportError(errorMessage);
       }
     } finally {
       setIsImportProfileSaving(false);
@@ -2238,6 +2372,7 @@ function App() {
 
     setIsImportProfileSaving(true);
     setWorkSessionImportError("");
+    setExpenseImportError("");
 
     try {
       await requestApi<void>(`/import-profiles/${profile.id}`, {
@@ -2250,14 +2385,18 @@ function App() {
       if (matchedWorkSessionImportProfile?.id === profile.id) {
         setMatchedWorkSessionImportProfile(null);
       }
+      if (matchedExpenseImportProfile?.id === profile.id) {
+        setMatchedExpenseImportProfile(null);
+      }
       setSuccessMessage("Configuracao excluida.");
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
       } else {
-        setWorkSessionImportError(
-          error instanceof Error ? error.message : "Nao foi possivel excluir a configuracao.",
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : "Nao foi possivel excluir a configuracao.";
+        setWorkSessionImportError(errorMessage);
+        setExpenseImportError(errorMessage);
       }
     } finally {
       setIsImportProfileSaving(false);
@@ -2361,6 +2500,284 @@ function App() {
       }
     } finally {
       setIsWorkSessionImportSaving(false);
+    }
+  }
+
+  function buildExpenseImportMappingParam(
+    mapping: Partial<ExpenseImportMapping>,
+  ): string | null {
+    const entries = Object.entries(mapping).filter(([, value]) => value);
+    if (entries.length === 0) {
+      return null;
+    }
+
+    return JSON.stringify(Object.fromEntries(entries));
+  }
+
+  function expensePreviewToImportMapping(preview: ExpenseImportPreview): ExpenseImportMapping {
+    return {
+      ...emptyExpenseImportMapping,
+      ...preview.suggested_mapping,
+      ...preview.column_mapping,
+    };
+  }
+
+  function getExpenseImportPath(
+    preview = false,
+    mapping: Partial<ExpenseImportMapping> = {},
+  ): string {
+    const params = new URLSearchParams();
+    if (expenseImportVehicleId) {
+      params.set("vehicle_id", expenseImportVehicleId);
+    }
+
+    const mappingParam = buildExpenseImportMappingParam(mapping);
+    if (mappingParam) {
+      params.set("column_mapping", mappingParam);
+    }
+
+    const query = params.toString();
+    return `/imports/expenses${preview ? "/preview" : ""}${query ? `?${query}` : ""}`;
+  }
+
+  function clearExpenseImportFile() {
+    setExpenseImportFile(null);
+    setExpenseImportPreview(null);
+    setExpenseImportColumns([]);
+    setExpenseImportMapping(emptyExpenseImportMapping);
+    setExpenseImportResult(null);
+    setExpenseImportError("");
+    setExpenseImportProfileName("");
+    setMatchedExpenseImportProfile(null);
+    setIsExpenseImportDragging(false);
+  }
+
+  function handleExpenseImportFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    const isCsv = file.name.toLowerCase().endsWith(".csv") || file.type.includes("csv");
+    if (!isCsv) {
+      clearExpenseImportFile();
+      setExpenseImportError("Selecione um arquivo CSV.");
+      return;
+    }
+
+    setExpenseImportFile(file);
+    setExpenseImportPreview(null);
+    setExpenseImportColumns([]);
+    setExpenseImportMapping(emptyExpenseImportMapping);
+    setExpenseImportResult(null);
+    setExpenseImportError("");
+    setExpenseImportProfileName("");
+    setMatchedExpenseImportProfile(null);
+  }
+
+  function handleExpenseImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    handleExpenseImportFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  }
+
+  function handleExpenseImportDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsExpenseImportDragging(false);
+    handleExpenseImportFile(event.dataTransfer.files[0] ?? null);
+  }
+
+  function downloadExpenseImportTemplate() {
+    const csvTemplate =
+      "expense_date,amount,category,description\n" +
+      "2026-09-20,95.50,fuel,Abastecimento\n" +
+      "2026-09-21,18.00,toll,Pedagio\n";
+    const blob = new Blob([csvTemplate], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "modelo-despesas-ganhocerto.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function matchExpenseImportProfile(headers: string[], preview: ExpenseImportPreview) {
+    if (!headers.length) {
+      setMatchedExpenseImportProfile(null);
+      return;
+    }
+
+    try {
+      const match = await requestApi<CsvImportProfileMatchResponse>("/import-profiles/match", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ import_type: "expenses", headers }),
+      });
+
+      if (!match.profile) {
+        setMatchedExpenseImportProfile(null);
+        return;
+      }
+
+      setMatchedExpenseImportProfile(match.profile);
+      setExpenseImportMapping(profileToExpenseImportMapping(match.column_mapping));
+      if (
+        match.column_mapping &&
+        !areExpenseImportMappingsEqual(preview.column_mapping, match.column_mapping)
+      ) {
+        setExpenseImportPreview(null);
+      }
+      if (
+        match.vehicle_id &&
+        vehicles.some((vehicle) => vehicle.id === match.vehicle_id)
+      ) {
+        setExpenseImportVehicleId(String(match.vehicle_id));
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      }
+    }
+  }
+
+  function handleIgnoreExpenseImportProfile() {
+    setMatchedExpenseImportProfile(null);
+    if (expenseImportPreview) {
+      setExpenseImportMapping(expensePreviewToImportMapping(expenseImportPreview));
+    }
+  }
+
+  async function handleSaveExpenseImportProfile() {
+    if (
+      !expenseImportPreview ||
+      expenseImportPreview.invalid_rows > 0 ||
+      !expenseImportColumns.length
+    ) {
+      return;
+    }
+
+    setIsImportProfileSaving(true);
+    setExpenseImportError("");
+
+    try {
+      const profile = await requestApi<CsvImportProfile>("/import-profiles", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: expenseImportProfileName.trim() || "Despesas CSV",
+          import_type: "expenses",
+          headers: expenseImportColumns,
+          column_mapping: expenseImportPreview.column_mapping,
+          vehicle_id: expenseImportVehicleId ? Number(expenseImportVehicleId) : null,
+        }),
+      });
+      setMatchedExpenseImportProfile(profile);
+      setExpenseImportProfileName("");
+      setSuccessMessage("Configuracao de importacao salva.");
+      await loadImportProfiles();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setExpenseImportError(
+          error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao.",
+        );
+      }
+    } finally {
+      setIsImportProfileSaving(false);
+    }
+  }
+
+  async function handleExpenseImportPreview() {
+    if (!expenseImportFile) {
+      setExpenseImportError("Selecione um arquivo CSV para continuar.");
+      return;
+    }
+
+    setIsExpenseImportPreviewLoading(true);
+    setExpenseImportError("");
+    setExpenseImportResult(null);
+
+    try {
+      const preview = await requestApi<ExpenseImportPreview>(
+        getExpenseImportPath(true, expenseImportMapping),
+        {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "text/csv",
+          },
+          body: expenseImportFile,
+        },
+      );
+      setExpenseImportPreview(preview);
+      setExpenseImportColumns(preview.columns_found);
+      setExpenseImportMapping(expensePreviewToImportMapping(preview));
+      await matchExpenseImportProfile(preview.columns_found, preview);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setExpenseImportPreview(null);
+        setExpenseImportError(
+          error instanceof Error ? error.message : "Nao foi possivel validar o CSV.",
+        );
+      }
+    } finally {
+      setIsExpenseImportPreviewLoading(false);
+    }
+  }
+
+  async function handleConfirmExpenseImport() {
+    if (!expenseImportPreview || !expenseImportFile) {
+      return;
+    }
+
+    if (expenseImportPreview.invalid_rows > 0 || expenseImportPreview.valid_rows === 0) {
+      return;
+    }
+
+    const shouldImport = window.confirm(
+      `Confirmar importacao de ${expenseImportPreview.valid_rows} despesas?`,
+    );
+    if (!shouldImport) {
+      return;
+    }
+
+    setIsExpenseImportSaving(true);
+    setExpenseImportError("");
+    setExpenseImportResult(null);
+
+    try {
+      const result = await requestApi<ExpenseImportResult>(
+        getExpenseImportPath(false, expenseImportPreview.column_mapping),
+        {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "text/csv",
+          },
+          body: expenseImportFile,
+        },
+      );
+      setExpenseImportResult(result);
+      setExpenseImportPreview(null);
+      setExpenseImportFile(null);
+      setExpenseImportColumns([]);
+      setExpenseImportMapping(emptyExpenseImportMapping);
+      setMatchedExpenseImportProfile(null);
+      setExpenseImportProfileName("");
+      setSuccessMessage("Importacao concluida.");
+      await loadExpenses();
+      await refreshDashboardData();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setExpenseImportError(
+          error instanceof Error ? error.message : "Nao foi possivel importar o CSV.",
+        );
+      }
+    } finally {
+      setIsExpenseImportSaving(false);
     }
   }
 
@@ -4027,15 +4444,19 @@ function App() {
                         Atualizar
                       </button>
                     </div>
-                    {importProfiles.length === 0 ? (
+                    {importProfiles.filter((profile) => profile.import_type === "work_sessions")
+                      .length === 0 ? (
                       <p className="subtle-note">Nenhuma configuracao salva ainda.</p>
                     ) : (
                       <div className="import-preview-list">
-                        {importProfiles.map((profile) => (
+                        {importProfiles
+                          .filter((profile) => profile.import_type === "work_sessions")
+                          .map((profile) => (
                           <article className="vehicle-card session-card" key={profile.id}>
                             <div>
                               <h4>{profile.name}</h4>
                               <p className="subtle-note">
+                                {getImportProfileTypeLabel(profile.import_type)} Â·{" "}
                                 {getImportProfileVehicleLabel(profile)}
                               </p>
                             </div>
@@ -4589,7 +5010,375 @@ function App() {
               <div className="section-title">
                 <p className="eyebrow">Despesas</p>
                 <h3>Custos da operação</h3>
+                <button
+                  className="button button-ghost inline-action"
+                  type="button"
+                  onClick={() => setIsExpenseImportVisible((current) => !current)}
+                >
+                  Importar despesas
+                </button>
               </div>
+
+              {isExpenseImportVisible ? (
+                <div
+                  className="import-panel"
+                  aria-busy={
+                    isExpenseImportPreviewLoading ||
+                    isExpenseImportSaving ||
+                    isImportProfileSaving
+                  }
+                >
+                  <div className="list-header">
+                    <div>
+                      <h3>Importar despesas por CSV</h3>
+                      <p className="subtle-note">
+                        Envie o arquivo, confira as colunas e revise o preview antes de gravar.
+                      </p>
+                    </div>
+                    <button className="text-button" type="button" onClick={downloadExpenseImportTemplate}>
+                      Baixar modelo CSV
+                    </button>
+                  </div>
+
+                  <div className="import-template-help">
+                    <span>expense_date: AAAA-MM-DD</span>
+                    <span>amount: valor</span>
+                    <span>category: categoria</span>
+                    <span>description: descricao opcional</span>
+                  </div>
+
+                  <div className="import-preview">
+                    <div className="list-header">
+                      <div>
+                        <h4>Configuracoes salvas</h4>
+                        <p className="subtle-note">
+                          Perfis de despesas ficam separados dos perfis de jornadas.
+                        </p>
+                      </div>
+                      <button
+                        className="text-button"
+                        disabled={isImportProfilesLoading}
+                        type="button"
+                        onClick={() => void loadImportProfiles()}
+                      >
+                        Atualizar
+                      </button>
+                    </div>
+                    {importProfiles.filter((profile) => profile.import_type === "expenses")
+                      .length === 0 ? (
+                      <p className="subtle-note">Nenhuma configuracao de despesas salva ainda.</p>
+                    ) : (
+                      <div className="import-preview-list">
+                        {importProfiles
+                          .filter((profile) => profile.import_type === "expenses")
+                          .map((profile) => (
+                            <article className="vehicle-card session-card" key={profile.id}>
+                              <div>
+                                <h4>{profile.name}</h4>
+                                <p className="subtle-note">
+                                  {getImportProfileTypeLabel(profile.import_type)} ·{" "}
+                                  {getImportProfileVehicleLabel(profile)}
+                                </p>
+                              </div>
+                              <div className="card-actions">
+                                <button
+                                  className="text-button"
+                                  disabled={isImportProfileSaving}
+                                  type="button"
+                                  onClick={() => void handleRenameImportProfile(profile)}
+                                >
+                                  Renomear
+                                </button>
+                                <button
+                                  className="text-button danger"
+                                  disabled={isImportProfileSaving}
+                                  type="button"
+                                  onClick={() => void handleDeleteImportProfile(profile)}
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </article>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Veiculo
+                      <select
+                        onChange={(event) => setExpenseImportVehicleId(event.target.value)}
+                        value={expenseImportVehicleId}
+                      >
+                        <option value="">Sem veiculo especifico</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label
+                      className={
+                        isExpenseImportDragging
+                          ? "import-dropzone import-dropzone-active"
+                          : "import-dropzone"
+                      }
+                      onDragLeave={() => setIsExpenseImportDragging(false)}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        setIsExpenseImportDragging(true);
+                      }}
+                      onDrop={handleExpenseImportDrop}
+                    >
+                      <span>Selecionar ou arrastar CSV</span>
+                      <small>Clique aqui ou solte o arquivo nesta area.</small>
+                      <input
+                        accept=".csv,text/csv"
+                        type="file"
+                        onChange={handleExpenseImportFileChange}
+                      />
+                    </label>
+                  </div>
+
+                  {expenseImportFile ? (
+                    <div className="import-file">
+                      <div>
+                        <strong>{expenseImportFile.name}</strong>
+                        <span>{formatFileSize(expenseImportFile.size)}</span>
+                      </div>
+                      <button
+                        className="text-button danger"
+                        type="button"
+                        onClick={clearExpenseImportFile}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {matchedExpenseImportProfile ? (
+                    <p className="form-message compact-message">
+                      Configuracao aplicada: {matchedExpenseImportProfile.name}.{" "}
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={handleIgnoreExpenseImportProfile}
+                      >
+                        Ignorar
+                      </button>
+                    </p>
+                  ) : null}
+
+                  {expenseImportColumns.length ? (
+                    <div className="import-mapping">
+                      <div>
+                        <h4>Qual coluna corresponde a cada informacao?</h4>
+                        <p className="subtle-note">
+                          Confira as sugestoes e ajuste se precisar antes do preview.
+                        </p>
+                      </div>
+                      <div className="form-grid">
+                        {expenseImportMappingFields.map((item) => (
+                          <label key={item.field}>
+                            {item.label}
+                            {item.optional ? " (opcional)" : ""}
+                            <select
+                              value={expenseImportMapping[item.field]}
+                              onChange={(event) => {
+                                setExpenseImportMapping({
+                                  ...expenseImportMapping,
+                                  [item.field]: event.target.value,
+                                });
+                                setExpenseImportPreview(null);
+                                setExpenseImportResult(null);
+                                setMatchedExpenseImportProfile(null);
+                              }}
+                            >
+                              <option value="">
+                                {item.optional ? "Nao mapear" : "Selecione"}
+                              </option>
+                              {expenseImportColumns.map((column) => (
+                                <option key={`${item.field}-${column}`} value={column}>
+                                  {column}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="form-actions import-actions">
+                    <button
+                      className="button"
+                      disabled={
+                        isExpenseImportPreviewLoading ||
+                        isExpenseImportSaving ||
+                        !expenseImportFile
+                      }
+                      type="button"
+                      onClick={() => void handleExpenseImportPreview()}
+                    >
+                      {isExpenseImportPreviewLoading
+                        ? "Validando..."
+                        : expenseImportColumns.length
+                          ? "Confirmar mapping e visualizar preview"
+                          : "Ler colunas e visualizar preview"}
+                    </button>
+                  </div>
+
+                  {expenseImportError ? (
+                    <p className="form-message compact-message">{expenseImportError}</p>
+                  ) : null}
+
+                  {expenseImportPreview ? (
+                    <div className="import-preview">
+                      <dl className="session-metrics import-summary">
+                        <div>
+                          <dt>Total</dt>
+                          <dd>{expenseImportPreview.total_rows}</dd>
+                        </div>
+                        <div>
+                          <dt>Validas</dt>
+                          <dd>{expenseImportPreview.valid_rows}</dd>
+                        </div>
+                        <div>
+                          <dt>Invalidas</dt>
+                          <dd>{expenseImportPreview.invalid_rows}</dd>
+                        </div>
+                      </dl>
+
+                      {expenseImportPreview.errors.length > 0 ? (
+                        <div className="import-errors">
+                          <h4>Corrija o CSV e envie novamente</h4>
+                          {expenseImportPreview.errors.map((error, index) => (
+                            <article key={`${error.row}-${error.field}-${index}`}>
+                              <strong>Linha {error.row}</strong>
+                              <span>
+                                {getImportFieldLabel(error.field)}: {error.message}
+                              </span>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {expenseImportPreview.rows.length > 0 ? (
+                        <div className="import-preview-list">
+                          {expenseImportPreview.rows.map((row) => (
+                            <article className="vehicle-card session-card" key={row.row}>
+                              <div>
+                                <h4>{formatDate(row.expense_date)}</h4>
+                                <p>{getExpenseCategoryLabel(row.category)}</p>
+                                <dl className="session-metrics expense-metrics">
+                                  <div>
+                                    <dt>Valor</dt>
+                                    <dd>{formatMoney(row.amount)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Descricao</dt>
+                                    <dd>{row.description ?? "—"}</dd>
+                                  </div>
+                                </dl>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {expenseImportPreview.invalid_rows > 0 ? (
+                        <p className="empty-state compact-empty-state">
+                          Existem linhas invalidas. Corrija o arquivo e envie novamente.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="import-mapping">
+                            <div>
+                              <h4>Salvar esta configuracao para proximas importacoes</h4>
+                              <p className="subtle-note">
+                                Opcional: informe um nome amigavel para reutilizar este mapeamento.
+                              </p>
+                            </div>
+                            <div className="form-grid">
+                              <label>
+                                Nome da configuracao
+                                <input
+                                  onChange={(event) =>
+                                    setExpenseImportProfileName(event.target.value)
+                                  }
+                                  placeholder="Ex.: Despesas do cartao"
+                                  value={expenseImportProfileName}
+                                />
+                              </label>
+                            </div>
+                            <button
+                              className="button button-ghost"
+                              disabled={isImportProfileSaving}
+                              type="button"
+                              onClick={() => void handleSaveExpenseImportProfile()}
+                            >
+                              {isImportProfileSaving ? "Salvando..." : "Salvar configuracao"}
+                            </button>
+                          </div>
+
+                          <button
+                            className="button"
+                            disabled={
+                              isExpenseImportSaving ||
+                              expenseImportPreview.valid_rows === 0
+                            }
+                            type="button"
+                            onClick={() => void handleConfirmExpenseImport()}
+                          >
+                            {isExpenseImportSaving
+                              ? "Importando..."
+                              : `Importar ${expenseImportPreview.valid_rows} despesas`}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {expenseImportResult ? (
+                    <div className="import-result">
+                      <h4>Importacao concluida</h4>
+                      <dl className="session-metrics import-summary">
+                        <div>
+                          <dt>Importadas</dt>
+                          <dd>{expenseImportResult.imported}</dd>
+                        </div>
+                        <div>
+                          <dt>Duplicadas</dt>
+                          <dd>{expenseImportResult.duplicates_skipped}</dd>
+                        </div>
+                        <div>
+                          <dt>Falhas</dt>
+                          <dd>{expenseImportResult.failed}</dd>
+                        </div>
+                      </dl>
+                      {expenseImportResult.duplicates_skipped > 0 ? (
+                        <p className="subtle-note">
+                          O GanhoCerto ignorou despesas que ja haviam sido importadas.
+                        </p>
+                      ) : null}
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={() =>
+                          document.getElementById("lista-despesas")?.scrollIntoView({
+                            behavior: "smooth",
+                          })
+                        }
+                      >
+                        Ver minhas despesas
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="vehicles-layout">
                 <form className="auth-form vehicle-form" onSubmit={handleExpenseSubmit}>
@@ -4712,7 +5501,7 @@ function App() {
                   </div>
                 </form>
 
-                <div className="vehicles-list" aria-busy={isExpensesLoading}>
+                <div className="vehicles-list" id="lista-despesas" aria-busy={isExpensesLoading}>
                   <div className="list-header">
                     <h3>Minhas despesas</h3>
                     <button
