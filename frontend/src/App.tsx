@@ -12,6 +12,12 @@ type DashboardPeriod = "today" | "last7" | "month" | "custom";
 type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
 type FinancialGoalType = "net" | "projected";
 type FinancialInsightType = "info" | "positive" | "attention";
+type WorkSessionImportField =
+  | "date"
+  | "gross_revenue"
+  | "distance_km"
+  | "worked_minutes"
+  | "trip_count";
 
 type User = {
   id: number;
@@ -66,9 +72,14 @@ type WorkSessionImportPreview = {
   total_rows: number;
   valid_rows: number;
   invalid_rows: number;
+  columns_found: string[];
+  suggested_mapping: Partial<Record<WorkSessionImportField, string>>;
+  column_mapping: Partial<Record<WorkSessionImportField, string>>;
   rows: WorkSessionImportRow[];
   errors: WorkSessionImportError[];
 };
+
+type WorkSessionImportMapping = Record<WorkSessionImportField, string>;
 
 type WorkSessionImportResult = {
   imported: number;
@@ -400,6 +411,26 @@ const emptyWorkSessionForm: WorkSessionForm = {
   worked_minutes: "",
   trip_count: "",
 };
+
+const emptyWorkSessionImportMapping: WorkSessionImportMapping = {
+  date: "",
+  gross_revenue: "",
+  distance_km: "",
+  worked_minutes: "",
+  trip_count: "",
+};
+
+const workSessionImportMappingFields: Array<{
+  field: WorkSessionImportField;
+  label: string;
+  optional?: boolean;
+}> = [
+  { field: "date", label: "Data" },
+  { field: "gross_revenue", label: "Faturamento" },
+  { field: "distance_km", label: "Km" },
+  { field: "worked_minutes", label: "Tempo trabalhado" },
+  { field: "trip_count", label: "Corridas", optional: true },
+];
 
 const emptyExpenseForm: ExpenseForm = {
   expense_date: new Date().toISOString().slice(0, 10),
@@ -734,6 +765,9 @@ function App() {
   const [workSessionImportFile, setWorkSessionImportFile] = useState<File | null>(null);
   const [workSessionImportPreview, setWorkSessionImportPreview] =
     useState<WorkSessionImportPreview | null>(null);
+  const [workSessionImportColumns, setWorkSessionImportColumns] = useState<string[]>([]);
+  const [workSessionImportMapping, setWorkSessionImportMapping] =
+    useState<WorkSessionImportMapping>(emptyWorkSessionImportMapping);
   const [workSessionImportResult, setWorkSessionImportResult] =
     useState<WorkSessionImportResult | null>(null);
   const [workSessionImportError, setWorkSessionImportError] = useState("");
@@ -817,6 +851,8 @@ function App() {
     setWorkSessionImportVehicleId("");
     setWorkSessionImportFile(null);
     setWorkSessionImportPreview(null);
+    setWorkSessionImportColumns([]);
+    setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
     setIsWorkSessionImportVisible(false);
@@ -1200,6 +1236,8 @@ function App() {
       setWorkSessionImportVehicleId("");
       setWorkSessionImportFile(null);
       setWorkSessionImportPreview(null);
+      setWorkSessionImportColumns([]);
+      setWorkSessionImportMapping(emptyWorkSessionImportMapping);
       setWorkSessionImportResult(null);
       setWorkSessionImportError("");
       setIsWorkSessionImportVisible(false);
@@ -1897,14 +1935,43 @@ function App() {
     return vehicle ? `${vehicle.name} - ${vehicle.brand} ${vehicle.model}` : "veículo selecionado";
   }
 
-  function getWorkSessionImportPath(preview = false): string {
+  function buildWorkSessionImportMappingParam(
+    mapping: Partial<WorkSessionImportMapping>,
+  ): string | null {
+    const entries = Object.entries(mapping).filter(([, value]) => value);
+    if (entries.length === 0) {
+      return null;
+    }
+
+    return JSON.stringify(Object.fromEntries(entries));
+  }
+
+  function previewToImportMapping(preview: WorkSessionImportPreview): WorkSessionImportMapping {
+    return {
+      ...emptyWorkSessionImportMapping,
+      ...preview.suggested_mapping,
+      ...preview.column_mapping,
+    };
+  }
+
+  function getWorkSessionImportPath(
+    preview = false,
+    mapping: Partial<WorkSessionImportMapping> = {},
+  ): string {
     const params = new URLSearchParams({ vehicle_id: workSessionImportVehicleId });
+    const mappingParam = buildWorkSessionImportMappingParam(mapping);
+    if (mappingParam) {
+      params.set("column_mapping", mappingParam);
+    }
+
     return `/imports/work-sessions${preview ? "/preview" : ""}?${params.toString()}`;
   }
 
   function clearWorkSessionImportFile() {
     setWorkSessionImportFile(null);
     setWorkSessionImportPreview(null);
+    setWorkSessionImportColumns([]);
+    setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
     setIsWorkSessionImportDragging(false);
@@ -1924,6 +1991,8 @@ function App() {
 
     setWorkSessionImportFile(file);
     setWorkSessionImportPreview(null);
+    setWorkSessionImportColumns([]);
+    setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
   }
@@ -1970,7 +2039,7 @@ function App() {
 
     try {
       const preview = await requestApi<WorkSessionImportPreview>(
-        getWorkSessionImportPath(true),
+        getWorkSessionImportPath(true, workSessionImportMapping),
         {
           method: "POST",
           headers: {
@@ -1981,6 +2050,8 @@ function App() {
         },
       );
       setWorkSessionImportPreview(preview);
+      setWorkSessionImportColumns(preview.columns_found);
+      setWorkSessionImportMapping(previewToImportMapping(preview));
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2016,17 +2087,22 @@ function App() {
     setWorkSessionImportResult(null);
 
     try {
-      const result = await requestApi<WorkSessionImportResult>(getWorkSessionImportPath(), {
-        method: "POST",
-        headers: {
-          ...getAuthHeaders(),
-          "Content-Type": "text/csv",
+      const result = await requestApi<WorkSessionImportResult>(
+        getWorkSessionImportPath(false, workSessionImportPreview.column_mapping),
+        {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "text/csv",
+          },
+          body: workSessionImportFile,
         },
-        body: workSessionImportFile,
-      });
+      );
       setWorkSessionImportResult(result);
       setWorkSessionImportPreview(null);
       setWorkSessionImportFile(null);
+      setWorkSessionImportColumns([]);
+      setWorkSessionImportMapping(emptyWorkSessionImportMapping);
       setSuccessMessage("Importação concluída.");
       await loadWorkSessions();
       await refreshDashboardData();
@@ -3740,6 +3816,45 @@ function App() {
                         </div>
                       ) : null}
 
+                      {workSessionImportColumns.length ? (
+                        <div className="import-mapping">
+                          <div>
+                            <h4>Qual coluna corresponde a cada informação?</h4>
+                            <p className="subtle-note">
+                              O GanhoCerto sugeriu o que encontrou. Confira e ajuste se precisar.
+                            </p>
+                          </div>
+                          <div className="form-grid">
+                            {workSessionImportMappingFields.map((item) => (
+                              <label key={item.field}>
+                                {item.label}
+                                {item.optional ? " (opcional)" : ""}
+                                <select
+                                  value={workSessionImportMapping[item.field]}
+                                  onChange={(event) => {
+                                    setWorkSessionImportMapping({
+                                      ...workSessionImportMapping,
+                                      [item.field]: event.target.value,
+                                    });
+                                    setWorkSessionImportPreview(null);
+                                    setWorkSessionImportResult(null);
+                                  }}
+                                >
+                                  <option value="">
+                                    {item.optional ? "Sem coluna / usar 0" : "Selecione"}
+                                  </option>
+                                  {workSessionImportColumns.map((column) => (
+                                    <option key={`${item.field}-${column}`} value={column}>
+                                      {column}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="form-actions import-actions">
                         <button
                           className="button"
@@ -3752,7 +3867,11 @@ function App() {
                           type="button"
                           onClick={() => void handleWorkSessionImportPreview()}
                         >
-                          {isWorkSessionImportPreviewLoading ? "Validando..." : "Visualizar preview"}
+                          {isWorkSessionImportPreviewLoading
+                            ? "Validando..."
+                            : workSessionImportColumns.length
+                              ? "Confirmar mapping e visualizar preview"
+                              : "Ler colunas e visualizar preview"}
                         </button>
                       </div>
 

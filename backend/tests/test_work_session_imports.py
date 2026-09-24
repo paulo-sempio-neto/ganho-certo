@@ -1,5 +1,7 @@
+import json
 from collections.abc import Generator
 from typing import cast
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
@@ -96,11 +98,16 @@ def post_preview(
     token: str,
     vehicle_id: int,
     csv_content: str,
+    column_mapping: dict[str, str] | None = None,
 ) -> Response:
+    path = f"/imports/work-sessions/preview?vehicle_id={vehicle_id}"
+    if column_mapping is not None:
+        path += f"&column_mapping={quote(json.dumps(column_mapping))}"
+
     return cast(
         Response,
         client.post(
-            f"/imports/work-sessions/preview?vehicle_id={vehicle_id}",
+            path,
             content=csv_content.encode("utf-8"),
             headers=csv_headers(token),
         ),
@@ -112,11 +119,16 @@ def post_import(
     token: str,
     vehicle_id: int,
     csv_content: str,
+    column_mapping: dict[str, str] | None = None,
 ) -> Response:
+    path = f"/imports/work-sessions?vehicle_id={vehicle_id}"
+    if column_mapping is not None:
+        path += f"&column_mapping={quote(json.dumps(column_mapping))}"
+
     return cast(
         Response,
         client.post(
-            f"/imports/work-sessions?vehicle_id={vehicle_id}",
+            path,
             content=csv_content.encode("utf-8"),
             headers=csv_headers(token),
         ),
@@ -141,6 +153,27 @@ def test_preview_valid_csv_normalizes_rows_without_persisting(
         "total_rows": 2,
         "valid_rows": 2,
         "invalid_rows": 0,
+        "columns_found": [
+            "date",
+            "gross_revenue",
+            "distance_km",
+            "worked_minutes",
+            "trip_count",
+        ],
+        "suggested_mapping": {
+            "date": "date",
+            "gross_revenue": "gross_revenue",
+            "distance_km": "distance_km",
+            "worked_minutes": "worked_minutes",
+            "trip_count": "trip_count",
+        },
+        "column_mapping": {
+            "date": "date",
+            "gross_revenue": "gross_revenue",
+            "distance_km": "distance_km",
+            "worked_minutes": "worked_minutes",
+            "trip_count": "trip_count",
+        },
         "rows": [
             {
                 "row": 2,
@@ -193,6 +226,135 @@ def test_import_preserves_money_precision(client: TestClient, db_session: Sessio
     assert f"{work_session.gross_revenue:.2f}" == "0.30"
 
 
+def test_preview_suggests_simple_aliases(client: TestClient) -> None:
+    token = register_and_login(client, "aliases@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = (
+        "data,ganhos,km,minutos,corridas\n"
+        "2026-09-20,350.50,180.40,480,22\n"
+    )
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["columns_found"] == ["data", "ganhos", "km", "minutos", "corridas"]
+    assert response.json()["suggested_mapping"] == {
+        "date": "data",
+        "gross_revenue": "ganhos",
+        "distance_km": "km",
+        "worked_minutes": "minutos",
+        "trip_count": "corridas",
+    }
+    assert response.json()["valid_rows"] == 1
+
+
+def test_preview_accepts_manual_mapping(client: TestClient) -> None:
+    token = register_and_login(client, "manual-mapping@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "Dia,Valor,Distancia,Tempo\n2026-09-20,350.50,180.40,480\n"
+
+    response = post_preview(
+        client,
+        token,
+        vehicle_id,
+        csv_content,
+        {
+            "date": "Dia",
+            "gross_revenue": "Valor",
+            "distance_km": "Distancia",
+            "worked_minutes": "Tempo",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 1
+    assert response.json()["rows"][0]["trip_count"] == 0
+    assert response.json()["column_mapping"] == {
+        "date": "Dia",
+        "gross_revenue": "Valor",
+        "distance_km": "Distancia",
+        "worked_minutes": "Tempo",
+    }
+
+
+def test_preview_rejects_missing_required_mapping(client: TestClient) -> None:
+    token = register_and_login(client, "missing-mapping@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "Dia,Valor,Distancia,Tempo\n2026-09-20,350.50,180.40,480\n"
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 0
+    assert response.json()["errors"][0]["message"] == "Mapeamento obrigatório não informado."
+
+
+def test_preview_rejects_missing_column_in_mapping(client: TestClient) -> None:
+    token = register_and_login(client, "missing-column@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "Dia,Valor,Distancia,Tempo\n2026-09-20,350.50,180.40,480\n"
+
+    response = post_preview(
+        client,
+        token,
+        vehicle_id,
+        csv_content,
+        {
+            "date": "Dia",
+            "gross_revenue": "Valor",
+            "distance_km": "Distancia",
+            "worked_minutes": "Minutos",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 0
+    assert response.json()["errors"][0]["field"] == "worked_minutes"
+    assert response.json()["errors"][0]["message"] == "Coluna mapeada não encontrada no CSV."
+
+
+def test_preview_rejects_duplicate_mapping(client: TestClient) -> None:
+    token = register_and_login(client, "duplicate-mapping@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "Dia,Valor,Distancia,Tempo\n2026-09-20,350.50,180.40,480\n"
+
+    response = post_preview(
+        client,
+        token,
+        vehicle_id,
+        csv_content,
+        {
+            "date": "Dia",
+            "gross_revenue": "Valor",
+            "distance_km": "Distancia",
+            "worked_minutes": "Distancia",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 0
+    assert any(
+        error["message"] == "A mesma coluna não pode ser usada para mais de um campo."
+        for error in response.json()["errors"]
+    )
+
+
+def test_ambiguous_mapping_does_not_import_automatically(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "ambiguous-mapping@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "data,data,ganhos,km,minutos\n2026-09-20,2026-09-20,350.50,180.40,480\n"
+
+    response = post_import(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["imported"] == 0
+    assert response.json()["failed"] == 1
+    assert count_work_sessions(db_session) == 0
+
+
 def test_import_rejects_vehicle_from_other_user(client: TestClient) -> None:
     user_a_token = register_and_login(client, "vehicle-import-a@email.com")
     user_b_token = register_and_login(client, "vehicle-import-b@email.com")
@@ -217,9 +379,9 @@ def test_import_without_token_returns_401(client: TestClient) -> None:
     ("csv_content", "field"),
     [
         (
-            "gross_revenue,date,distance_km,worked_minutes,trip_count\n"
-            "10,2026-09-20,1,60,1\n",
-            "header",
+            "quando,valor,distancia,tempo,total\n"
+            "2026-09-20,10,1,60,1\n",
+            "date",
         ),
         (CSV_HEADER + "20-09-2026,10.00,1.00,60,1\n", "date"),
         (CSV_HEADER + "2026-09-20,valor,1.00,60,1\n", "gross_revenue"),

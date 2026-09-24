@@ -223,6 +223,9 @@ class WorkSessionImportPreview(BaseModel):
     total_rows: int
     valid_rows: int
     invalid_rows: int
+    columns_found: list[str] = Field(default_factory=list)
+    suggested_mapping: dict[str, str] = Field(default_factory=dict)
+    column_mapping: dict[str, str] = Field(default_factory=dict)
     rows: list[WorkSessionImportRow]
     errors: list[WorkSessionImportError]
 
