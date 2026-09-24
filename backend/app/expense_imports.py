@@ -302,7 +302,21 @@ def parse_csv_content(
     total_rows = 0
 
     for row_number, raw_row in enumerate(reader, start=2):
-        if raw_row is None or all(not (value or "").strip() for value in raw_row.values()):
+        if raw_row is None:
+            continue
+
+        if None in raw_row:
+            total_rows += 1
+            errors.append(
+                WorkSessionImportError(
+                    row=row_number,
+                    field="file",
+                    message="Linha CSV possui mais colunas do que o cabeçalho.",
+                )
+            )
+            continue
+
+        if all(not (value or "").strip() for value in raw_row.values()):
             continue
 
         total_rows += 1

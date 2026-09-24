@@ -165,6 +165,24 @@ def test_expense_import_preview_valid_does_not_persist(
     assert count_expenses(db_session) == 0
 
 
+def test_expense_import_preview_rejects_rows_with_extra_columns(client: TestClient) -> None:
+    token = register_and_login(client, "extra-columns-expenses@email.com")
+    csv_content = CSV_HEADER + ",,,,valor excedente\n"
+
+    response = post_preview(client, token, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 0
+    assert response.json()["invalid_rows"] == 1
+    assert response.json()["errors"] == [
+        {
+            "row": 2,
+            "field": "file",
+            "message": "Linha CSV possui mais colunas do que o cabeçalho.",
+        }
+    ]
+
+
 def test_expense_import_valid_multiple_rows_and_precision(
     client: TestClient,
     db_session: Session,

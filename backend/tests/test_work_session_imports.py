@@ -197,6 +197,25 @@ def test_preview_valid_csv_normalizes_rows_without_persisting(
     assert count_work_sessions(db_session) == 0
 
 
+def test_preview_rejects_rows_with_extra_columns(client: TestClient) -> None:
+    token = register_and_login(client, "extra-columns-work-sessions@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = CSV_HEADER + ",,,,,valor excedente\n"
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 0
+    assert response.json()["invalid_rows"] == 1
+    assert response.json()["errors"] == [
+        {
+            "row": 2,
+            "field": "file",
+            "message": "Linha CSV possui mais colunas do que o cabeçalho.",
+        }
+    ]
+
+
 def test_import_valid_csv_imports_multiple_rows(client: TestClient, db_session: Session) -> None:
     token = register_and_login(client, "import@email.com")
     vehicle_id = create_vehicle(client, token)

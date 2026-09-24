@@ -3,12 +3,13 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import WorkSession
+from app.models import Expense, WorkSession
 
 
 @pytest.fixture
@@ -96,6 +97,17 @@ def create_work_session(client: TestClient, token: str, vehicle_id: int) -> int:
     return int(response.json()["id"])
 
 
+def quick_start_payload(
+    vehicle_id: int,
+    expense_amount: str | None = "45.00",
+) -> dict[str, object]:
+    payload = work_session_payload(vehicle_id)
+    if expense_amount is not None:
+        payload["expense_amount"] = expense_amount
+        payload["expense_category"] = "fuel"
+    return payload
+
+
 def test_create_work_session(client: TestClient) -> None:
     token = register_and_login(client, "paulo@email.com")
     vehicle_id = create_vehicle(client, token)
@@ -110,6 +122,91 @@ def test_create_work_session(client: TestClient) -> None:
     assert response.json()["vehicle_id"] == vehicle_id
     assert response.json()["gross_revenue"] == "123.45"
     assert "user_id" not in response.json()
+
+
+def test_quick_start_creates_work_session_and_optional_expense(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "quick-start-success@email.com")
+    vehicle_id = create_vehicle(client, token)
+
+    response = client.post(
+        "/work-sessions/quick-start",
+        json=quick_start_payload(vehicle_id),
+        headers=auth_headers(token),
+    )
+
+    work_sessions = db_session.scalars(select(WorkSession)).all()
+    expenses = db_session.scalars(select(Expense)).all()
+    assert response.status_code == 201
+    assert len(work_sessions) == 1
+    assert len(expenses) == 1
+    assert expenses[0].vehicle_id == vehicle_id
+    assert expenses[0].amount_cents == 4500
+
+
+def test_quick_start_rolls_back_work_session_when_expense_creation_fails(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = register_and_login(client, "quick-start-rollback@email.com")
+    vehicle_id = create_vehicle(client, token)
+    original_add = db_session.add
+
+    def fail_expense_add(instance: object, _warn: bool = True) -> None:
+        if isinstance(instance, Expense):
+            raise IntegrityError("Simulated expense failure", {}, Exception())
+        original_add(instance, _warn=_warn)
+
+    monkeypatch.setattr(db_session, "add", fail_expense_add)
+
+    response = client.post(
+        "/work-sessions/quick-start",
+        json=quick_start_payload(vehicle_id),
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 500
+    assert db_session.scalars(select(WorkSession)).all() == []
+    assert db_session.scalars(select(Expense)).all() == []
+
+
+def test_quick_start_without_expense_creates_only_work_session(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "quick-start-no-expense@email.com")
+    vehicle_id = create_vehicle(client, token)
+
+    response = client.post(
+        "/work-sessions/quick-start",
+        json=quick_start_payload(vehicle_id, expense_amount=None),
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    assert len(db_session.scalars(select(WorkSession)).all()) == 1
+    assert db_session.scalars(select(Expense)).all() == []
+
+
+def test_quick_start_keeps_data_isolated_between_users(client: TestClient) -> None:
+    user_a_token = register_and_login(client, "quick-start-a@email.com")
+    user_b_token = register_and_login(client, "quick-start-b@email.com")
+    user_a_vehicle = create_vehicle(client, user_a_token, "Carro A")
+
+    response = client.post(
+        "/work-sessions/quick-start",
+        json=quick_start_payload(user_a_vehicle),
+        headers=auth_headers(user_a_token),
+    )
+    user_b_sessions = client.get("/work-sessions", headers=auth_headers(user_b_token))
+    user_b_expenses = client.get("/expenses", headers=auth_headers(user_b_token))
+
+    assert response.status_code == 201
+    assert user_b_sessions.json() == []
+    assert user_b_expenses.json() == []
 
 
 def test_list_only_current_user_work_sessions(client: TestClient) -> None:

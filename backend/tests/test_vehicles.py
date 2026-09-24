@@ -140,6 +140,33 @@ def test_delete_own_vehicle(client: TestClient) -> None:
     assert get_response.status_code == 404
 
 
+def test_delete_vehicle_with_related_records_returns_conflict(client: TestClient) -> None:
+    token = register_and_login(client, "vehicle-dependencies@email.com")
+    vehicle_id = create_vehicle(client, token)
+    work_session_response = client.post(
+        "/work-sessions",
+        json={
+            "vehicle_id": vehicle_id,
+            "work_date": "2026-09-23",
+            "gross_revenue": "120.00",
+            "distance_km": "40.00",
+            "worked_minutes": 180,
+            "trip_count": 8,
+        },
+        headers=auth_headers(token),
+    )
+
+    delete_response = client.delete(f"/vehicles/{vehicle_id}", headers=auth_headers(token))
+    get_response = client.get(f"/vehicles/{vehicle_id}", headers=auth_headers(token))
+
+    assert work_session_response.status_code == 201
+    assert delete_response.status_code == 409
+    assert delete_response.json()["detail"] == (
+        "Vehicle cannot be deleted because it has related records."
+    )
+    assert get_response.status_code == 200
+
+
 def test_vehicles_without_token_returns_401(client: TestClient) -> None:
     response = client.get("/vehicles")
 

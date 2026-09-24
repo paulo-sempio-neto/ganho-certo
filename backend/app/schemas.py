@@ -181,6 +181,14 @@ class MaintenanceRecordCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @field_validator("service_date")
+    @classmethod
+    def validate_service_date(cls, value: date) -> date:
+        if value > date.today():
+            raise ValueError("service_date cannot be in the future.")
+
+        return value
+
     @field_validator("notes")
     @classmethod
     def normalize_notes(cls, value: str | None) -> str | None:
@@ -308,6 +316,11 @@ class WorkSessionCreate(WorkSessionBase):
 
 class WorkSessionUpdate(WorkSessionBase):
     pass
+
+
+class QuickStartDayCreate(WorkSessionBase):
+    expense_amount: Decimal | None = Field(default=None, gt=Decimal("0"))
+    expense_category: Literal["fuel", "charging"] = "fuel"
 
 
 class WorkSessionPublic(WorkSessionBase):

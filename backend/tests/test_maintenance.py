@@ -247,6 +247,23 @@ def test_create_and_list_maintenance_records_ordered(client: TestClient) -> None
     assert [record["notes"] for record in response.json()] == ["Nova", "Antiga"]
 
 
+def test_maintenance_record_rejects_future_service_date(client: TestClient) -> None:
+    token = register_and_login(client, "maintenance-future-date@email.com")
+    vehicle_id = create_vehicle(client, token)
+    plan = create_plan(client, token, vehicle_id)
+
+    response = client.post(
+        f"/maintenance-plans/{plan['id']}/records",
+        json={
+            "service_date": (date.today() + timedelta(days=1)).isoformat(),
+            "notes": "Agendada",
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 422
+
+
 def test_maintenance_isolation_and_authentication(client: TestClient) -> None:
     user_a_token = register_and_login(client, "maintenance-access-a@email.com")
     user_b_token = register_and_login(client, "maintenance-access-b@email.com")

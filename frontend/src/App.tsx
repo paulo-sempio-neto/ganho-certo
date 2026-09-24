@@ -524,7 +524,7 @@ const emptyCostProfileForm: VehicleCostProfileForm = {
 };
 
 const emptyWorkSessionForm: WorkSessionForm = {
-  work_date: new Date().toISOString().slice(0, 10),
+  work_date: toDateInputValue(new Date()),
   vehicle_id: "",
   gross_revenue: "",
   distance_km: "",
@@ -572,7 +572,7 @@ const expenseImportMappingFields: Array<{
 ];
 
 const emptyExpenseForm: ExpenseForm = {
-  expense_date: new Date().toISOString().slice(0, 10),
+  expense_date: toDateInputValue(new Date()),
   category: "fuel",
   amount: "",
   vehicle_id: "",
@@ -583,7 +583,7 @@ const emptyRecurringExpenseForm: RecurringExpenseForm = {
   category: "insurance",
   amount: "",
   frequency: "monthly",
-  start_date: new Date().toISOString().slice(0, 10),
+  start_date: toDateInputValue(new Date()),
   end_date: "",
   vehicle_id: "",
   description: "",
@@ -593,8 +593,8 @@ const emptyRecurringExpenseForm: RecurringExpenseForm = {
 const emptyFinancialGoalForm: FinancialGoalForm = {
   goal_type: "net",
   target_amount: "",
-  start_date: new Date().toISOString().slice(0, 10),
-  end_date: new Date().toISOString().slice(0, 10),
+  start_date: toDateInputValue(new Date()),
+  end_date: toDateInputValue(new Date()),
   vehicle_id: "",
 };
 
@@ -609,7 +609,7 @@ const emptyMaintenancePlanForm: MaintenancePlanForm = {
 };
 
 const emptyMaintenanceRecordForm: MaintenanceRecordForm = {
-  service_date: new Date().toISOString().slice(0, 10),
+  service_date: toDateInputValue(new Date()),
   notes: "",
 };
 
@@ -633,7 +633,7 @@ const emptyQuickDailyEntryForm: QuickDailyEntryForm = {
   worked_minutes: "",
   trip_count: "",
   vehicle_id: "",
-  work_date: new Date().toISOString().slice(0, 10),
+  work_date: toDateInputValue(new Date()),
 };
 
 function toDateInputValue(date: Date): string {
@@ -709,13 +709,13 @@ function getMaintenanceStatusClass(value: MaintenanceStatusType): string {
   return "status-pill status-active";
 }
 
-function getErrorMessage(status: number): string {
+function getDefaultErrorMessage(status: number): string {
   if (status === 401) {
     return "Sessao expirada ou invalida. Entre novamente.";
   }
 
   if (status === 409) {
-    return "Este email ja esta cadastrado.";
+    return "Conflito ao concluir a solicitacao.";
   }
 
   if (status === 422) {
@@ -729,6 +729,30 @@ function getErrorMessage(status: number): string {
   return "Nao foi possivel concluir a solicitacao.";
 }
 
+async function getErrorMessage(response: Response): Promise<string> {
+  if (response.status !== 409) {
+    return getDefaultErrorMessage(response.status);
+  }
+
+  try {
+    const payload: unknown = await response.json();
+    if (
+      typeof payload === "object" &&
+      payload !== null &&
+      "detail" in payload &&
+      typeof payload.detail === "string"
+    ) {
+      return payload.detail === "Email already registered."
+        ? "Este email ja esta cadastrado."
+        : payload.detail;
+    }
+  } catch {
+    // Fall back to a generic message when the API does not return JSON.
+  }
+
+  return getDefaultErrorMessage(response.status);
+}
+
 function normalizeDecimalInput(value: string): string {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   if (!/^\d+(\.\d+)?$/.test(normalized)) {
@@ -739,10 +763,32 @@ function normalizeDecimalInput(value: string): string {
 }
 
 function moneyInputToApi(value: string): string {
-  const cleaned = value.trim().replace(/R\$/gi, "").replace(/\s/g, "").replace(/\./g, "");
-  const normalized = cleaned.replace(",", ".");
+  const cleaned = value.trim().replace(/R\$/gi, "").replace(/\s/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  const decimalIndex = Math.max(lastComma, lastDot);
+  let normalized = cleaned;
+
+  if (decimalIndex >= 0) {
+    const integerPart = cleaned.slice(0, decimalIndex).replace(/[.,]/g, "");
+    const decimalPart = cleaned.slice(decimalIndex + 1);
+    if (!integerPart || !decimalPart) {
+      throw new Error("Informe um valor em reais, por exemplo 250,50.");
+    }
+
+    if (decimalPart.length <= 2) {
+      normalized = `${integerPart}.${decimalPart}`;
+    } else if (
+      decimalPart.length === 3 &&
+      (lastComma < 0 || lastDot < 0) &&
+      /^[\d.]+$/.test(cleaned)
+    ) {
+      normalized = `${cleaned.replace(/[.,]/g, "")}.00`;
+    }
+  }
+
   if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
-    throw new Error("Informe o faturamento em reais, por exemplo 250,50.");
+    throw new Error("Informe um valor em reais, por exemplo 250,50.");
   }
 
   const [reais, cents = ""] = normalized.split(".");
@@ -926,7 +972,7 @@ async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(response.status));
+    throw new Error(await getErrorMessage(response));
   }
 
   if (response.status === 204) {
@@ -2005,7 +2051,7 @@ function App() {
     const fuelExpenseCents = moneyInputToCents(quickStartForm.fuel_expense);
     const workDate = toDateInputValue(new Date());
 
-    await requestApi<WorkSession>("/work-sessions", {
+    await requestApi<WorkSession>("/work-sessions/quick-start", {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -2015,22 +2061,14 @@ function App() {
         distance_km: normalizeDecimalInput(quickStartForm.distance_km),
         worked_minutes: workedMinutes,
         trip_count: tripCount,
+        ...(fuelExpenseCents > 0n
+          ? {
+              expense_amount: moneyInputToApi(quickStartForm.fuel_expense),
+              expense_category: quickStartForm.expense_category,
+            }
+          : {}),
       }),
     });
-
-    if (fuelExpenseCents > 0n) {
-      await requestApi<Expense>("/expenses", {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          vehicle_id: vehicle.id,
-          expense_date: workDate,
-          category: quickStartForm.expense_category,
-          amount: moneyInputToApi(quickStartForm.fuel_expense),
-          description: "Registrado pelo início rápido",
-        }),
-      });
-    }
 
     setPendingQuickStartAction(null);
     setSuccessMessage("Seu primeiro dia foi registrado com os dados da simulação.");

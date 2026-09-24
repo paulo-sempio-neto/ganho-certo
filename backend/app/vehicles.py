@@ -2,11 +2,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import User, Vehicle
+from app.models import (
+    CsvImportProfile,
+    Expense,
+    FinancialGoal,
+    MaintenancePlan,
+    RecurringExpense,
+    User,
+    Vehicle,
+    VehicleCostProfile,
+    WorkSession,
+)
 from app.schemas import VehicleCreate, VehiclePublic, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
@@ -20,6 +31,22 @@ def get_user_vehicle(vehicle_id: int, user_id: int, db: Session) -> Vehicle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found.")
 
     return vehicle
+
+
+def vehicle_has_dependencies(vehicle_id: int, db: Session) -> bool:
+    dependent_models = (
+        WorkSession,
+        Expense,
+        RecurringExpense,
+        FinancialGoal,
+        CsvImportProfile,
+        MaintenancePlan,
+        VehicleCostProfile,
+    )
+    return any(
+        db.scalar(select(model.id).where(model.vehicle_id == vehicle_id).limit(1)) is not None
+        for model in dependent_models
+    )
 
 
 @router.post("", response_model=VehiclePublic, status_code=status.HTTP_201_CREATED)
@@ -85,6 +112,19 @@ def delete_vehicle(
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
     vehicle = get_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
-    db.delete(vehicle)
-    db.commit()
+    if vehicle_has_dependencies(vehicle_id=vehicle.id, db=db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vehicle cannot be deleted because it has related records.",
+        )
+
+    try:
+        db.delete(vehicle)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vehicle cannot be deleted because it has related records.",
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

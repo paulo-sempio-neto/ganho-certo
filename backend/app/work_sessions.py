@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import User, Vehicle, WorkSession
-from app.schemas import WorkSessionCreate, WorkSessionPublic, WorkSessionUpdate
+from app.models import Expense, User, Vehicle, WorkSession
+from app.schemas import QuickStartDayCreate, WorkSessionCreate, WorkSessionPublic, WorkSessionUpdate
 
 router = APIRouter(prefix="/work-sessions", tags=["work-sessions"])
 
@@ -58,6 +58,48 @@ def create_work_session(
     )
     db.add(work_session)
     db.commit()
+    db.refresh(work_session)
+    return work_session
+
+
+@router.post("/quick-start", response_model=WorkSessionPublic, status_code=status.HTTP_201_CREATED)
+def create_quick_start_day(
+    payload: QuickStartDayCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> WorkSession:
+    get_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
+    work_session = WorkSession(
+        user_id=current_user.id,
+        vehicle_id=payload.vehicle_id,
+        work_date=payload.work_date,
+        gross_revenue_cents=money_to_cents(payload.gross_revenue),
+        distance_km=payload.distance_km,
+        worked_minutes=payload.worked_minutes,
+        trip_count=payload.trip_count,
+    )
+
+    try:
+        db.add(work_session)
+        if payload.expense_amount is not None:
+            db.add(
+                Expense(
+                    user_id=current_user.id,
+                    vehicle_id=payload.vehicle_id,
+                    expense_date=payload.work_date,
+                    category=payload.expense_category,
+                    amount_cents=money_to_cents(payload.expense_amount),
+                    description="Registrado pelo início rápido",
+                )
+            )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not register quick-start day.",
+        ) from exc
+
     db.refresh(work_session)
     return work_session
 
