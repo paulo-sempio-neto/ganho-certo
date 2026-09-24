@@ -16,6 +16,7 @@ FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid"
 OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
+FinancialInsightType = Literal["info", "positive", "attention"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -352,6 +353,17 @@ class FinancialGoalProgress(BaseModel):
             return None
 
         return f"{value:.2f}"
+
+
+class FinancialInsight(BaseModel):
+    code: str
+    type: FinancialInsightType
+    title: str
+    message: str
+
+
+class FinancialInsightsResponse(BaseModel):
+    insights: list[FinancialInsight]
 
 
 class FinancialDailySummary(BaseModel):
