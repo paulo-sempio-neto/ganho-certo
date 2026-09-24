@@ -719,6 +719,21 @@ select:focus {
   gap: 10px;
 }
 
+.toggle-field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border-radius: 8px;
+  background: #f4f7f3;
+  padding: 12px;
+}
+
+.toggle-field input {
+  width: 20px;
+  min-height: 20px;
+  accent-color: #26734d;
+}
+
 .vehicles-list {
   display: grid;
   align-content: start;
@@ -818,6 +833,31 @@ select:focus {
   grid-template-columns: minmax(0, 0.6fr) minmax(0, 1.4fr);
 }
 
+.recurring-card-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.vehicle-card .status-pill {
+  padding: 5px 9px;
+}
+
+.status-active {
+  background: #edf8ef;
+  color: #21643f;
+}
+
+.status-inactive {
+  background: #f4eee8;
+  color: #76510d;
+}
+
+.recurring-metrics {
+  grid-template-columns: 0.8fr 1.1fr 1.1fr;
+}
+
 .expense-description {
   margin: 12px 0 0;
   border-left: 3px solid #cbd3ca;
@@ -842,6 +882,7 @@ select:focus {
   .form-grid,
   .form-grid-three,
   .session-metrics,
+  .recurring-metrics,
   .daily-time-grid,
   .daily-entry-metrics,
   .daily-entry-actions,

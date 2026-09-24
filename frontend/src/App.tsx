@@ -9,6 +9,7 @@ type AuthMode = "login" | "register";
 type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
 type OwnershipType = "owned" | "financed" | "rented";
 type DashboardPeriod = "today" | "last7" | "month" | "custom";
+type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
 
 type User = {
   id: number;
@@ -63,6 +64,20 @@ type Expense = {
   category: ExpenseCategory;
   amount: string;
   description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type RecurringExpense = {
+  id: number;
+  vehicle_id: number | null;
+  category: ExpenseCategory;
+  amount: string;
+  frequency: RecurringExpenseFrequency;
+  start_date: string;
+  end_date: string | null;
+  description: string | null;
+  active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -123,6 +138,17 @@ type ExpenseForm = {
   amount: string;
   vehicle_id: string;
   description: string;
+};
+
+type RecurringExpenseForm = {
+  category: ExpenseCategory;
+  amount: string;
+  frequency: RecurringExpenseFrequency;
+  start_date: string;
+  end_date: string;
+  vehicle_id: string;
+  description: string;
+  active: boolean;
 };
 
 type QuickStartForm = {
@@ -244,6 +270,12 @@ const expenseCategoryOptions: Array<{ label: string; value: ExpenseCategory }> =
   { label: "Outros", value: "other" },
 ];
 
+const recurringFrequencyOptions: Array<{ label: string; value: RecurringExpenseFrequency }> = [
+  { label: "Semanal", value: "weekly" },
+  { label: "Mensal", value: "monthly" },
+  { label: "Anual", value: "yearly" },
+];
+
 const emptyVehicleForm: VehicleForm = {
   name: "",
   brand: "",
@@ -282,6 +314,17 @@ const emptyExpenseForm: ExpenseForm = {
   amount: "",
   vehicle_id: "",
   description: "",
+};
+
+const emptyRecurringExpenseForm: RecurringExpenseForm = {
+  category: "insurance",
+  amount: "",
+  frequency: "monthly",
+  start_date: new Date().toISOString().slice(0, 10),
+  end_date: "",
+  vehicle_id: "",
+  description: "",
+  active: true,
 };
 
 const emptyQuickStartForm: QuickStartForm = {
@@ -342,6 +385,10 @@ function getFuelLabel(value: FuelType): string {
 
 function getExpenseCategoryLabel(value: ExpenseCategory): string {
   return expenseCategoryOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function getRecurringFrequencyLabel(value: RecurringExpenseFrequency): string {
+  return recurringFrequencyOptions.find((option) => option.value === value)?.label ?? value;
 }
 
 function getErrorMessage(status: number): string {
@@ -510,6 +557,7 @@ function App() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [costProfileForm, setCostProfileForm] =
@@ -517,6 +565,8 @@ function App() {
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
+  const [recurringExpenseForm, setRecurringExpenseForm] =
+    useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
   const [quickStartForm, setQuickStartForm] = useState<QuickStartForm>(emptyQuickStartForm);
   const [quickStartResult, setQuickStartResult] = useState<QuickStartResult | null>(null);
   const [quickStartVisible, setQuickStartVisible] = useState(false);
@@ -535,6 +585,7 @@ function App() {
   const [costProfileVehicleId, setCostProfileVehicleId] = useState<number | null>(null);
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+  const [editingRecurringExpenseId, setEditingRecurringExpenseId] = useState<number | null>(null);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
   const [dashboardVehicleId, setDashboardVehicleId] = useState("");
   const [customStartDate, setCustomStartDate] = useState(toDateInputValue(new Date()));
@@ -546,12 +597,14 @@ function App() {
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
   const [isExpensesLoading, setIsExpensesLoading] = useState(false);
+  const [isRecurringExpensesLoading, setIsRecurringExpensesLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
+  const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
 
@@ -562,15 +615,18 @@ function App() {
     setVehicles([]);
     setWorkSessions([]);
     setExpenses([]);
+    setRecurringExpenses([]);
     setFinancialSummary(null);
     setEditingVehicleId(null);
     setCostProfileVehicleId(null);
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
+    setEditingRecurringExpenseId(null);
     setVehicleForm(emptyVehicleForm);
     setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
     setExpenseForm(emptyExpenseForm);
+    setRecurringExpenseForm(emptyRecurringExpenseForm);
     setQuickStartForm(emptyQuickStartForm);
     setQuickStartResult(null);
     setQuickStartVisible(false);
@@ -765,6 +821,30 @@ function App() {
     }
   }
 
+  async function loadRecurringExpenses(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsRecurringExpensesLoading(true);
+    try {
+      const nextRecurringExpenses = await requestApi<RecurringExpense[]>("/recurring-expenses", {
+        headers: getAuthHeaders(currentToken),
+      });
+      setRecurringExpenses(nextRecurringExpenses);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(
+          error instanceof Error ? error.message : "Erro ao carregar despesas recorrentes.",
+        );
+      }
+    } finally {
+      setIsRecurringExpensesLoading(false);
+    }
+  }
+
   async function loadFinancialSummary(currentToken = token) {
     if (!currentToken) {
       return;
@@ -826,6 +906,7 @@ function App() {
       setVehicles([]);
       setWorkSessions([]);
       setExpenses([]);
+      setRecurringExpenses([]);
       setFinancialSummary(null);
       setCostProfileVehicleId(null);
       setCostProfileForm(emptyCostProfileForm);
@@ -842,6 +923,7 @@ function App() {
         await loadVehicles(token);
         await loadWorkSessions(token);
         await loadExpenses(token);
+        await loadRecurringExpenses(token);
         await loadFinancialSummary(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
@@ -1604,6 +1686,145 @@ function App() {
     }
   }
 
+  function resetRecurringExpenseForm() {
+    setEditingRecurringExpenseId(null);
+    setRecurringExpenseForm(emptyRecurringExpenseForm);
+  }
+
+  function handleEditRecurringExpense(recurringExpense: RecurringExpense) {
+    setEditingRecurringExpenseId(recurringExpense.id);
+    setRecurringExpenseForm({
+      category: recurringExpense.category,
+      amount: formatMoney(recurringExpense.amount).replace("R$ ", ""),
+      frequency: recurringExpense.frequency,
+      start_date: recurringExpense.start_date,
+      end_date: recurringExpense.end_date ?? "",
+      vehicle_id: recurringExpense.vehicle_id ? String(recurringExpense.vehicle_id) : "",
+      description: recurringExpense.description ?? "",
+      active: recurringExpense.active,
+    });
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  function buildRecurringExpensePayload(form: RecurringExpenseForm) {
+    return {
+      category: form.category,
+      amount: moneyInputToApi(form.amount),
+      frequency: form.frequency,
+      start_date: form.start_date,
+      end_date: form.end_date || null,
+      description: form.description.trim() || null,
+      active: form.active,
+      ...(form.vehicle_id ? { vehicle_id: Number(form.vehicle_id) } : {}),
+    };
+  }
+
+  async function handleRecurringExpenseSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsRecurringExpenseSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = buildRecurringExpensePayload(recurringExpenseForm);
+
+      if (editingRecurringExpenseId) {
+        await requestApi<RecurringExpense>(`/recurring-expenses/${editingRecurringExpenseId}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Despesa recorrente atualizada com sucesso.");
+      } else {
+        await requestApi<RecurringExpense>("/recurring-expenses", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Despesa recorrente cadastrada com sucesso.");
+      }
+
+      resetRecurringExpenseForm();
+      await loadRecurringExpenses();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(
+          error instanceof Error ? error.message : "Erro ao salvar despesa recorrente.",
+        );
+      }
+    } finally {
+      setIsRecurringExpenseSaving(false);
+    }
+  }
+
+  async function handleToggleRecurringExpense(recurringExpense: RecurringExpense) {
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<RecurringExpense>(`/recurring-expenses/${recurringExpense.id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          category: recurringExpense.category,
+          amount: recurringExpense.amount,
+          frequency: recurringExpense.frequency,
+          start_date: recurringExpense.start_date,
+          end_date: recurringExpense.end_date,
+          description: recurringExpense.description,
+          active: !recurringExpense.active,
+          ...(recurringExpense.vehicle_id ? { vehicle_id: recurringExpense.vehicle_id } : {}),
+        }),
+      });
+      setSuccessMessage(
+        recurringExpense.active
+          ? "Despesa recorrente desativada."
+          : "Despesa recorrente ativada.",
+      );
+      await loadRecurringExpenses();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(
+          error instanceof Error ? error.message : "Erro ao alterar despesa recorrente.",
+        );
+      }
+    }
+  }
+
+  async function handleDeleteRecurringExpense(recurringExpense: RecurringExpense) {
+    const shouldDelete = window.confirm(
+      `Excluir a despesa recorrente de ${getExpenseCategoryLabel(recurringExpense.category)}?`,
+    );
+    if (!shouldDelete) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<void>(`/recurring-expenses/${recurringExpense.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setSuccessMessage("Despesa recorrente excluida com sucesso.");
+      await loadRecurringExpenses();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(
+          error instanceof Error ? error.message : "Erro ao excluir despesa recorrente.",
+        );
+      }
+    }
+  }
+
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
 
@@ -1669,6 +1890,7 @@ function App() {
               ) : null}
               <a href="#jornadas">Jornadas</a>
               <a href="#despesas">Despesas</a>
+              <a href="#despesas-recorrentes">Recorrentes</a>
               <a href="#veiculos">Veículos</a>
             </nav>
 
@@ -2894,6 +3116,293 @@ function App() {
                           className="text-button danger"
                           type="button"
                           onClick={() => void handleDeleteExpense(expense)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-section" id="despesas-recorrentes">
+              <div className="section-title">
+                <p className="eyebrow">Despesas recorrentes</p>
+                <h3>Custos que se repetem</h3>
+                <p className="subtle-note">
+                  Cadastre custos que se repetem para nÃ£o precisar informÃ¡-los novamente todos os meses.
+                </p>
+                <p className="subtle-note">
+                  Por enquanto, estes custos ficam apenas configurados: ainda nÃ£o sÃ£o lanÃ§ados como
+                  despesas nem aplicados ao dashboard.
+                </p>
+              </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleRecurringExpenseSubmit}>
+                  <h3>
+                    {editingRecurringExpenseId
+                      ? "Editar despesa recorrente"
+                      : "Cadastrar despesa recorrente"}
+                  </h3>
+
+                  <div className="form-grid">
+                    <label>
+                      Categoria
+                      <select
+                        name="recurring-expense-category"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            category: event.target.value as ExpenseCategory,
+                          })
+                        }
+                        required
+                        value={recurringExpenseForm.category}
+                      >
+                        {expenseCategoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      FrequÃªncia
+                      <select
+                        name="recurring-expense-frequency"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            frequency: event.target.value as RecurringExpenseFrequency,
+                          })
+                        }
+                        required
+                        value={recurringExpenseForm.frequency}
+                      >
+                        {recurringFrequencyOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Valor
+                      <input
+                        inputMode="decimal"
+                        name="recurring-expense-amount"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            amount: event.target.value,
+                          })
+                        }
+                        placeholder="120,35"
+                        required
+                        type="text"
+                        value={recurringExpenseForm.amount}
+                      />
+                    </label>
+
+                    <label>
+                      VeÃ­culo
+                      <select
+                        name="recurring-expense-vehicle"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            vehicle_id: event.target.value,
+                          })
+                        }
+                        value={recurringExpenseForm.vehicle_id}
+                      >
+                        <option value="">Todos / sem veÃ­culo especÃ­fico</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Data de inÃ­cio
+                      <input
+                        name="recurring-expense-start-date"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            start_date: event.target.value,
+                          })
+                        }
+                        required
+                        type="date"
+                        value={recurringExpenseForm.start_date}
+                      />
+                    </label>
+
+                    <label>
+                      Data de tÃ©rmino <span className="optional-label">(opcional)</span>
+                      <input
+                        name="recurring-expense-end-date"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            end_date: event.target.value,
+                          })
+                        }
+                        type="date"
+                        value={recurringExpenseForm.end_date}
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    DescriÃ§Ã£o <span className="optional-label">(opcional)</span>
+                    <input
+                      maxLength={255}
+                      name="recurring-expense-description"
+                      onChange={(event) =>
+                        setRecurringExpenseForm({
+                          ...recurringExpenseForm,
+                          description: event.target.value,
+                        })
+                      }
+                      placeholder="Ex: Seguro, aluguel, lavagem"
+                      type="text"
+                      value={recurringExpenseForm.description}
+                    />
+                  </label>
+
+                  <label className="toggle-field">
+                    <input
+                      checked={recurringExpenseForm.active}
+                      name="recurring-expense-active"
+                      onChange={(event) =>
+                        setRecurringExpenseForm({
+                          ...recurringExpenseForm,
+                          active: event.target.checked,
+                        })
+                      }
+                      type="checkbox"
+                    />
+                    <span>Despesa recorrente ativa</span>
+                  </label>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isRecurringExpenseSaving} type="submit">
+                      {isRecurringExpenseSaving
+                        ? "Salvando..."
+                        : editingRecurringExpenseId
+                          ? "Salvar recorrÃªncia"
+                          : "Cadastrar recorrÃªncia"}
+                    </button>
+                    {editingRecurringExpenseId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetRecurringExpenseForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isRecurringExpensesLoading}>
+                  <div className="list-header">
+                    <h3>Minhas recorrÃªncias</h3>
+                    <button
+                      className="text-button"
+                      disabled={isRecurringExpensesLoading}
+                      type="button"
+                      onClick={() => void loadRecurringExpenses()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isRecurringExpensesLoading ? (
+                    <p className="empty-state">Carregando despesas recorrentes...</p>
+                  ) : null}
+
+                  {!isRecurringExpensesLoading && recurringExpenses.length === 0 ? (
+                    <p className="empty-state">
+                      Nenhuma despesa recorrente cadastrada ainda. Use esta Ã¡rea para guardar
+                      custos fixos ou frequentes.
+                    </p>
+                  ) : null}
+
+                  {recurringExpenses.map((recurringExpense) => (
+                    <article className="vehicle-card session-card" key={recurringExpense.id}>
+                      <div>
+                        <div className="recurring-card-title">
+                          <h4>{getExpenseCategoryLabel(recurringExpense.category)}</h4>
+                          <span
+                            className={
+                              recurringExpense.active
+                                ? "status-pill status-active"
+                                : "status-pill status-inactive"
+                            }
+                          >
+                            {recurringExpense.active ? "Ativa" : "Inativa"}
+                          </span>
+                        </div>
+                        <p>{formatMoney(recurringExpense.amount)}</p>
+                        <dl className="session-metrics recurring-metrics">
+                          <div>
+                            <dt>FrequÃªncia</dt>
+                            <dd>{getRecurringFrequencyLabel(recurringExpense.frequency)}</dd>
+                          </div>
+                          <div>
+                            <dt>VeÃ­culo</dt>
+                            <dd>
+                              {recurringExpense.vehicle_id
+                                ? getVehicleLabel(recurringExpense.vehicle_id)
+                                : "Todos / sem veÃ­culo"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>PerÃ­odo</dt>
+                            <dd>
+                              {formatDate(recurringExpense.start_date)} atÃ©{" "}
+                              {recurringExpense.end_date
+                                ? formatDate(recurringExpense.end_date)
+                                : "sem tÃ©rmino"}
+                            </dd>
+                          </div>
+                        </dl>
+                        {recurringExpense.description ? (
+                          <p className="expense-description">{recurringExpense.description}</p>
+                        ) : null}
+                      </div>
+                      <div className="card-actions">
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => handleEditRecurringExpense(recurringExpense)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => void handleToggleRecurringExpense(recurringExpense)}
+                        >
+                          {recurringExpense.active ? "Desativar" : "Ativar"}
+                        </button>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={() => void handleDeleteRecurringExpense(recurringExpense)}
                         >
                           Excluir
                         </button>
