@@ -147,6 +147,25 @@ type QuickStartResult = {
   averageTicketCents: bigint | null;
 };
 
+type QuickDailyEntryForm = {
+  gross_revenue: string;
+  distance_km: string;
+  worked_hours: string;
+  worked_minutes: string;
+  trip_count: string;
+  vehicle_id: string;
+  work_date: string;
+};
+
+type QuickDailyEntryResult = {
+  grossRevenueCents: bigint;
+  grossPerHourCents: bigint | null;
+  grossPerKmCents: bigint | null;
+  tripCount: number;
+  vehicle: Vehicle;
+  workDate: string;
+};
+
 type FinancialDailySummary = {
   date: string;
   gross_revenue: string;
@@ -276,6 +295,16 @@ const emptyQuickStartForm: QuickStartForm = {
   trip_count: "",
   rental_monthly: "",
   financing_monthly: "",
+};
+
+const emptyQuickDailyEntryForm: QuickDailyEntryForm = {
+  gross_revenue: "",
+  distance_km: "",
+  worked_hours: "",
+  worked_minutes: "",
+  trip_count: "",
+  vehicle_id: "",
+  work_date: new Date().toISOString().slice(0, 10),
 };
 
 function toDateInputValue(date: Date): string {
@@ -491,6 +520,14 @@ function App() {
   const [quickStartForm, setQuickStartForm] = useState<QuickStartForm>(emptyQuickStartForm);
   const [quickStartResult, setQuickStartResult] = useState<QuickStartResult | null>(null);
   const [quickStartVisible, setQuickStartVisible] = useState(false);
+  const [quickDailyEntryForm, setQuickDailyEntryForm] =
+    useState<QuickDailyEntryForm>(emptyQuickDailyEntryForm);
+  const [quickDailyEntryResult, setQuickDailyEntryResult] =
+    useState<QuickDailyEntryResult | null>(null);
+  const [quickDailyEntryShowDate, setQuickDailyEntryShowDate] = useState(false);
+  const [pendingQuickDailyEntry, setPendingQuickDailyEntry] = useState(false);
+  const [dailyExpenseForm, setDailyExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
+  const [dailyExpenseVisible, setDailyExpenseVisible] = useState(false);
   const [pendingQuickStartAction, setPendingQuickStartAction] = useState<
     "register" | "configure" | null
   >(null);
@@ -515,6 +552,8 @@ function App() {
   const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
+  const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
+  const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -535,6 +574,12 @@ function App() {
     setQuickStartForm(emptyQuickStartForm);
     setQuickStartResult(null);
     setQuickStartVisible(false);
+    setQuickDailyEntryForm(emptyQuickDailyEntryForm);
+    setQuickDailyEntryResult(null);
+    setQuickDailyEntryShowDate(false);
+    setPendingQuickDailyEntry(false);
+    setDailyExpenseForm(emptyExpenseForm);
+    setDailyExpenseVisible(false);
     setPendingQuickStartAction(null);
     setMode("login");
     setPassword("");
@@ -652,6 +697,18 @@ function App() {
       setWorkSessionForm((currentForm) => ({
         ...currentForm,
         vehicle_id: currentForm.vehicle_id || String(nextVehicles[0]?.id ?? ""),
+      }));
+      setQuickDailyEntryForm((currentForm) => ({
+        ...currentForm,
+        vehicle_id:
+          currentForm.vehicle_id ||
+          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
+      }));
+      setDailyExpenseForm((currentForm) => ({
+        ...currentForm,
+        vehicle_id:
+          currentForm.vehicle_id ||
+          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
       }));
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -888,13 +945,13 @@ function App() {
     await loadVehicleCostProfile(vehicle.id);
   }
 
-  function getQuickStartWorkedMinutes(): number {
-    if (!/^\d+$/.test(quickStartForm.worked_hours) || !/^\d+$/.test(quickStartForm.worked_minutes)) {
+  function getWorkedMinutesFromFields(hoursValue: string, minutesValue: string): number {
+    if (!/^\d+$/.test(hoursValue) || !/^\d+$/.test(minutesValue)) {
       throw new Error("Informe as horas e os minutos trabalhados.");
     }
 
-    const hours = Number(quickStartForm.worked_hours);
-    const minutes = Number(quickStartForm.worked_minutes);
+    const hours = Number(hoursValue);
+    const minutes = Number(minutesValue);
     if (!Number.isSafeInteger(hours) || !Number.isSafeInteger(minutes) || minutes > 59) {
       throw new Error("Verifique o tempo trabalhado.");
     }
@@ -907,21 +964,48 @@ function App() {
     return totalMinutes;
   }
 
-  function getQuickStartTripCount(): number {
-    if (!quickStartForm.trip_count.trim()) {
+  function getOptionalTripCount(value: string): number {
+    if (!value.trim()) {
       return 0;
     }
 
-    if (!/^\d+$/.test(quickStartForm.trip_count)) {
+    if (!/^\d+$/.test(value)) {
       throw new Error("Informe o número de corridas corretamente.");
     }
 
-    const tripCount = Number(quickStartForm.trip_count);
+    const tripCount = Number(value);
     if (!Number.isSafeInteger(tripCount)) {
       throw new Error("Informe o número de corridas corretamente.");
     }
 
     return tripCount;
+  }
+
+  function getQuickStartWorkedMinutes(): number {
+    return getWorkedMinutesFromFields(quickStartForm.worked_hours, quickStartForm.worked_minutes);
+  }
+
+  function getQuickStartTripCount(): number {
+    return getOptionalTripCount(quickStartForm.trip_count);
+  }
+
+  function getQuickDailyVehicle(): Vehicle | null {
+    if (vehicles.length === 1) {
+      return vehicles[0];
+    }
+
+    return vehicles.find((vehicle) => String(vehicle.id) === quickDailyEntryForm.vehicle_id) ?? null;
+  }
+
+  function getQuickDailyWorkedMinutes(): number {
+    return getWorkedMinutesFromFields(
+      quickDailyEntryForm.worked_hours,
+      quickDailyEntryForm.worked_minutes,
+    );
+  }
+
+  function getQuickDailyTripCount(): number {
+    return getOptionalTripCount(quickDailyEntryForm.trip_count);
   }
 
   function calculateQuickStart(): QuickStartResult {
@@ -948,6 +1032,158 @@ function App() {
       averageTicketCents:
         tripCount > 0 ? divideAndRound(grossRevenueCents, BigInt(tripCount)) : null,
     };
+  }
+
+  function calculateQuickDailyEntry(vehicle: Vehicle): QuickDailyEntryResult {
+    const grossRevenueCents = moneyInputToCents(quickDailyEntryForm.gross_revenue);
+    const distance = parseNonNegativeDecimal(quickDailyEntryForm.distance_km, "os km rodados");
+    const workedMinutes = getQuickDailyWorkedMinutes();
+    const tripCount = getQuickDailyTripCount();
+
+    if (distance.scale > 3 || distance.units <= 0n || grossRevenueCents < 0n) {
+      throw new Error("Informe valores possiveis para registrar o dia.");
+    }
+
+    return {
+      grossRevenueCents,
+      grossPerHourCents: divideAndRound(grossRevenueCents * 60n, BigInt(workedMinutes)),
+      grossPerKmCents: divideAndRound(
+        grossRevenueCents * 10n ** BigInt(distance.scale),
+        distance.units,
+      ),
+      tripCount,
+      vehicle,
+      workDate: quickDailyEntryForm.work_date || toDateInputValue(new Date()),
+    };
+  }
+
+  async function saveQuickDailyEntry(vehicle: Vehicle) {
+    const result = calculateQuickDailyEntry(vehicle);
+    const workedMinutes = getQuickDailyWorkedMinutes();
+    const tripCount = getQuickDailyTripCount();
+
+    await requestApi<WorkSession>("/work-sessions", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        vehicle_id: vehicle.id,
+        work_date: result.workDate,
+        gross_revenue: moneyInputToApi(quickDailyEntryForm.gross_revenue),
+        distance_km: normalizeDecimalInput(quickDailyEntryForm.distance_km),
+        worked_minutes: workedMinutes,
+        trip_count: tripCount,
+      }),
+    });
+
+    setPendingQuickDailyEntry(false);
+    setQuickDailyEntryResult(result);
+    setDailyExpenseForm({
+      ...emptyExpenseForm,
+      expense_date: result.workDate,
+      vehicle_id: String(vehicle.id),
+    });
+    setDailyExpenseVisible(false);
+    setQuickDailyEntryForm({
+      ...emptyQuickDailyEntryForm,
+      work_date: toDateInputValue(new Date()),
+      vehicle_id: String(vehicle.id),
+    });
+    setQuickDailyEntryShowDate(false);
+    setSuccessMessage("Dia registrado com sucesso.");
+    await loadWorkSessions();
+    await loadFinancialSummary();
+    requestAnimationFrame(() =>
+      document.getElementById("registro-rapido")?.scrollIntoView({ behavior: "smooth" }),
+    );
+  }
+
+  async function handleQuickDailyEntrySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsQuickDailyEntrySaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const vehicle = getQuickDailyVehicle();
+      if (!vehicle) {
+        setPendingQuickDailyEntry(true);
+        setMessage("Cadastre seu veiculo para salvar o dia. Seus dados foram mantidos.");
+        document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+        return;
+      }
+
+      await saveQuickDailyEntry(vehicle);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar seu dia.");
+      }
+    } finally {
+      setIsQuickDailyEntrySaving(false);
+    }
+  }
+
+  function handleViewCompleteResult() {
+    if (quickDailyEntryResult) {
+      const today = toDateInputValue(new Date());
+      setDashboardPeriod(quickDailyEntryResult.workDate === today ? "today" : "custom");
+      setDashboardVehicleId(String(quickDailyEntryResult.vehicle.id));
+      setCustomStartDate(quickDailyEntryResult.workDate);
+      setCustomEndDate(quickDailyEntryResult.workDate);
+    }
+
+    requestAnimationFrame(() =>
+      document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" }),
+    );
+  }
+
+  function openDailyExpenseShortcut() {
+    if (!quickDailyEntryResult) {
+      return;
+    }
+
+    setDailyExpenseForm({
+      ...emptyExpenseForm,
+      expense_date: quickDailyEntryResult.workDate,
+      vehicle_id: String(quickDailyEntryResult.vehicle.id),
+    });
+    setDailyExpenseVisible(true);
+  }
+
+  async function handleDailyExpenseSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsDailyExpenseSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<Expense>("/expenses", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          expense_date: dailyExpenseForm.expense_date,
+          category: dailyExpenseForm.category,
+          amount: moneyInputToApi(dailyExpenseForm.amount),
+          description: dailyExpenseForm.description.trim() || null,
+          ...(dailyExpenseForm.vehicle_id ? { vehicle_id: Number(dailyExpenseForm.vehicle_id) } : {}),
+        }),
+      });
+
+      setDailyExpenseVisible(false);
+      setDailyExpenseForm(emptyExpenseForm);
+      setSuccessMessage("Gasto de hoje adicionado com sucesso.");
+      await loadExpenses();
+      await loadFinancialSummary();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Nao foi possivel salvar o gasto.");
+      }
+    } finally {
+      setIsDailyExpenseSaving(false);
+    }
   }
 
   function handleQuickStartSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1085,6 +1321,9 @@ function App() {
       }
       if (savedVehicle && pendingQuickStartAction === "configure") {
         await handleQuickStartConfigure(savedVehicle);
+      }
+      if (savedVehicle && pendingQuickDailyEntry) {
+        await saveQuickDailyEntry(savedVehicle);
       }
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1404,6 +1643,15 @@ function App() {
             {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
             <nav className="dashboard-nav" aria-label="Navegacao principal">
+              <button
+                className="daily-entry-nav-button"
+                type="button"
+                onClick={() =>
+                  document.getElementById("registro-rapido")?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
+                Registrar meu dia
+              </button>
               {workSessions.length > 0 ? <a href="#dashboard">Dashboard</a> : null}
               {workSessions.length > 0 ? (
                 <button
@@ -1423,6 +1671,288 @@ function App() {
               <a href="#despesas">Despesas</a>
               <a href="#veiculos">Veículos</a>
             </nav>
+
+            <section className="daily-entry" id="registro-rapido">
+              <div className="section-title">
+                <p className="eyebrow">Registro rapido</p>
+                <h3>Registrar meu dia</h3>
+                <p className="subtle-note">
+                  Preencha o essencial e salve sua jornada em poucos segundos.
+                </p>
+              </div>
+
+              <form className="auth-form daily-entry-form" onSubmit={handleQuickDailyEntrySubmit}>
+                <div className="daily-date-row">
+                  <p>Data: {formatDate(quickDailyEntryForm.work_date || toDateInputValue(new Date()))}</p>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => setQuickDailyEntryShowDate((currentValue) => !currentValue)}
+                  >
+                    Alterar data
+                  </button>
+                </div>
+
+                {quickDailyEntryShowDate ? (
+                  <label className="daily-date-input">
+                    Data do registro
+                    <input
+                      onChange={(event) =>
+                        setQuickDailyEntryForm({
+                          ...quickDailyEntryForm,
+                          work_date: event.target.value,
+                        })
+                      }
+                      type="date"
+                      value={quickDailyEntryForm.work_date}
+                    />
+                  </label>
+                ) : null}
+
+                <label>
+                  Faturamento
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setQuickDailyEntryForm({
+                        ...quickDailyEntryForm,
+                        gross_revenue: event.target.value,
+                      })
+                    }
+                    placeholder="250,50"
+                    required
+                    type="text"
+                    value={quickDailyEntryForm.gross_revenue}
+                  />
+                </label>
+
+                <label>
+                  Km rodados
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setQuickDailyEntryForm({
+                        ...quickDailyEntryForm,
+                        distance_km: event.target.value,
+                      })
+                    }
+                    placeholder="87,5"
+                    required
+                    type="text"
+                    value={quickDailyEntryForm.distance_km}
+                  />
+                </label>
+
+                <div className="form-grid daily-time-grid">
+                  <label>
+                    Horas trabalhadas
+                    <input
+                      min="0"
+                      onChange={(event) =>
+                        setQuickDailyEntryForm({
+                          ...quickDailyEntryForm,
+                          worked_hours: event.target.value,
+                        })
+                      }
+                      required
+                      type="number"
+                      value={quickDailyEntryForm.worked_hours}
+                    />
+                  </label>
+
+                  <label>
+                    Minutos trabalhados
+                    <input
+                      max="59"
+                      min="0"
+                      onChange={(event) =>
+                        setQuickDailyEntryForm({
+                          ...quickDailyEntryForm,
+                          worked_minutes: event.target.value,
+                        })
+                      }
+                      required
+                      type="number"
+                      value={quickDailyEntryForm.worked_minutes}
+                    />
+                  </label>
+                </div>
+
+                <label>
+                  Numero de corridas <span className="optional-label">(opcional)</span>
+                  <input
+                    min="0"
+                    onChange={(event) =>
+                      setQuickDailyEntryForm({
+                        ...quickDailyEntryForm,
+                        trip_count: event.target.value,
+                      })
+                    }
+                    type="number"
+                    value={quickDailyEntryForm.trip_count}
+                  />
+                </label>
+
+                {vehicles.length === 0 ? (
+                  <p className="empty-state daily-entry-note">
+                    Cadastre um veiculo para salvar. Os dados digitados ficam nesta tela.
+                  </p>
+                ) : null}
+
+                {vehicles.length === 1 ? (
+                  <p className="daily-selected-vehicle">
+                    Veiculo: <strong>{getVehicleLabel(vehicles[0].id)}</strong>
+                  </p>
+                ) : null}
+
+                {vehicles.length > 1 ? (
+                  <label>
+                    Veiculo
+                    <select
+                      onChange={(event) =>
+                        setQuickDailyEntryForm({
+                          ...quickDailyEntryForm,
+                          vehicle_id: event.target.value,
+                        })
+                      }
+                      required
+                      value={quickDailyEntryForm.vehicle_id}
+                    >
+                      <option value="">Selecione</option>
+                      {vehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.name} - {vehicle.brand} {vehicle.model}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                <button className="button daily-entry-button" disabled={isQuickDailyEntrySaving} type="submit">
+                  {isQuickDailyEntrySaving ? "Salvando..." : "Salvar meu dia"}
+                </button>
+              </form>
+
+              {quickDailyEntryResult ? (
+                <div className="daily-entry-result">
+                  <div className="metric-grid daily-entry-metrics">
+                    <article className="metric-card metric-profit">
+                      <span>Faturamento</span>
+                      <strong>{formatCents(quickDailyEntryResult.grossRevenueCents)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>R$/hora</span>
+                      <strong>
+                        {quickDailyEntryResult.grossPerHourCents === null
+                          ? "—"
+                          : formatCents(quickDailyEntryResult.grossPerHourCents)}
+                      </strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>R$/km</span>
+                      <strong>
+                        {quickDailyEntryResult.grossPerKmCents === null
+                          ? "—"
+                          : formatCents(quickDailyEntryResult.grossPerKmCents)}
+                      </strong>
+                    </article>
+                    {quickDailyEntryResult.tripCount > 0 ? (
+                      <article className="metric-card">
+                        <span>Corridas</span>
+                        <strong>{quickDailyEntryResult.tripCount}</strong>
+                      </article>
+                    ) : null}
+                  </div>
+
+                  <div className="daily-entry-actions">
+                    <button className="button" type="button" onClick={handleViewCompleteResult}>
+                      Ver meu resultado completo
+                    </button>
+                    <button className="button button-ghost" type="button" onClick={openDailyExpenseShortcut}>
+                      + Adicionar gasto de hoje
+                    </button>
+                  </div>
+
+                  {dailyExpenseVisible ? (
+                    <form className="auth-form daily-expense-form" onSubmit={handleDailyExpenseSubmit}>
+                      <div className="section-title">
+                        <p className="eyebrow">Gasto de hoje</p>
+                        <h3>Adicionar gasto</h3>
+                        <p className="subtle-note">
+                          Data {formatDate(dailyExpenseForm.expense_date)} e veiculo ja preenchidos.
+                        </p>
+                      </div>
+
+                      <label>
+                        Categoria
+                        <select
+                          onChange={(event) =>
+                            setDailyExpenseForm({
+                              ...dailyExpenseForm,
+                              category: event.target.value as ExpenseCategory,
+                            })
+                          }
+                          required
+                          value={dailyExpenseForm.category}
+                        >
+                          {expenseCategoryOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label>
+                        Valor
+                        <input
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setDailyExpenseForm({
+                              ...dailyExpenseForm,
+                              amount: event.target.value,
+                            })
+                          }
+                          placeholder="89,90"
+                          required
+                          type="text"
+                          value={dailyExpenseForm.amount}
+                        />
+                      </label>
+
+                      <label>
+                        Descricao <span className="optional-label">(opcional)</span>
+                        <input
+                          maxLength={255}
+                          onChange={(event) =>
+                            setDailyExpenseForm({
+                              ...dailyExpenseForm,
+                              description: event.target.value,
+                            })
+                          }
+                          placeholder="Ex: Combustivel"
+                          type="text"
+                          value={dailyExpenseForm.description}
+                        />
+                      </label>
+
+                      <div className="form-actions">
+                        <button className="button" disabled={isDailyExpenseSaving} type="submit">
+                          {isDailyExpenseSaving ? "Salvando..." : "Salvar gasto"}
+                        </button>
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={() => setDailyExpenseVisible(false)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
 
             {isQuickStartVisible ? (
               <section className="quick-start" id="quick-start">

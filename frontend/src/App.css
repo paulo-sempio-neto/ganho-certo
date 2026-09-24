@@ -265,6 +265,7 @@ select:focus {
   text-decoration: none;
 }
 
+.daily-entry-nav-button,
 .quick-start-nav-button {
   border: 1px solid #d9ded5;
   border-radius: 999px;
@@ -274,6 +275,87 @@ select:focus {
   font-size: 0.9rem;
   font-weight: 800;
   padding: 9px 14px;
+}
+
+.daily-entry {
+  display: grid;
+  gap: 18px;
+  border: 2px solid #26734d;
+  border-radius: 12px;
+  background: #f7fbf8;
+  padding: 20px;
+}
+
+.daily-entry-form {
+  gap: 12px;
+}
+
+.daily-entry-form input,
+.daily-entry-form select {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.daily-date-row,
+.daily-selected-vehicle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  border-radius: 8px;
+  background: #eef6ef;
+  color: #2d4635;
+  padding: 10px 12px;
+}
+
+.daily-date-row p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.daily-date-input {
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
+.daily-time-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.daily-entry-note {
+  margin: 0;
+}
+
+.daily-entry-button {
+  min-height: 60px;
+  font-size: 1.05rem;
+}
+
+.daily-entry-result {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #d8e6dc;
+  padding-top: 16px;
+}
+
+.daily-entry-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.daily-entry-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.daily-expense-form {
+  border: 1px solid #d8e6dc;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
 }
 
 .quick-start {
@@ -760,13 +842,17 @@ select:focus {
   .form-grid,
   .form-grid-three,
   .session-metrics,
+  .daily-time-grid,
+  .daily-entry-metrics,
+  .daily-entry-actions,
   .quick-start-progress,
   .quick-start-metrics,
   .quick-start-time {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-nav a {
+  .dashboard-nav a,
+  .daily-entry-nav-button {
     flex: 1 1 calc(50% - 10px);
     text-align: center;
   }
