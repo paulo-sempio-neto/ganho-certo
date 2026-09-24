@@ -393,21 +393,18 @@ def get_recurring_expense_breakdown(
     ]
 
 
-@router.get("/financial-summary", response_model=FinancialSummary)
-def get_financial_summary(
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
-    start_date: Annotated[date | None, Query()] = None,
-    end_date: Annotated[date | None, Query()] = None,
-    vehicle_id: Annotated[int | None, Query(gt=0)] = None,
-) -> FinancialSummary:
-    validate_date_range(start_date=start_date, end_date=end_date)
-    validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
-
-    work_session_query = select(WorkSession).where(WorkSession.user_id == current_user.id)
-    expense_query = select(Expense).where(Expense.user_id == current_user.id)
+def get_financial_summary_records(
+    *,
+    user_id: int,
+    db: Session,
+    start_date: date | None,
+    end_date: date | None,
+    vehicle_id: int | None,
+) -> tuple[list[WorkSession], list[Expense], list[RecurringExpense], list[VehicleCostProfile]]:
+    work_session_query = select(WorkSession).where(WorkSession.user_id == user_id)
+    expense_query = select(Expense).where(Expense.user_id == user_id)
     recurring_expense_query = select(RecurringExpense).where(
-        RecurringExpense.user_id == current_user.id,
+        RecurringExpense.user_id == user_id,
         RecurringExpense.active.is_(True),
     )
 
@@ -426,16 +423,27 @@ def get_financial_summary(
             RecurringExpense.vehicle_id == vehicle_id
         )
 
-    work_sessions = list(db.scalars(work_session_query).all())
-    expenses = list(db.scalars(expense_query).all())
-    recurring_expenses = list(db.scalars(recurring_expense_query).all())
-    profile_query = (
-        select(VehicleCostProfile).join(Vehicle).where(Vehicle.user_id == current_user.id)
-    )
+    profile_query = select(VehicleCostProfile).join(Vehicle).where(Vehicle.user_id == user_id)
     if vehicle_id is not None:
         profile_query = profile_query.where(VehicleCostProfile.vehicle_id == vehicle_id)
 
-    cost_profiles = list(db.scalars(profile_query).all())
+    return (
+        list(db.scalars(work_session_query).all()),
+        list(db.scalars(expense_query).all()),
+        list(db.scalars(recurring_expense_query).all()),
+        list(db.scalars(profile_query).all()),
+    )
+
+
+def build_financial_summary(
+    *,
+    start_date: date | None,
+    end_date: date | None,
+    work_sessions: list[WorkSession],
+    expenses: list[Expense],
+    recurring_expenses: list[RecurringExpense],
+    cost_profiles: list[VehicleCostProfile],
+) -> FinancialSummary:
     profiles_by_vehicle_id = {profile.vehicle_id: profile for profile in cost_profiles}
 
     gross_revenue_cents = sum(session.gross_revenue_cents for session in work_sessions)
@@ -448,15 +456,16 @@ def get_financial_summary(
     )
     total_worked_minutes = sum(session.worked_minutes for session in work_sessions)
     total_trip_count = sum(session.trip_count for session in work_sessions)
+    effective_period = get_effective_period(
+        start_date=start_date,
+        end_date=end_date,
+        work_sessions=work_sessions,
+        expenses=expenses,
+    )
     structural_costs = get_structural_costs(
         profiles=cost_profiles,
         vehicle_distances=get_vehicle_distances(work_sessions),
-        effective_period=get_effective_period(
-            start_date=start_date,
-            end_date=end_date,
-            work_sessions=work_sessions,
-            expenses=expenses,
-        ),
+        effective_period=effective_period,
     )
     estimated_structural_costs = structural_costs_total(structural_costs)
     economic_expenses = cents_to_decimal(
@@ -468,19 +477,12 @@ def get_financial_summary(
         recurring_expenses=recurring_expenses,
         expenses=expenses,
         profiles_by_vehicle_id=profiles_by_vehicle_id,
-        effective_period=get_effective_period(
-            start_date=start_date,
-            end_date=end_date,
-            work_sessions=work_sessions,
-            expenses=expenses,
-        ),
+        effective_period=effective_period,
     )
     recurring_expenses_total = round_decimal(
         sum((item.amount for item in recurring_expenses_breakdown), ZERO_MONEY)
     )
-    projected_economic_costs = round_decimal(
-        estimated_economic_costs + recurring_expenses_total
-    )
+    projected_economic_costs = round_decimal(estimated_economic_costs + recurring_expenses_total)
     projected_economic_result = round_decimal(gross_revenue - projected_economic_costs)
 
     hours = Decimal(total_worked_minutes) / Decimal("60")
@@ -529,4 +531,32 @@ def get_financial_summary(
         expense_per_km=divide_or_none(total_expenses, total_distance_km),
         average_ticket=divide_or_none(gross_revenue, Decimal(total_trip_count)),
         daily=daily,
+    )
+
+
+@router.get("/financial-summary", response_model=FinancialSummary)
+def get_financial_summary(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+    start_date: Annotated[date | None, Query()] = None,
+    end_date: Annotated[date | None, Query()] = None,
+    vehicle_id: Annotated[int | None, Query(gt=0)] = None,
+) -> FinancialSummary:
+    validate_date_range(start_date=start_date, end_date=end_date)
+    validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+
+    work_sessions, expenses, recurring_expenses, cost_profiles = get_financial_summary_records(
+        user_id=current_user.id,
+        db=db,
+        start_date=start_date,
+        end_date=end_date,
+        vehicle_id=vehicle_id,
+    )
+    return build_financial_summary(
+        start_date=start_date,
+        end_date=end_date,
+        work_sessions=work_sessions,
+        expenses=expenses,
+        recurring_expenses=recurring_expenses,
+        cost_profiles=cost_profiles,
     )

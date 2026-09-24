@@ -6,6 +6,7 @@ from app.config import Settings, get_settings
 from app.expense_imports import router as expense_imports_router
 from app.expenses import router as expenses_router
 from app.financial_goals import router as financial_goals_router
+from app.financial_history import router as financial_history_router
 from app.financial_insights import router as financial_insights_router
 from app.financial_summary import router as financial_summary_router
 from app.import_profiles import router as import_profiles_router
@@ -52,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(recurring_expenses_router)
     application.include_router(maintenance_router)
     application.include_router(financial_goals_router)
+    application.include_router(financial_history_router)
     application.include_router(financial_insights_router)
     application.include_router(financial_summary_router)
 

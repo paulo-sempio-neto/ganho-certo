@@ -18,6 +18,8 @@ RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
 CsvImportType = Literal["work_sessions", "expenses"]
+FinancialHistoryGrouping = Literal["daily", "weekly", "monthly"]
+FinancialHistoryTrendDirection = Literal["increased", "decreased", "unchanged"]
 MaintenanceCategory = Literal[
     "oil",
     "tires",
@@ -731,3 +733,97 @@ class FinancialSummary(BaseModel):
             return None
 
         return f"{value:.2f}"
+
+
+class FinancialHistoryPeriod(BaseModel):
+    period_start: date
+    period_end: date
+    gross_revenue: Decimal
+    registered_expenses: Decimal
+    estimated_structural_costs: Decimal
+    recurring_projected_expenses: Decimal
+    cash_remaining: Decimal
+    estimated_result: Decimal
+    projected_result: Decimal
+    worked_minutes: int
+    distance_km: Decimal
+    trip_count: int
+    revenue_per_hour: Decimal | None
+    estimated_result_per_hour: Decimal | None
+    revenue_per_km: Decimal | None
+    estimated_result_per_km: Decimal | None
+
+    @field_serializer(
+        "gross_revenue",
+        "registered_expenses",
+        "estimated_structural_costs",
+        "recurring_projected_expenses",
+        "cash_remaining",
+        "estimated_result",
+        "projected_result",
+        "distance_km",
+        "revenue_per_hour",
+        "estimated_result_per_hour",
+        "revenue_per_km",
+        "estimated_result_per_km",
+    )
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+
+class FinancialHistoryMetricComparison(BaseModel):
+    current: Decimal | None
+    previous: Decimal | None
+    absolute_delta: Decimal | None
+    percentage_delta: Decimal | None
+
+    @field_serializer("current", "previous", "absolute_delta", "percentage_delta")
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+
+class FinancialHistoryComparison(BaseModel):
+    current_period_start: date
+    current_period_end: date
+    previous_period_start: date
+    previous_period_end: date
+    gross_revenue: FinancialHistoryMetricComparison
+    registered_expenses: FinancialHistoryMetricComparison
+    estimated_result: FinancialHistoryMetricComparison
+    projected_result: FinancialHistoryMetricComparison
+    worked_minutes: FinancialHistoryMetricComparison
+    distance_km: FinancialHistoryMetricComparison
+    estimated_result_per_hour: FinancialHistoryMetricComparison
+    estimated_result_per_km: FinancialHistoryMetricComparison
+
+
+class FinancialHistoryTrendFact(BaseModel):
+    metric: str
+    direction: FinancialHistoryTrendDirection
+    current: Decimal
+    previous: Decimal
+    absolute_delta: Decimal
+    percentage_delta: Decimal | None
+
+    @field_serializer("current", "previous", "absolute_delta", "percentage_delta")
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+
+class FinancialHistoryResponse(BaseModel):
+    start_date: date
+    end_date: date
+    vehicle_id: int | None
+    grouping: FinancialHistoryGrouping
+    periods: list[FinancialHistoryPeriod]
+    comparison: FinancialHistoryComparison
+    trend_facts: list[FinancialHistoryTrendFact]
