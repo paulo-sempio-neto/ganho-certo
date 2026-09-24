@@ -17,7 +17,7 @@ OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
-CsvImportType = Literal["work_sessions"]
+CsvImportType = Literal["work_sessions", "expenses"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -232,6 +232,36 @@ class WorkSessionImportPreview(BaseModel):
 
 
 class WorkSessionImportResult(BaseModel):
+    imported: int
+    duplicates_skipped: int
+    failed: int
+    errors: list[WorkSessionImportError] = Field(default_factory=list)
+
+
+class ExpenseImportRow(BaseModel):
+    row: int
+    expense_date: date
+    amount: Decimal
+    category: ExpenseCategory
+    description: str | None
+
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class ExpenseImportPreview(BaseModel):
+    total_rows: int
+    valid_rows: int
+    invalid_rows: int
+    columns_found: list[str] = Field(default_factory=list)
+    suggested_mapping: dict[str, str] = Field(default_factory=dict)
+    column_mapping: dict[str, str] = Field(default_factory=dict)
+    rows: list[ExpenseImportRow]
+    errors: list[WorkSessionImportError]
+
+
+class ExpenseImportResult(BaseModel):
     imported: int
     duplicates_skipped: int
     failed: int

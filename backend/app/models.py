@@ -171,6 +171,13 @@ class WorkSession(Base):
 
 class Expense(Base):
     __tablename__ = "expenses"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "import_fingerprint",
+            name="uq_expenses_user_import_fingerprint",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -183,6 +190,7 @@ class Expense(Base):
     category: Mapped[str] = mapped_column(String(30), nullable=False)
     amount_cents: Mapped[int] = mapped_column(Integer(), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    import_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

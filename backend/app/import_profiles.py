@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.expense_imports import validate_column_mapping as validate_expense_column_mapping
 from app.models import CsvImportProfile, User, Vehicle
 from app.schemas import (
     CsvImportProfileCreate,
@@ -17,7 +18,7 @@ from app.schemas import (
     CsvImportProfilePublic,
     CsvImportProfileUpdate,
 )
-from app.work_session_imports import validate_column_mapping
+from app.work_session_imports import validate_column_mapping as validate_work_session_column_mapping
 
 router = APIRouter(prefix="/import-profiles", tags=["import-profiles"])
 
@@ -58,8 +59,16 @@ def get_user_vehicle(vehicle_id: int | None, user_id: int, db: Session) -> Vehic
     return vehicle
 
 
-def validate_profile_mapping(headers: list[str], mapping: dict[str, str]) -> None:
-    mapping_errors = validate_column_mapping(columns=headers, mapping=mapping)
+def validate_profile_mapping(
+    import_type: str,
+    headers: list[str],
+    mapping: dict[str, str],
+) -> None:
+    if import_type == "expenses":
+        mapping_errors = validate_expense_column_mapping(columns=headers, mapping=mapping)
+    else:
+        mapping_errors = validate_work_session_column_mapping(columns=headers, mapping=mapping)
+
     if mapping_errors:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -119,7 +128,11 @@ def create_import_profile(
     get_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
     headers = normalize_headers(payload.headers)
     column_mapping = normalize_column_mapping(payload.column_mapping)
-    validate_profile_mapping(headers=headers, mapping=column_mapping)
+    validate_profile_mapping(
+        import_type=payload.import_type,
+        headers=headers,
+        mapping=column_mapping,
+    )
 
     profile = CsvImportProfile(
         user_id=current_user.id,
@@ -199,6 +212,11 @@ def update_import_profile(
         profile.vehicle_id = payload.vehicle_id
     if payload.name is not None:
         profile.name = payload.name
+    if payload.import_type is not None and payload.headers is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="headers are required when updating import_type.",
+        )
     if payload.import_type is not None:
         profile.import_type = payload.import_type
     if payload.headers is not None:
@@ -208,7 +226,10 @@ def update_import_profile(
             if payload.column_mapping is not None
             else profile.column_mapping
         )
-        validate_profile_mapping(headers=headers, mapping=mapping)
+        import_type = (
+            payload.import_type if payload.import_type is not None else profile.import_type
+        )
+        validate_profile_mapping(import_type=import_type, headers=headers, mapping=mapping)
         profile.header_signature = build_header_signature(headers)
     if payload.column_mapping is not None:
         if payload.headers is None:

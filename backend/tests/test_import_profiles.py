@@ -18,6 +18,13 @@ MAPPING = {
     "worked_minutes": "worked_minutes",
     "trip_count": "trip_count",
 }
+EXPENSE_HEADERS = ["expense_date", "amount", "category", "description"]
+EXPENSE_MAPPING = {
+    "expense_date": "expense_date",
+    "amount": "amount",
+    "category": "category",
+    "description": "description",
+}
 
 
 @pytest.fixture
@@ -91,12 +98,13 @@ def create_profile(
     name: str = "App CSV",
     headers: list[str] | None = None,
     mapping: dict[str, str] | None = None,
+    import_type: str = "work_sessions",
 ) -> dict[str, object]:
     response = client.post(
         "/import-profiles",
         json={
             "name": name,
-            "import_type": "work_sessions",
+            "import_type": import_type,
             "headers": headers or HEADERS,
             "column_mapping": mapping or MAPPING,
             "vehicle_id": vehicle_id,
@@ -264,3 +272,36 @@ def test_match_ignores_missing_saved_vehicle(client: TestClient, db_session: Ses
     assert data["profile"]["vehicle_id"] is None
     assert data["vehicle_id"] is None
     assert db_session.scalar(select(CsvImportProfile.vehicle_id)) == 9999
+
+
+def test_expense_profiles_do_not_conflict_with_work_session_profiles(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "profiles-by-type@example.com")
+    work_profile = create_profile(client, token, name="Jornadas")
+    expense_profile = create_profile(
+        client,
+        token,
+        name="Despesas",
+        import_type="expenses",
+        headers=EXPENSE_HEADERS,
+        mapping=EXPENSE_MAPPING,
+    )
+
+    expense_match = client.post(
+        "/import-profiles/match",
+        json={"import_type": "expenses", "headers": EXPENSE_HEADERS},
+        headers=auth_headers(token),
+    )
+    work_session_match = client.post(
+        "/import-profiles/match",
+        json={"import_type": "work_sessions", "headers": HEADERS},
+        headers=auth_headers(token),
+    )
+
+    assert expense_match.status_code == 200
+    assert expense_match.json()["profile"]["id"] == expense_profile["id"]
+    assert expense_match.json()["profile"]["import_type"] == "expenses"
+    assert work_session_match.status_code == 200
+    assert work_session_match.json()["profile"]["id"] == work_profile["id"]
+    assert work_session_match.json()["profile"]["import_type"] == "work_sessions"
