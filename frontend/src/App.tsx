@@ -125,6 +125,28 @@ type ExpenseForm = {
   description: string;
 };
 
+type QuickStartForm = {
+  gross_revenue: string;
+  distance_km: string;
+  worked_hours: string;
+  worked_minutes: string;
+  fuel_expense: string;
+  expense_category: "fuel" | "charging";
+  ownership_type: OwnershipType;
+  trip_count: string;
+  rental_monthly: string;
+  financing_monthly: string;
+};
+
+type QuickStartResult = {
+  grossRevenueCents: bigint;
+  fuelExpenseCents: bigint;
+  remainingCents: bigint;
+  remainingPerHourCents: bigint | null;
+  remainingPerKmCents: bigint | null;
+  averageTicketCents: bigint | null;
+};
+
 type FinancialDailySummary = {
   date: string;
   gross_revenue: string;
@@ -241,6 +263,19 @@ const emptyExpenseForm: ExpenseForm = {
   amount: "",
   vehicle_id: "",
   description: "",
+};
+
+const emptyQuickStartForm: QuickStartForm = {
+  gross_revenue: "",
+  distance_km: "",
+  worked_hours: "",
+  worked_minutes: "",
+  fuel_expense: "",
+  expense_category: "fuel",
+  ownership_type: "owned",
+  trip_count: "",
+  rental_monthly: "",
+  financing_monthly: "",
 };
 
 function toDateInputValue(date: Date): string {
@@ -367,6 +402,45 @@ function formatDate(value: string): string {
   return `${day}/${month}/${year}`;
 }
 
+function moneyInputToCents(value: string): bigint {
+  return BigInt(moneyInputToApi(value).replace(".", ""));
+}
+
+function parseNonNegativeDecimal(value: string, fieldName: string) {
+  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error(`Informe ${fieldName} corretamente.`);
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  return {
+    units: BigInt(`${whole}${fraction}`),
+    scale: fraction.length,
+  };
+}
+
+function divideAndRound(numerator: bigint, denominator: bigint): bigint {
+  if (denominator === 0n) {
+    throw new Error("Não é possível dividir por zero.");
+  }
+
+  const isNegative = numerator < 0n !== denominator < 0n;
+  const absoluteNumerator = numerator < 0n ? -numerator : numerator;
+  const absoluteDenominator = denominator < 0n ? -denominator : denominator;
+  const quotient = absoluteNumerator / absoluteDenominator;
+  const remainder = absoluteNumerator % absoluteDenominator;
+  const rounded = remainder * 2n >= absoluteDenominator ? quotient + 1n : quotient;
+  return isNegative ? -rounded : rounded;
+}
+
+function formatCents(value: bigint): string {
+  const isNegative = value < 0n;
+  const absolute = isNegative ? -value : value;
+  const reais = (absolute / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const cents = (absolute % 100n).toString().padStart(2, "0");
+  return `${isNegative ? "-" : ""}R$ ${reais},${cents}`;
+}
+
 async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!API_BASE_URL) {
     throw new Error("Configure VITE_API_BASE_URL para conectar ao backend.");
@@ -414,6 +488,12 @@ function App() {
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
+  const [quickStartForm, setQuickStartForm] = useState<QuickStartForm>(emptyQuickStartForm);
+  const [quickStartResult, setQuickStartResult] = useState<QuickStartResult | null>(null);
+  const [quickStartVisible, setQuickStartVisible] = useState(false);
+  const [pendingQuickStartAction, setPendingQuickStartAction] = useState<
+    "register" | "configure" | null
+  >(null);
   const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
   const [costProfileVehicleId, setCostProfileVehicleId] = useState<number | null>(null);
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
@@ -452,6 +532,10 @@ function App() {
     setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
     setExpenseForm(emptyExpenseForm);
+    setQuickStartForm(emptyQuickStartForm);
+    setQuickStartResult(null);
+    setQuickStartVisible(false);
+    setPendingQuickStartAction(null);
     setMode("login");
     setPassword("");
     setSuccessMessage("");
@@ -804,6 +888,164 @@ function App() {
     await loadVehicleCostProfile(vehicle.id);
   }
 
+  function getQuickStartWorkedMinutes(): number {
+    if (!/^\d+$/.test(quickStartForm.worked_hours) || !/^\d+$/.test(quickStartForm.worked_minutes)) {
+      throw new Error("Informe as horas e os minutos trabalhados.");
+    }
+
+    const hours = Number(quickStartForm.worked_hours);
+    const minutes = Number(quickStartForm.worked_minutes);
+    if (!Number.isSafeInteger(hours) || !Number.isSafeInteger(minutes) || minutes > 59) {
+      throw new Error("Verifique o tempo trabalhado.");
+    }
+
+    const totalMinutes = hours * 60 + minutes;
+    if (!Number.isSafeInteger(totalMinutes) || totalMinutes <= 0) {
+      throw new Error("Informe um tempo trabalhado maior que zero.");
+    }
+
+    return totalMinutes;
+  }
+
+  function getQuickStartTripCount(): number {
+    if (!quickStartForm.trip_count.trim()) {
+      return 0;
+    }
+
+    if (!/^\d+$/.test(quickStartForm.trip_count)) {
+      throw new Error("Informe o número de corridas corretamente.");
+    }
+
+    const tripCount = Number(quickStartForm.trip_count);
+    if (!Number.isSafeInteger(tripCount)) {
+      throw new Error("Informe o número de corridas corretamente.");
+    }
+
+    return tripCount;
+  }
+
+  function calculateQuickStart(): QuickStartResult {
+    const grossRevenueCents = moneyInputToCents(quickStartForm.gross_revenue);
+    const fuelExpenseCents = moneyInputToCents(quickStartForm.fuel_expense);
+    const distance = parseNonNegativeDecimal(quickStartForm.distance_km, "os km rodados");
+    const workedMinutes = getQuickStartWorkedMinutes();
+    const tripCount = getQuickStartTripCount();
+
+    if (distance.scale > 3 || distance.units <= 0n || grossRevenueCents < 0n || fuelExpenseCents < 0n) {
+      throw new Error("Informe valores possíveis para a simulação.");
+    }
+
+    const remainingCents = grossRevenueCents - fuelExpenseCents;
+    return {
+      grossRevenueCents,
+      fuelExpenseCents,
+      remainingCents,
+      remainingPerHourCents: divideAndRound(remainingCents * 60n, BigInt(workedMinutes)),
+      remainingPerKmCents: divideAndRound(
+        remainingCents * 10n ** BigInt(distance.scale),
+        distance.units,
+      ),
+      averageTicketCents:
+        tripCount > 0 ? divideAndRound(grossRevenueCents, BigInt(tripCount)) : null,
+    };
+  }
+
+  function handleQuickStartSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      setQuickStartResult(calculateQuickStart());
+    } catch (error) {
+      setQuickStartResult(null);
+      setMessage(error instanceof Error ? error.message : "Não foi possível calcular a estimativa.");
+    }
+  }
+
+  async function handleQuickStartConfigure(vehicle = vehicles[0]) {
+    if (!vehicle) {
+      setPendingQuickStartAction("configure");
+      setMessage("Cadastre seu veículo primeiro. Seus dados da simulação foram mantidos.");
+      document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    setPendingQuickStartAction(null);
+    await handleOpenCostProfile(vehicle);
+    setCostProfileForm((currentForm) => ({
+      ...currentForm,
+      ownership_type: quickStartForm.ownership_type,
+      rental_monthly:
+        quickStartForm.ownership_type === "rented" ? quickStartForm.rental_monthly : "",
+      financing_monthly:
+        quickStartForm.ownership_type === "financed" ? quickStartForm.financing_monthly : "",
+    }));
+    document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function registerQuickStartDay(vehicle: Vehicle) {
+    const workedMinutes = getQuickStartWorkedMinutes();
+    const tripCount = getQuickStartTripCount();
+    const fuelExpenseCents = moneyInputToCents(quickStartForm.fuel_expense);
+    const workDate = toDateInputValue(new Date());
+
+    await requestApi<WorkSession>("/work-sessions", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        vehicle_id: vehicle.id,
+        work_date: workDate,
+        gross_revenue: moneyInputToApi(quickStartForm.gross_revenue),
+        distance_km: normalizeDecimalInput(quickStartForm.distance_km),
+        worked_minutes: workedMinutes,
+        trip_count: tripCount,
+      }),
+    });
+
+    if (fuelExpenseCents > 0n) {
+      await requestApi<Expense>("/expenses", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          vehicle_id: vehicle.id,
+          expense_date: workDate,
+          category: quickStartForm.expense_category,
+          amount: moneyInputToApi(quickStartForm.fuel_expense),
+          description: "Registrado pelo início rápido",
+        }),
+      });
+    }
+
+    setPendingQuickStartAction(null);
+    setSuccessMessage("Seu primeiro dia foi registrado com os dados da simulação.");
+    await loadWorkSessions();
+    await loadExpenses();
+    await loadFinancialSummary();
+    document.getElementById("jornadas")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function handleQuickStartRegister() {
+    if (!quickStartResult) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+    if (!vehicles[0]) {
+      setPendingQuickStartAction("register");
+      setMessage("Cadastre seu veículo para registrar o dia. Seus dados da simulação foram mantidos.");
+      document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    try {
+      await registerQuickStartDay(vehicles[0]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Não foi possível registrar o dia.");
+    }
+  }
+
   async function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsVehicleSaving(true);
@@ -819,6 +1061,7 @@ function App() {
     };
 
     try {
+      let savedVehicle: Vehicle | null = null;
       if (editingVehicleId) {
         await requestApi<Vehicle>(`/vehicles/${editingVehicleId}`, {
           method: "PUT",
@@ -827,7 +1070,7 @@ function App() {
         });
         setSuccessMessage("Veiculo atualizado com sucesso.");
       } else {
-        await requestApi<Vehicle>("/vehicles", {
+        savedVehicle = await requestApi<Vehicle>("/vehicles", {
           method: "POST",
           headers: getAuthHeaders(),
           body: JSON.stringify(payload),
@@ -837,6 +1080,12 @@ function App() {
 
       resetVehicleForm();
       await loadVehicles();
+      if (savedVehicle && pendingQuickStartAction === "register") {
+        await registerQuickStartDay(savedVehicle);
+      }
+      if (savedVehicle && pendingQuickStartAction === "configure") {
+        await handleQuickStartConfigure(savedVehicle);
+      }
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1117,6 +1366,7 @@ function App() {
   }
 
   const selectedCostProfileVehicle = getCostProfileVehicle();
+  const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -1154,13 +1404,277 @@ function App() {
             {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
             <nav className="dashboard-nav" aria-label="Navegacao principal">
-              <a href="#dashboard">Dashboard</a>
+              {workSessions.length > 0 ? <a href="#dashboard">Dashboard</a> : null}
+              {workSessions.length > 0 ? (
+                <button
+                  className="quick-start-nav-button"
+                  type="button"
+                  onClick={() => {
+                    setQuickStartVisible(true);
+                    requestAnimationFrame(() =>
+                      document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
+                    );
+                  }}
+                >
+                  Simular um dia
+                </button>
+              ) : null}
               <a href="#jornadas">Jornadas</a>
               <a href="#despesas">Despesas</a>
               <a href="#veiculos">Veículos</a>
             </nav>
 
-            <section className="manager-section dashboard-section" id="dashboard">
+            {isQuickStartVisible ? (
+              <section className="quick-start" id="quick-start">
+                <div className="section-title">
+                  <p className="eyebrow">Início rápido</p>
+                  <h3>Descubra seu GanhoCerto</h3>
+                  <p className="subtle-note">
+                    Veja em poucos passos quanto realmente sobrou do seu dia de trabalho.
+                  </p>
+                </div>
+
+                <div className="quick-start-progress" aria-label="Progresso da simulação">
+                  <span>1. Quanto você fez hoje?</span>
+                  <span>2. Quanto trabalhou?</span>
+                  <span>3. Quanto gastou?</span>
+                  <span>4. Seu resultado</span>
+                </div>
+
+                {!quickStartResult ? (
+                  <form className="auth-form quick-start-form" onSubmit={handleQuickStartSubmit}>
+                    <fieldset className="form-group">
+                      <legend>Quanto você fez hoje?</legend>
+                      <label>
+                        Faturamento do dia
+                        <input
+                          inputMode="decimal"
+                          onChange={(event) =>
+                            setQuickStartForm({ ...quickStartForm, gross_revenue: event.target.value })
+                          }
+                          placeholder="Ex: 250,50"
+                          required
+                          type="text"
+                          value={quickStartForm.gross_revenue}
+                        />
+                      </label>
+                    </fieldset>
+
+                    <fieldset className="form-group">
+                      <legend>Quanto trabalhou?</legend>
+                      <div className="form-grid quick-start-time">
+                        <label>
+                          Km rodados
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, distance_km: event.target.value })
+                            }
+                            placeholder="Ex: 87,5"
+                            required
+                            type="text"
+                            value={quickStartForm.distance_km}
+                          />
+                        </label>
+                        <label>
+                          Horas trabalhadas
+                          <input
+                            min="0"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, worked_hours: event.target.value })
+                            }
+                            required
+                            type="number"
+                            value={quickStartForm.worked_hours}
+                          />
+                        </label>
+                        <label>
+                          Minutos
+                          <input
+                            max="59"
+                            min="0"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, worked_minutes: event.target.value })
+                            }
+                            required
+                            type="number"
+                            value={quickStartForm.worked_minutes}
+                          />
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <fieldset className="form-group">
+                      <legend>Quanto gastou?</legend>
+                      <div className="form-grid">
+                        <label>
+                          Combustível ou recarga
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, fuel_expense: event.target.value })
+                            }
+                            placeholder="Ex: 80,00"
+                            required
+                            type="text"
+                            value={quickStartForm.fuel_expense}
+                          />
+                        </label>
+                        <label>
+                          Tipo de gasto
+                          <select
+                            onChange={(event) =>
+                              setQuickStartForm({
+                                ...quickStartForm,
+                                expense_category: event.target.value as "fuel" | "charging",
+                              })
+                            }
+                            value={quickStartForm.expense_category}
+                          >
+                            <option value="fuel">Combustível</option>
+                            <option value="charging">Recarga elétrica</option>
+                          </select>
+                        </label>
+                      </div>
+                    </fieldset>
+
+                    <fieldset className="form-group">
+                      <legend>Seu veículo</legend>
+                      <label>
+                        Tipo do veículo
+                        <select
+                          onChange={(event) =>
+                            setQuickStartForm({
+                              ...quickStartForm,
+                              ownership_type: event.target.value as OwnershipType,
+                            })
+                          }
+                          value={quickStartForm.ownership_type}
+                        >
+                          {ownershipOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {quickStartForm.ownership_type === "rented" ? (
+                        <label>
+                          Aluguel mensal <span className="optional-label">(opcional)</span>
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, rental_monthly: event.target.value })
+                            }
+                            placeholder="Ex: 2.200,00"
+                            type="text"
+                            value={quickStartForm.rental_monthly}
+                          />
+                        </label>
+                      ) : null}
+
+                      {quickStartForm.ownership_type === "financed" ? (
+                        <label>
+                          Financiamento mensal <span className="optional-label">(opcional)</span>
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, financing_monthly: event.target.value })
+                            }
+                            placeholder="Ex: 1.800,00"
+                            type="text"
+                            value={quickStartForm.financing_monthly}
+                          />
+                        </label>
+                      ) : null}
+                    </fieldset>
+
+                    <label>
+                      Número de corridas <span className="optional-label">(opcional)</span>
+                      <input
+                        min="0"
+                        onChange={(event) =>
+                          setQuickStartForm({ ...quickStartForm, trip_count: event.target.value })
+                        }
+                        type="number"
+                        value={quickStartForm.trip_count}
+                      />
+                    </label>
+
+                    <button className="button quick-start-button" type="submit">
+                      Ver minha estimativa rápida
+                    </button>
+                  </form>
+                ) : (
+                  <div className="quick-start-result">
+                    <div className="section-title">
+                      <p className="eyebrow">Resultado inicial</p>
+                      <h3>Sua estimativa rápida</h3>
+                    </div>
+                    <div className="metric-grid quick-start-metrics">
+                      <article className="metric-card">
+                        <span>Faturamento</span>
+                        <strong>{formatCents(quickStartResult.grossRevenueCents)}</strong>
+                      </article>
+                      <article className="metric-card metric-expense">
+                        <span>Gasto informado</span>
+                        <strong>{formatCents(quickStartResult.fuelExpenseCents)}</strong>
+                      </article>
+                      <article className="metric-card metric-profit">
+                        <span>Sobra após gasto</span>
+                        <strong>{formatCents(quickStartResult.remainingCents)}</strong>
+                      </article>
+                      <article className="metric-card">
+                        <span>R$/hora</span>
+                        <strong>
+                          {quickStartResult.remainingPerHourCents === null
+                            ? "—"
+                            : formatCents(quickStartResult.remainingPerHourCents)}
+                        </strong>
+                      </article>
+                      <article className="metric-card">
+                        <span>R$/km</span>
+                        <strong>
+                          {quickStartResult.remainingPerKmCents === null
+                            ? "—"
+                            : formatCents(quickStartResult.remainingPerKmCents)}
+                        </strong>
+                      </article>
+                      {quickStartResult.averageTicketCents !== null ? (
+                        <article className="metric-card">
+                          <span>Ticket médio</span>
+                          <strong>{formatCents(quickStartResult.averageTicketCents)}</strong>
+                        </article>
+                      ) : null}
+                    </div>
+                    <p className="quick-start-disclaimer">
+                      Este é um cálculo inicial. Custos como manutenção, pneus, seguro, IPVA e
+                      depreciação podem reduzir seu resultado real.
+                    </p>
+                    <div className="quick-start-actions">
+                      <p>Quer descobrir quanto realmente sobra considerando todos os custos do seu veículo?</p>
+                      <button className="button" type="button" onClick={() => void handleQuickStartConfigure()}>
+                        Configurar meu GanhoCerto
+                      </button>
+                      <button className="button button-ghost" type="button" onClick={() => void handleQuickStartRegister()}>
+                        Registrar meu primeiro dia
+                      </button>
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => setQuickStartResult(null)}
+                      >
+                        Ajustar dados
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {workSessions.length > 0 ? (
+              <section className="manager-section dashboard-section" id="dashboard">
               <div className="section-title">
                 <p className="eyebrow">Dashboard</p>
                 <h3>Resumo financeiro</h3>
@@ -1422,7 +1936,8 @@ function App() {
                   </div>
                 </>
               ) : null}
-            </section>
+              </section>
+            ) : null}
 
             <section className="manager-section" id="jornadas">
               <div className="section-title">
@@ -1863,6 +2378,11 @@ function App() {
               <div className="section-title">
                 <p className="eyebrow">Veículos</p>
                 <h3>Carros disponíveis para jornadas</h3>
+                {pendingQuickStartAction ? (
+                  <p className="subtle-note">
+                    Cadastre os dados básicos do veículo para continuar sem perder sua simulação.
+                  </p>
+                ) : null}
               </div>
 
               <div className="vehicles-layout">
