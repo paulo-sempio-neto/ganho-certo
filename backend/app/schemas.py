@@ -18,6 +18,19 @@ RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
 CsvImportType = Literal["work_sessions", "expenses"]
+MaintenanceCategory = Literal[
+    "oil",
+    "tires",
+    "brakes",
+    "filters",
+    "alignment",
+    "battery",
+    "inspection",
+    "transmission",
+    "cooling",
+    "other",
+]
+MaintenanceStatusType = Literal["ok", "due_soon", "due"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -103,6 +116,118 @@ class VehiclePublic(VehicleBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class MaintenancePlanBase(BaseModel):
+    vehicle_id: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=120)
+    category: MaintenanceCategory
+    interval_km: Decimal | None = Field(default=None, gt=Decimal("0"))
+    interval_days: int | None = Field(default=None, gt=0)
+    estimated_cost: Decimal | None = Field(default=None, ge=Decimal("0"))
+    active: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field is required.")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_interval(self) -> "MaintenancePlanBase":
+        if self.interval_km is None and self.interval_days is None:
+            raise ValueError("At least one maintenance interval is required.")
+
+        return self
+
+
+class MaintenancePlanCreate(MaintenancePlanBase):
+    pass
+
+
+class MaintenancePlanUpdate(MaintenancePlanBase):
+    pass
+
+
+class MaintenancePlanPublic(MaintenancePlanBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("interval_km")
+    def serialize_interval_km(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+    @field_serializer("estimated_cost")
+    def serialize_estimated_cost(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+
+class MaintenanceRecordCreate(BaseModel):
+    service_date: date
+    notes: str | None = Field(default=None, max_length=255)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_notes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
+
+
+class MaintenanceRecordPublic(MaintenanceRecordCreate):
+    id: int
+    maintenance_plan_id: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MaintenancePlanStatus(BaseModel):
+    status: MaintenanceStatusType
+    km_since_last_service: Decimal | None
+    km_remaining: Decimal | None
+    days_since_last_service: int | None
+    days_remaining: int | None
+    estimated_cost: Decimal | None
+    recommended_reserve_per_km: Decimal | None
+
+    @field_serializer("km_since_last_service", "km_remaining")
+    def serialize_distance(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+    @field_serializer("estimated_cost")
+    def serialize_status_money(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+    @field_serializer("recommended_reserve_per_km")
+    def serialize_reserve_per_km(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.4f}"
 
 
 class VehicleCostProfileBase(BaseModel):

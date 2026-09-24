@@ -60,6 +60,7 @@ class Vehicle(Base):
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="vehicle")
     financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="vehicle")
     import_profiles: Mapped[list[CsvImportProfile]] = relationship(back_populates="vehicle")
+    maintenance_plans: Mapped[list[MaintenancePlan]] = relationship(back_populates="vehicle")
     cost_profile: Mapped[VehicleCostProfile | None] = relationship(
         back_populates="vehicle",
         uselist=False,
@@ -307,3 +308,58 @@ class CsvImportProfile(Base):
     )
     user: Mapped[User] = relationship(back_populates="import_profiles")
     vehicle: Mapped[Vehicle | None] = relationship(back_populates="import_profiles")
+
+
+class MaintenancePlan(Base):
+    __tablename__ = "maintenance_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    category: Mapped[str] = mapped_column(String(30), nullable=False)
+    interval_km: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    interval_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    estimated_cost_cents: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    vehicle: Mapped[Vehicle] = relationship(back_populates="maintenance_plans")
+    records: Mapped[list[MaintenanceRecord]] = relationship(
+        back_populates="maintenance_plan",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def estimated_cost(self) -> Decimal | None:
+        if self.estimated_cost_cents is None:
+            return None
+
+        return Decimal(self.estimated_cost_cents) / Decimal("100")
+
+
+class MaintenanceRecord(Base):
+    __tablename__ = "maintenance_records"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    maintenance_plan_id: Mapped[int] = mapped_column(
+        ForeignKey("maintenance_plans.id"),
+        nullable=False,
+        index=True,
+    )
+    service_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    notes: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    maintenance_plan: Mapped[MaintenancePlan] = relationship(back_populates="records")
