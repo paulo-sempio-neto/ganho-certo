@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
 
 import "./App.css";
 
@@ -45,6 +45,36 @@ type WorkSession = {
   trip_count: number;
   created_at: string;
   updated_at: string;
+};
+
+type WorkSessionImportRow = {
+  row: number;
+  date: string;
+  gross_revenue: string;
+  distance_km: string;
+  worked_minutes: number;
+  trip_count: number;
+};
+
+type WorkSessionImportError = {
+  row: number;
+  field: string;
+  message: string;
+};
+
+type WorkSessionImportPreview = {
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  rows: WorkSessionImportRow[];
+  errors: WorkSessionImportError[];
+};
+
+type WorkSessionImportResult = {
+  imported: number;
+  duplicates_skipped: number;
+  failed: number;
+  errors: WorkSessionImportError[];
 };
 
 type ExpenseCategory =
@@ -548,6 +578,32 @@ function formatWorkTime(totalMinutes: number): string {
   return `${hours}h ${minutes.toString().padStart(2, "0")}min`;
 }
 
+function formatFileSize(size: number): string {
+  if (size < 1024) {
+    return `${size} bytes`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1).replace(".", ",")} KB`;
+  }
+
+  return `${(size / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+}
+
+function getImportFieldLabel(field: string): string {
+  const labels: Record<string, string> = {
+    date: "Data",
+    gross_revenue: "Faturamento",
+    distance_km: "Km rodados",
+    worked_minutes: "Minutos trabalhados",
+    trip_count: "Corridas",
+    header: "Cabeçalho",
+    file: "Arquivo",
+  };
+
+  return labels[field] ?? field;
+}
+
 function formatDate(value: string): string {
   const [year, month, day] = value.split("-");
   return `${day}/${month}/${year}`;
@@ -674,6 +730,15 @@ function App() {
     useState<VehicleCostProfileForm>(emptyCostProfileForm);
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
+  const [workSessionImportVehicleId, setWorkSessionImportVehicleId] = useState("");
+  const [workSessionImportFile, setWorkSessionImportFile] = useState<File | null>(null);
+  const [workSessionImportPreview, setWorkSessionImportPreview] =
+    useState<WorkSessionImportPreview | null>(null);
+  const [workSessionImportResult, setWorkSessionImportResult] =
+    useState<WorkSessionImportResult | null>(null);
+  const [workSessionImportError, setWorkSessionImportError] = useState("");
+  const [isWorkSessionImportVisible, setIsWorkSessionImportVisible] = useState(false);
+  const [isWorkSessionImportDragging, setIsWorkSessionImportDragging] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [recurringExpenseForm, setRecurringExpenseForm] =
     useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
@@ -719,6 +784,9 @@ function App() {
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
+  const [isWorkSessionImportPreviewLoading, setIsWorkSessionImportPreviewLoading] =
+    useState(false);
+  const [isWorkSessionImportSaving, setIsWorkSessionImportSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
   const [isFinancialGoalSaving, setIsFinancialGoalSaving] = useState(false);
@@ -746,6 +814,13 @@ function App() {
     setVehicleForm(emptyVehicleForm);
     setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
+    setWorkSessionImportVehicleId("");
+    setWorkSessionImportFile(null);
+    setWorkSessionImportPreview(null);
+    setWorkSessionImportResult(null);
+    setWorkSessionImportError("");
+    setIsWorkSessionImportVisible(false);
+    setIsWorkSessionImportDragging(false);
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
     setFinancialGoalForm(emptyFinancialGoalForm);
@@ -767,7 +842,7 @@ function App() {
     setMessage(nextMessage);
   }
 
-  function getAuthHeaders(currentToken = token): HeadersInit {
+  function getAuthHeaders(currentToken = token): Record<string, string> {
     return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
   }
 
@@ -901,6 +976,17 @@ function App() {
           currentForm.vehicle_id ||
           (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
       }));
+      setWorkSessionImportVehicleId((currentVehicleId) => {
+        if (nextVehicles.length === 1) {
+          return String(nextVehicles[0].id);
+        }
+
+        if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
+          return currentVehicleId;
+        }
+
+        return "";
+      });
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1111,6 +1197,13 @@ function App() {
       setFinancialInsights([]);
       setCostProfileVehicleId(null);
       setCostProfileForm(emptyCostProfileForm);
+      setWorkSessionImportVehicleId("");
+      setWorkSessionImportFile(null);
+      setWorkSessionImportPreview(null);
+      setWorkSessionImportResult(null);
+      setWorkSessionImportError("");
+      setIsWorkSessionImportVisible(false);
+      setIsWorkSessionImportDragging(false);
       return;
     }
 
@@ -1796,6 +1889,157 @@ function App() {
       } else {
         setMessage(error instanceof Error ? error.message : "Erro ao excluir jornada.");
       }
+    }
+  }
+
+  function getWorkSessionImportVehicleLabel(): string {
+    const vehicle = vehicles.find((item) => String(item.id) === workSessionImportVehicleId);
+    return vehicle ? `${vehicle.name} - ${vehicle.brand} ${vehicle.model}` : "veículo selecionado";
+  }
+
+  function getWorkSessionImportPath(preview = false): string {
+    const params = new URLSearchParams({ vehicle_id: workSessionImportVehicleId });
+    return `/imports/work-sessions${preview ? "/preview" : ""}?${params.toString()}`;
+  }
+
+  function clearWorkSessionImportFile() {
+    setWorkSessionImportFile(null);
+    setWorkSessionImportPreview(null);
+    setWorkSessionImportResult(null);
+    setWorkSessionImportError("");
+    setIsWorkSessionImportDragging(false);
+  }
+
+  function handleWorkSessionImportFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    const isCsv = file.name.toLowerCase().endsWith(".csv") || file.type.includes("csv");
+    if (!isCsv) {
+      clearWorkSessionImportFile();
+      setWorkSessionImportError("Selecione um arquivo CSV.");
+      return;
+    }
+
+    setWorkSessionImportFile(file);
+    setWorkSessionImportPreview(null);
+    setWorkSessionImportResult(null);
+    setWorkSessionImportError("");
+  }
+
+  function handleWorkSessionImportFileChange(event: ChangeEvent<HTMLInputElement>) {
+    handleWorkSessionImportFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  }
+
+  function handleWorkSessionImportDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsWorkSessionImportDragging(false);
+    handleWorkSessionImportFile(event.dataTransfer.files[0] ?? null);
+  }
+
+  function downloadWorkSessionImportTemplate() {
+    const csvTemplate =
+      "date,gross_revenue,distance_km,worked_minutes,trip_count\n" +
+      "2026-09-20,350.50,180.4,480,22\n" +
+      "2026-09-21,410.00,205.0,530,25\n";
+    const blob = new Blob([csvTemplate], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "modelo-jornadas-ganhocerto.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleWorkSessionImportPreview() {
+    if (!workSessionImportVehicleId) {
+      setWorkSessionImportError("Selecione um veículo para importar as jornadas.");
+      return;
+    }
+
+    if (!workSessionImportFile) {
+      setWorkSessionImportError("Selecione um arquivo CSV para continuar.");
+      return;
+    }
+
+    setIsWorkSessionImportPreviewLoading(true);
+    setWorkSessionImportError("");
+    setWorkSessionImportResult(null);
+
+    try {
+      const preview = await requestApi<WorkSessionImportPreview>(
+        getWorkSessionImportPath(true),
+        {
+          method: "POST",
+          headers: {
+            ...getAuthHeaders(),
+            "Content-Type": "text/csv",
+          },
+          body: workSessionImportFile,
+        },
+      );
+      setWorkSessionImportPreview(preview);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setWorkSessionImportPreview(null);
+        setWorkSessionImportError(
+          error instanceof Error ? error.message : "Não foi possível validar o CSV.",
+        );
+      }
+    } finally {
+      setIsWorkSessionImportPreviewLoading(false);
+    }
+  }
+
+  async function handleConfirmWorkSessionImport() {
+    if (!workSessionImportPreview || !workSessionImportFile || !workSessionImportVehicleId) {
+      return;
+    }
+
+    if (workSessionImportPreview.invalid_rows > 0 || workSessionImportPreview.valid_rows === 0) {
+      return;
+    }
+
+    const shouldImport = window.confirm(
+      `Confirmar importação de ${workSessionImportPreview.valid_rows} jornadas para ${getWorkSessionImportVehicleLabel()}?`,
+    );
+    if (!shouldImport) {
+      return;
+    }
+
+    setIsWorkSessionImportSaving(true);
+    setWorkSessionImportError("");
+    setWorkSessionImportResult(null);
+
+    try {
+      const result = await requestApi<WorkSessionImportResult>(getWorkSessionImportPath(), {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "text/csv",
+        },
+        body: workSessionImportFile,
+      });
+      setWorkSessionImportResult(result);
+      setWorkSessionImportPreview(null);
+      setWorkSessionImportFile(null);
+      setSuccessMessage("Importação concluída.");
+      await loadWorkSessions();
+      await refreshDashboardData();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setWorkSessionImportError(
+          error instanceof Error ? error.message : "Não foi possível importar o CSV.",
+        );
+      }
+    } finally {
+      setIsWorkSessionImportSaving(false);
     }
   }
 
@@ -3407,7 +3651,237 @@ function App() {
               <div className="section-title">
                 <p className="eyebrow">Jornadas</p>
                 <h3>Registro diario de trabalho</h3>
+                <button
+                  className="button button-ghost inline-action"
+                  type="button"
+                  onClick={() => setIsWorkSessionImportVisible((current) => !current)}
+                >
+                  Importar jornadas
+                </button>
               </div>
+
+              {isWorkSessionImportVisible ? (
+                <div className="import-panel" aria-busy={isWorkSessionImportPreviewLoading || isWorkSessionImportSaving}>
+                  <div className="list-header">
+                    <div>
+                      <h3>Importar jornadas por CSV</h3>
+                      <p className="subtle-note">
+                        Escolha o veículo, envie o arquivo e revise o preview antes de gravar.
+                      </p>
+                    </div>
+                    <button className="text-button" type="button" onClick={downloadWorkSessionImportTemplate}>
+                      Baixar modelo CSV
+                    </button>
+                  </div>
+
+                  <div className="import-template-help">
+                    <span>date: AAAA-MM-DD</span>
+                    <span>gross_revenue: faturamento</span>
+                    <span>distance_km: km rodados</span>
+                    <span>worked_minutes: minutos trabalhados</span>
+                    <span>trip_count: número de corridas</span>
+                  </div>
+
+                  {vehicles.length === 0 ? (
+                    <p className="empty-state compact-empty-state">
+                      Cadastre um veículo antes de importar jornadas.{" "}
+                      <a href="#veiculos">Ir para Veículos</a>
+                    </p>
+                  ) : (
+                    <>
+                      <div className="form-grid">
+                        <label>
+                          Veículo
+                          <select
+                            disabled={vehicles.length === 1}
+                            onChange={(event) => setWorkSessionImportVehicleId(event.target.value)}
+                            required
+                            value={workSessionImportVehicleId}
+                          >
+                            <option value="">Selecione</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label
+                          className={
+                            isWorkSessionImportDragging ? "import-dropzone import-dropzone-active" : "import-dropzone"
+                          }
+                          onDragLeave={() => setIsWorkSessionImportDragging(false)}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            setIsWorkSessionImportDragging(true);
+                          }}
+                          onDrop={handleWorkSessionImportDrop}
+                        >
+                          <span>Selecionar ou arrastar CSV</span>
+                          <small>Clique aqui ou solte o arquivo nesta área.</small>
+                          <input
+                            accept=".csv,text/csv"
+                            type="file"
+                            onChange={handleWorkSessionImportFileChange}
+                          />
+                        </label>
+                      </div>
+
+                      {workSessionImportFile ? (
+                        <div className="import-file">
+                          <div>
+                            <strong>{workSessionImportFile.name}</strong>
+                            <span>{formatFileSize(workSessionImportFile.size)}</span>
+                          </div>
+                          <button className="text-button danger" type="button" onClick={clearWorkSessionImportFile}>
+                            Remover
+                          </button>
+                        </div>
+                      ) : null}
+
+                      <div className="form-actions import-actions">
+                        <button
+                          className="button"
+                          disabled={
+                            isWorkSessionImportPreviewLoading ||
+                            isWorkSessionImportSaving ||
+                            !workSessionImportVehicleId ||
+                            !workSessionImportFile
+                          }
+                          type="button"
+                          onClick={() => void handleWorkSessionImportPreview()}
+                        >
+                          {isWorkSessionImportPreviewLoading ? "Validando..." : "Visualizar preview"}
+                        </button>
+                      </div>
+
+                      {workSessionImportError ? (
+                        <p className="form-message compact-message">{workSessionImportError}</p>
+                      ) : null}
+
+                      {workSessionImportPreview ? (
+                        <div className="import-preview">
+                          <dl className="session-metrics import-summary">
+                            <div>
+                              <dt>Total</dt>
+                              <dd>{workSessionImportPreview.total_rows}</dd>
+                            </div>
+                            <div>
+                              <dt>Válidas</dt>
+                              <dd>{workSessionImportPreview.valid_rows}</dd>
+                            </div>
+                            <div>
+                              <dt>Inválidas</dt>
+                              <dd>{workSessionImportPreview.invalid_rows}</dd>
+                            </div>
+                          </dl>
+
+                          {workSessionImportPreview.errors.length > 0 ? (
+                            <div className="import-errors">
+                              <h4>Corrija o CSV e envie novamente</h4>
+                              {workSessionImportPreview.errors.map((error, index) => (
+                                <article key={`${error.row}-${error.field}-${index}`}>
+                                  <strong>Linha {error.row}</strong>
+                                  <span>
+                                    {getImportFieldLabel(error.field)}: {error.message}
+                                  </span>
+                                </article>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {workSessionImportPreview.rows.length > 0 ? (
+                            <div className="import-preview-list">
+                              {workSessionImportPreview.rows.map((row) => (
+                                <article className="vehicle-card session-card" key={row.row}>
+                                  <div>
+                                    <h4>{formatDate(row.date)}</h4>
+                                    <dl className="session-metrics">
+                                      <div>
+                                        <dt>Faturamento</dt>
+                                        <dd>{formatMoney(row.gross_revenue)}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Km</dt>
+                                        <dd>{formatDistance(row.distance_km)}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Tempo</dt>
+                                        <dd>{formatWorkTime(row.worked_minutes)}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Corridas</dt>
+                                        <dd>{row.trip_count}</dd>
+                                      </div>
+                                    </dl>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {workSessionImportPreview.invalid_rows > 0 ? (
+                            <p className="empty-state compact-empty-state">
+                              Existem linhas inválidas. A importação só ficará disponível após corrigir o arquivo.
+                            </p>
+                          ) : (
+                            <button
+                              className="button"
+                              disabled={
+                                isWorkSessionImportSaving ||
+                                workSessionImportPreview.valid_rows === 0
+                              }
+                              type="button"
+                              onClick={() => void handleConfirmWorkSessionImport()}
+                            >
+                              {isWorkSessionImportSaving
+                                ? "Importando..."
+                                : `Importar ${workSessionImportPreview.valid_rows} jornadas`}
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {workSessionImportResult ? (
+                        <div className="import-result">
+                          <h4>Importação concluída</h4>
+                          <dl className="session-metrics import-summary">
+                            <div>
+                              <dt>Importadas</dt>
+                              <dd>{workSessionImportResult.imported}</dd>
+                            </div>
+                            <div>
+                              <dt>Duplicadas</dt>
+                              <dd>{workSessionImportResult.duplicates_skipped}</dd>
+                            </div>
+                            <div>
+                              <dt>Falhas</dt>
+                              <dd>{workSessionImportResult.failed}</dd>
+                            </div>
+                          </dl>
+                          {workSessionImportResult.duplicates_skipped > 0 ? (
+                            <p className="subtle-note">
+                              O GanhoCerto ignorou registros que já haviam sido importados.
+                            </p>
+                          ) : null}
+                          <button
+                            className="button button-ghost"
+                            type="button"
+                            onClick={() =>
+                              document.getElementById("lista-jornadas")?.scrollIntoView({
+                                behavior: "smooth",
+                              })
+                            }
+                          >
+                            Ver minhas jornadas
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
 
               <div className="vehicles-layout">
                 <form className="auth-form vehicle-form" onSubmit={handleWorkSessionSubmit}>
@@ -3569,7 +4043,7 @@ function App() {
                   </div>
                 </form>
 
-                <div className="vehicles-list" aria-busy={isWorkSessionsLoading}>
+                <div className="vehicles-list" id="lista-jornadas" aria-busy={isWorkSessionsLoading}>
                   <div className="list-header">
                     <h3>Minhas jornadas</h3>
                     <button

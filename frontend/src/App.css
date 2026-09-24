@@ -799,6 +799,11 @@ select:focus {
   padding-top: 24px;
 }
 
+.inline-action {
+  justify-self: start;
+  margin-top: 8px;
+}
+
 .section-title {
   display: grid;
   gap: 4px;
@@ -868,6 +873,147 @@ select:focus {
 .form-actions {
   display: grid;
   gap: 10px;
+}
+
+.import-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d9ded5;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.import-template-help {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.import-template-help span {
+  border-radius: 999px;
+  background: #f3f6f1;
+  color: #58625a;
+  font-size: 0.82rem;
+  padding: 7px 10px;
+}
+
+.import-dropzone {
+  display: grid;
+  place-content: center;
+  min-height: 112px;
+  border: 1px dashed #aeb9af;
+  border-radius: 10px;
+  background: #fbfcfa;
+  color: #26734d;
+  cursor: pointer;
+  padding: 18px;
+  text-align: center;
+}
+
+.import-dropzone-active {
+  border-color: #26734d;
+  background: #edf8ef;
+}
+
+.import-dropzone span {
+  font-weight: 900;
+}
+
+.import-dropzone small {
+  color: #677069;
+}
+
+.import-dropzone input {
+  display: none;
+}
+
+.import-file,
+.import-result {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e4e8e1;
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
+.import-file div,
+.import-result {
+  min-width: 0;
+}
+
+.import-file strong,
+.import-file span {
+  display: block;
+}
+
+.import-file strong {
+  overflow-wrap: anywhere;
+}
+
+.import-file span {
+  color: #677069;
+  font-size: 0.86rem;
+}
+
+.import-actions {
+  max-width: 280px;
+}
+
+.import-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.import-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.import-errors {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #f0d2ca;
+  border-radius: 8px;
+  background: #fff9ef;
+  padding: 12px;
+}
+
+.import-errors h4,
+.import-result h4 {
+  margin: 0;
+  color: #111812;
+}
+
+.import-errors article {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid #f0d2ca;
+  padding-top: 8px;
+}
+
+.import-errors article:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.import-errors span {
+  color: #76510d;
+}
+
+.import-preview-list {
+  display: grid;
+  gap: 10px;
+  max-height: 460px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.import-result {
+  align-items: stretch;
+  flex-direction: column;
 }
 
 .toggle-field {
@@ -1104,6 +1250,7 @@ select:focus {
   .form-grid,
   .form-grid-three,
   .session-metrics,
+  .import-summary,
   .recurring-metrics,
   .goal-metrics,
   .goal-summary-metrics,
