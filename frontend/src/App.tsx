@@ -210,6 +210,11 @@ type FinancialStructuralCosts = {
   depreciation: string;
 };
 
+type FinancialRecurringExpenseBreakdown = {
+  category: ExpenseCategory;
+  amount: string;
+};
+
 type FinancialSummary = {
   gross_revenue: string;
   total_expenses: string;
@@ -217,6 +222,10 @@ type FinancialSummary = {
   estimated_structural_costs: string;
   estimated_economic_costs: string;
   estimated_economic_result: string;
+  recurring_expenses_total: string;
+  recurring_expenses_breakdown: FinancialRecurringExpenseBreakdown[];
+  projected_economic_costs: string;
+  projected_economic_result: string;
   structural_costs: FinancialStructuralCosts;
   total_distance_km: string;
   total_worked_minutes: number;
@@ -713,6 +722,10 @@ function App() {
             : null,
       }))
       .filter((item) => isPositiveMoney(item.value));
+  }
+
+  function getRecurringProjectionItems(summary: FinancialSummary) {
+    return summary.recurring_expenses_breakdown.filter((item) => isPositiveMoney(item.amount));
   }
 
   function buildFinancialSummaryPath() {
@@ -2493,49 +2506,84 @@ function App() {
                 <>
                   <div className="economic-panel">
                     <div className="section-title">
-                      <p className="eyebrow">Seu resultado de verdade</p>
-                      <h3>Visao economica do periodo</h3>
+                      <p className="eyebrow">Visao em camadas</p>
+                      <h3>Do realizado ao projetado</h3>
                       <p className="subtle-note">
-                        O resultado economico considera custos configurados do veiculo, como
-                        aluguel, financiamento, seguro, IPVA, manutencao, pneus, oleo e
-                        depreciacao.
+                        Separe o que ja aconteceu, os custos estimados e as despesas recorrentes
+                        previstas para o periodo.
                       </p>
                     </div>
 
-                    <div className="metric-grid economic-flow">
-                      <article className="metric-card">
-                        <span>Faturamento bruto</span>
-                        <strong>{formatMoney(financialSummary.gross_revenue)}</strong>
-                      </article>
-                      <article className="metric-card metric-expense">
-                        <span>Despesas registradas</span>
-                        <strong>{formatMoney(financialSummary.total_expenses)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Sobra apos despesas</span>
-                        <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
-                      </article>
-                      <article className="metric-card metric-expense">
-                        <span>Custos estruturais estimados</span>
-                        <strong>{formatMoney(financialSummary.estimated_structural_costs)}</strong>
-                      </article>
-                      <article
-                        className={
-                          isNegativeMoney(financialSummary.estimated_economic_result)
-                            ? "metric-card economic-result-card metric-negative"
-                            : "metric-card economic-result-card metric-profit"
-                        }
-                      >
-                        <span>Resultado economico estimado</span>
-                        <strong>{formatMoney(financialSummary.estimated_economic_result)}</strong>
+                    <article
+                      className={
+                        isNegativeMoney(financialSummary.projected_economic_result)
+                          ? "metric-card projected-result-card metric-negative"
+                          : "metric-card projected-result-card metric-profit"
+                      }
+                    >
+                      <span>Resultado projetado</span>
+                      <strong>{formatMoney(financialSummary.projected_economic_result)}</strong>
+                      <small>
+                        Considera despesas registradas, custos estruturais configurados e despesas
+                        recorrentes previstas para o periodo.
+                      </small>
+                      {isNegativeMoney(financialSummary.projected_economic_result) ? (
                         <small>
-                          Com base nas despesas registradas e nos custos configurados do seu
-                          veiculo.
+                          Neste periodo, seus custos projetados estao acima do faturamento
+                          registrado.
                         </small>
-                        <small>
-                          Custos economicos considerados:{" "}
-                          {formatMoney(financialSummary.estimated_economic_costs)}
-                        </small>
+                      ) : null}
+                    </article>
+
+                    <div className="dashboard-layers">
+                      <article className="dashboard-layer">
+                        <p className="eyebrow">Realizado</p>
+                        <dl>
+                          <div>
+                            <dt>Faturamento</dt>
+                            <dd>{formatMoney(financialSummary.gross_revenue)}</dd>
+                          </div>
+                          <div>
+                            <dt>Despesas registradas</dt>
+                            <dd>{formatMoney(financialSummary.total_expenses)}</dd>
+                          </div>
+                          <div>
+                            <dt>Sobra apos despesas</dt>
+                            <dd>{formatMoney(financialSummary.estimated_net_profit)}</dd>
+                          </div>
+                        </dl>
+                      </article>
+
+                      <article className="dashboard-layer">
+                        <p className="eyebrow">Estimado</p>
+                        <dl>
+                          <div>
+                            <dt>Custos estruturais estimados</dt>
+                            <dd>{formatMoney(financialSummary.estimated_structural_costs)}</dd>
+                          </div>
+                          <div>
+                            <dt>Resultado economico estimado</dt>
+                            <dd>{formatMoney(financialSummary.estimated_economic_result)}</dd>
+                          </div>
+                        </dl>
+                      </article>
+
+                      <article className="dashboard-layer dashboard-layer-projected">
+                        <p className="eyebrow">Projetado</p>
+                        <dl>
+                          <div>
+                            <dt>Despesas recorrentes previstas</dt>
+                            <dd>{formatMoney(financialSummary.recurring_expenses_total)}</dd>
+                          </div>
+                          <div>
+                            <dt>Custos projetados totais</dt>
+                            <dd>{formatMoney(financialSummary.projected_economic_costs)}</dd>
+                          </div>
+                          <div>
+                            <dt>Resultado projetado apos recorrencias</dt>
+                            <dd>{formatMoney(financialSummary.projected_economic_result)}</dd>
+                          </div>
+                        </dl>
                       </article>
                     </div>
 
@@ -2545,6 +2593,42 @@ function App() {
                         completa. <a href="#veiculos">Ir para Veiculos</a>
                       </p>
                     ) : null}
+                  </div>
+
+                  <div className="recurring-projection">
+                    <div className="list-header">
+                      <h3>Despesas recorrentes previstas</h3>
+                    </div>
+                    <p className="subtle-note">
+                      Despesas recorrentes sao projecoes baseadas nos custos que voce configurou.
+                      Quando uma despesa real equivalente ja esta registrada, o GanhoCerto evita
+                      contar o mesmo custo duas vezes.
+                    </p>
+
+                    {isPositiveMoney(financialSummary.recurring_expenses_total) ? (
+                      <>
+                        <div className="recurring-projection-list">
+                          {getRecurringProjectionItems(financialSummary).map((item) => (
+                            <article className="structural-item" key={item.category}>
+                              <div>
+                                <strong>{getExpenseCategoryLabel(item.category)}</strong>
+                                <span>Previsto no periodo</span>
+                              </div>
+                              <strong>{formatMoney(item.amount)}</strong>
+                            </article>
+                          ))}
+                        </div>
+                        <article className="recurring-projection-total">
+                          <span>Total previsto no periodo</span>
+                          <strong>{formatMoney(financialSummary.recurring_expenses_total)}</strong>
+                        </article>
+                      </>
+                    ) : (
+                      <p className="empty-state compact-empty-state">
+                        Voce ainda nao possui despesas recorrentes previstas neste periodo.{" "}
+                        <a href="#despesas-recorrentes">Configurar despesas recorrentes</a>
+                      </p>
+                    )}
                   </div>
 
                   <div className="structural-breakdown">
@@ -2573,21 +2657,6 @@ function App() {
                         ))}
                       </div>
                     )}
-                  </div>
-
-                  <div className="metric-grid highlights">
-                    <article className="metric-card metric-profit">
-                      <span>Lucro líquido estimado</span>
-                      <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Faturamento bruto</span>
-                      <strong>{formatMoney(financialSummary.gross_revenue)}</strong>
-                    </article>
-                    <article className="metric-card metric-expense">
-                      <span>Despesas</span>
-                      <strong>{formatMoney(financialSummary.total_expenses)}</strong>
-                    </article>
                   </div>
 
                   <div className="metric-grid">
