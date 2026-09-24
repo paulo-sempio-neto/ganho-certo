@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Date,
     DateTime,
@@ -35,6 +36,7 @@ class User(Base):
     expenses: Mapped[list[Expense]] = relationship(back_populates="user")
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="user")
     financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="user")
+    import_profiles: Mapped[list[CsvImportProfile]] = relationship(back_populates="user")
 
 
 class Vehicle(Base):
@@ -57,6 +59,7 @@ class Vehicle(Base):
     expenses: Mapped[list[Expense]] = relationship(back_populates="vehicle")
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="vehicle")
     financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="vehicle")
+    import_profiles: Mapped[list[CsvImportProfile]] = relationship(back_populates="vehicle")
     cost_profile: Mapped[VehicleCostProfile | None] = relationship(
         back_populates="vehicle",
         uselist=False,
@@ -267,3 +270,32 @@ class RecurringExpense(Base):
     @property
     def amount(self) -> Decimal:
         return Decimal(self.amount_cents) / Decimal("100")
+
+
+class CsvImportProfile(Base):
+    __tablename__ = "csv_import_profiles"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    vehicle_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vehicles.id"),
+        nullable=True,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    import_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    header_signature: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    column_mapping: Mapped[dict[str, str]] = mapped_column(JSON(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="import_profiles")
+    vehicle: Mapped[Vehicle | None] = relationship(back_populates="import_profiles")

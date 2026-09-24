@@ -7,6 +7,7 @@ from app.expenses import router as expenses_router
 from app.financial_goals import router as financial_goals_router
 from app.financial_insights import router as financial_insights_router
 from app.financial_summary import router as financial_summary_router
+from app.import_profiles import router as import_profiles_router
 from app.recurring_expenses import router as recurring_expenses_router
 from app.vehicle_cost_profiles import router as vehicle_cost_profiles_router
 from app.vehicles import router as vehicles_router
@@ -28,6 +29,7 @@ app.include_router(vehicles_router)
 app.include_router(vehicle_cost_profiles_router)
 app.include_router(work_sessions_router)
 app.include_router(work_session_imports_router)
+app.include_router(import_profiles_router)
 app.include_router(expenses_router)
 app.include_router(recurring_expenses_router)
 app.include_router(financial_goals_router)

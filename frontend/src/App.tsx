@@ -88,6 +88,23 @@ type WorkSessionImportResult = {
   errors: WorkSessionImportError[];
 };
 
+type CsvImportProfile = {
+  id: number;
+  name: string;
+  import_type: "work_sessions";
+  header_signature: string;
+  column_mapping: Partial<Record<WorkSessionImportField, string>>;
+  vehicle_id: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type CsvImportProfileMatchResponse = {
+  profile: CsvImportProfile | null;
+  column_mapping: Partial<Record<WorkSessionImportField, string>> | null;
+  vehicle_id: number | null;
+};
+
 type ExpenseCategory =
   | "fuel"
   | "charging"
@@ -750,6 +767,7 @@ function App() {
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
+  const [importProfiles, setImportProfiles] = useState<CsvImportProfile[]>([]);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [financialGoalProgressById, setFinancialGoalProgressById] = useState<
     Record<number, FinancialGoalProgress>
@@ -771,6 +789,9 @@ function App() {
   const [workSessionImportResult, setWorkSessionImportResult] =
     useState<WorkSessionImportResult | null>(null);
   const [workSessionImportError, setWorkSessionImportError] = useState("");
+  const [workSessionImportProfileName, setWorkSessionImportProfileName] = useState("");
+  const [matchedWorkSessionImportProfile, setMatchedWorkSessionImportProfile] =
+    useState<CsvImportProfile | null>(null);
   const [isWorkSessionImportVisible, setIsWorkSessionImportVisible] = useState(false);
   const [isWorkSessionImportDragging, setIsWorkSessionImportDragging] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
@@ -821,6 +842,8 @@ function App() {
   const [isWorkSessionImportPreviewLoading, setIsWorkSessionImportPreviewLoading] =
     useState(false);
   const [isWorkSessionImportSaving, setIsWorkSessionImportSaving] = useState(false);
+  const [isImportProfilesLoading, setIsImportProfilesLoading] = useState(false);
+  const [isImportProfileSaving, setIsImportProfileSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
   const [isFinancialGoalSaving, setIsFinancialGoalSaving] = useState(false);
@@ -835,6 +858,7 @@ function App() {
     setWorkSessions([]);
     setExpenses([]);
     setRecurringExpenses([]);
+    setImportProfiles([]);
     setFinancialGoals([]);
     setFinancialGoalProgressById({});
     setFinancialSummary(null);
@@ -855,6 +879,8 @@ function App() {
     setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
+    setWorkSessionImportProfileName("");
+    setMatchedWorkSessionImportProfile(null);
     setIsWorkSessionImportVisible(false);
     setIsWorkSessionImportDragging(false);
     setExpenseForm(emptyExpenseForm);
@@ -1102,6 +1128,32 @@ function App() {
     }
   }
 
+  async function loadImportProfiles(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsImportProfilesLoading(true);
+    try {
+      const nextProfiles = await requestApi<CsvImportProfile[]>("/import-profiles", {
+        headers: getAuthHeaders(currentToken),
+      });
+      setImportProfiles(nextProfiles);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Erro ao carregar configuracoes de importacao.",
+        );
+      }
+    } finally {
+      setIsImportProfilesLoading(false);
+    }
+  }
+
   async function loadFinancialGoals(currentToken = token) {
     if (!currentToken) {
       return;
@@ -1227,6 +1279,7 @@ function App() {
       setWorkSessions([]);
       setExpenses([]);
       setRecurringExpenses([]);
+      setImportProfiles([]);
       setFinancialGoals([]);
       setFinancialGoalProgressById({});
       setFinancialSummary(null);
@@ -1240,6 +1293,8 @@ function App() {
       setWorkSessionImportMapping(emptyWorkSessionImportMapping);
       setWorkSessionImportResult(null);
       setWorkSessionImportError("");
+      setWorkSessionImportProfileName("");
+      setMatchedWorkSessionImportProfile(null);
       setIsWorkSessionImportVisible(false);
       setIsWorkSessionImportDragging(false);
       return;
@@ -1253,6 +1308,7 @@ function App() {
         setUser(currentUser);
         setMessage("");
         await loadVehicles(token);
+        await loadImportProfiles(token);
         await loadWorkSessions(token);
         await loadExpenses(token);
         await loadRecurringExpenses(token);
@@ -1954,6 +2010,32 @@ function App() {
     };
   }
 
+  function profileToImportMapping(
+    mapping: Partial<Record<WorkSessionImportField, string>> | null,
+  ): WorkSessionImportMapping {
+    return {
+      ...emptyWorkSessionImportMapping,
+      ...(mapping ?? {}),
+    };
+  }
+
+  function areImportMappingsEqual(
+    first: Partial<Record<WorkSessionImportField, string>>,
+    second: Partial<Record<WorkSessionImportField, string>>,
+  ): boolean {
+    return workSessionImportMappingFields.every(
+      (item) => (first[item.field] ?? "") === (second[item.field] ?? ""),
+    );
+  }
+
+  function getImportProfileVehicleLabel(profile: CsvImportProfile): string {
+    if (!profile.vehicle_id) {
+      return "Sem veiculo salvo";
+    }
+
+    return getVehicleLabel(profile.vehicle_id);
+  }
+
   function getWorkSessionImportPath(
     preview = false,
     mapping: Partial<WorkSessionImportMapping> = {},
@@ -1974,6 +2056,8 @@ function App() {
     setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
+    setWorkSessionImportProfileName("");
+    setMatchedWorkSessionImportProfile(null);
     setIsWorkSessionImportDragging(false);
   }
 
@@ -1995,6 +2079,8 @@ function App() {
     setWorkSessionImportMapping(emptyWorkSessionImportMapping);
     setWorkSessionImportResult(null);
     setWorkSessionImportError("");
+    setWorkSessionImportProfileName("");
+    setMatchedWorkSessionImportProfile(null);
   }
 
   function handleWorkSessionImportFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -2020,6 +2106,162 @@ function App() {
     link.download = "modelo-jornadas-ganhocerto.csv";
     link.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function matchWorkSessionImportProfile(
+    headers: string[],
+    preview: WorkSessionImportPreview,
+  ) {
+    if (!headers.length) {
+      setMatchedWorkSessionImportProfile(null);
+      return;
+    }
+
+    try {
+      const match = await requestApi<CsvImportProfileMatchResponse>("/import-profiles/match", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ import_type: "work_sessions", headers }),
+      });
+
+      if (!match.profile) {
+        setMatchedWorkSessionImportProfile(null);
+        return;
+      }
+
+      setMatchedWorkSessionImportProfile(match.profile);
+      setWorkSessionImportMapping(profileToImportMapping(match.column_mapping));
+      if (
+        match.column_mapping &&
+        !areImportMappingsEqual(preview.column_mapping, match.column_mapping)
+      ) {
+        setWorkSessionImportPreview(null);
+      }
+      if (
+        match.vehicle_id &&
+        vehicles.some((vehicle) => vehicle.id === match.vehicle_id)
+      ) {
+        setWorkSessionImportVehicleId(String(match.vehicle_id));
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      }
+    }
+  }
+
+  async function handleSaveWorkSessionImportProfile() {
+    if (
+      !workSessionImportPreview ||
+      workSessionImportPreview.invalid_rows > 0 ||
+      !workSessionImportColumns.length ||
+      !workSessionImportProfileName.trim()
+    ) {
+      return;
+    }
+
+    setIsImportProfileSaving(true);
+    setWorkSessionImportError("");
+
+    try {
+      const profile = await requestApi<CsvImportProfile>("/import-profiles", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          name: workSessionImportProfileName,
+          import_type: "work_sessions",
+          headers: workSessionImportColumns,
+          column_mapping: workSessionImportPreview.column_mapping,
+          vehicle_id: workSessionImportVehicleId ? Number(workSessionImportVehicleId) : null,
+        }),
+      });
+      setMatchedWorkSessionImportProfile(profile);
+      setWorkSessionImportProfileName("");
+      setSuccessMessage("Configuracao de importacao salva.");
+      await loadImportProfiles();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setWorkSessionImportError(
+          error instanceof Error ? error.message : "Nao foi possivel salvar a configuracao.",
+        );
+      }
+    } finally {
+      setIsImportProfileSaving(false);
+    }
+  }
+
+  async function handleRenameImportProfile(profile: CsvImportProfile) {
+    const nextName = window.prompt("Novo nome da configuracao", profile.name)?.trim();
+    if (!nextName || nextName === profile.name) {
+      return;
+    }
+
+    setIsImportProfileSaving(true);
+    setWorkSessionImportError("");
+
+    try {
+      const updatedProfile = await requestApi<CsvImportProfile>(
+        `/import-profiles/${profile.id}`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ name: nextName }),
+        },
+      );
+      setImportProfiles((currentProfiles) =>
+        currentProfiles.map((item) => (item.id === updatedProfile.id ? updatedProfile : item)),
+      );
+      if (matchedWorkSessionImportProfile?.id === updatedProfile.id) {
+        setMatchedWorkSessionImportProfile(updatedProfile);
+      }
+      setSuccessMessage("Configuracao renomeada.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setWorkSessionImportError(
+          error instanceof Error ? error.message : "Nao foi possivel renomear a configuracao.",
+        );
+      }
+    } finally {
+      setIsImportProfileSaving(false);
+    }
+  }
+
+  async function handleDeleteImportProfile(profile: CsvImportProfile) {
+    const shouldDelete = window.confirm(`Excluir configuracao "${profile.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setIsImportProfileSaving(true);
+    setWorkSessionImportError("");
+
+    try {
+      await requestApi<void>(`/import-profiles/${profile.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setImportProfiles((currentProfiles) =>
+        currentProfiles.filter((item) => item.id !== profile.id),
+      );
+      if (matchedWorkSessionImportProfile?.id === profile.id) {
+        setMatchedWorkSessionImportProfile(null);
+      }
+      setSuccessMessage("Configuracao excluida.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setWorkSessionImportError(
+          error instanceof Error ? error.message : "Nao foi possivel excluir a configuracao.",
+        );
+      }
+    } finally {
+      setIsImportProfileSaving(false);
+    }
   }
 
   async function handleWorkSessionImportPreview() {
@@ -2052,6 +2294,7 @@ function App() {
       setWorkSessionImportPreview(preview);
       setWorkSessionImportColumns(preview.columns_found);
       setWorkSessionImportMapping(previewToImportMapping(preview));
+      await matchWorkSessionImportProfile(preview.columns_found, preview);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2103,6 +2346,8 @@ function App() {
       setWorkSessionImportFile(null);
       setWorkSessionImportColumns([]);
       setWorkSessionImportMapping(emptyWorkSessionImportMapping);
+      setMatchedWorkSessionImportProfile(null);
+      setWorkSessionImportProfileName("");
       setSuccessMessage("Importação concluída.");
       await loadWorkSessions();
       await refreshDashboardData();
@@ -3737,7 +3982,14 @@ function App() {
               </div>
 
               {isWorkSessionImportVisible ? (
-                <div className="import-panel" aria-busy={isWorkSessionImportPreviewLoading || isWorkSessionImportSaving}>
+                <div
+                  className="import-panel"
+                  aria-busy={
+                    isWorkSessionImportPreviewLoading ||
+                    isWorkSessionImportSaving ||
+                    isImportProfileSaving
+                  }
+                >
                   <div className="list-header">
                     <div>
                       <h3>Importar jornadas por CSV</h3>
@@ -3756,6 +4008,59 @@ function App() {
                     <span>distance_km: km rodados</span>
                     <span>worked_minutes: minutos trabalhados</span>
                     <span>trip_count: número de corridas</span>
+                  </div>
+
+                  <div className="import-preview">
+                    <div className="list-header">
+                      <div>
+                        <h4>Configuracoes salvas</h4>
+                        <p className="subtle-note">
+                          Use perfis para reaproveitar o mesmo mapeamento em CSVs iguais.
+                        </p>
+                      </div>
+                      <button
+                        className="text-button"
+                        disabled={isImportProfilesLoading}
+                        type="button"
+                        onClick={() => void loadImportProfiles()}
+                      >
+                        Atualizar
+                      </button>
+                    </div>
+                    {importProfiles.length === 0 ? (
+                      <p className="subtle-note">Nenhuma configuracao salva ainda.</p>
+                    ) : (
+                      <div className="import-preview-list">
+                        {importProfiles.map((profile) => (
+                          <article className="vehicle-card session-card" key={profile.id}>
+                            <div>
+                              <h4>{profile.name}</h4>
+                              <p className="subtle-note">
+                                {getImportProfileVehicleLabel(profile)}
+                              </p>
+                            </div>
+                            <div className="card-actions">
+                              <button
+                                className="text-button"
+                                disabled={isImportProfileSaving}
+                                type="button"
+                                onClick={() => void handleRenameImportProfile(profile)}
+                              >
+                                Renomear
+                              </button>
+                              <button
+                                className="text-button danger"
+                                disabled={isImportProfileSaving}
+                                type="button"
+                                onClick={() => void handleDeleteImportProfile(profile)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {vehicles.length === 0 ? (
@@ -3816,6 +4121,12 @@ function App() {
                         </div>
                       ) : null}
 
+                      {matchedWorkSessionImportProfile ? (
+                        <p className="form-message compact-message">
+                          Configuracao aplicada: {matchedWorkSessionImportProfile.name}.
+                        </p>
+                      ) : null}
+
                       {workSessionImportColumns.length ? (
                         <div className="import-mapping">
                           <div>
@@ -3838,6 +4149,7 @@ function App() {
                                     });
                                     setWorkSessionImportPreview(null);
                                     setWorkSessionImportResult(null);
+                                    setMatchedWorkSessionImportProfile(null);
                                   }}
                                 >
                                   <option value="">
@@ -3945,19 +4257,55 @@ function App() {
                               Existem linhas inválidas. A importação só ficará disponível após corrigir o arquivo.
                             </p>
                           ) : (
-                            <button
-                              className="button"
-                              disabled={
-                                isWorkSessionImportSaving ||
-                                workSessionImportPreview.valid_rows === 0
-                              }
-                              type="button"
-                              onClick={() => void handleConfirmWorkSessionImport()}
-                            >
-                              {isWorkSessionImportSaving
-                                ? "Importando..."
-                                : `Importar ${workSessionImportPreview.valid_rows} jornadas`}
-                            </button>
+                            <>
+                              <div className="import-mapping">
+                                <div>
+                                  <h4>Salvar esta configuracao</h4>
+                                  <p className="subtle-note">
+                                    Opcional: guarde este mapeamento para CSVs com as mesmas colunas.
+                                  </p>
+                                </div>
+                                <div className="form-grid">
+                                  <label>
+                                    Nome da configuracao
+                                    <input
+                                      onChange={(event) =>
+                                        setWorkSessionImportProfileName(event.target.value)
+                                      }
+                                      placeholder="Ex.: CSV semanal do app"
+                                      value={workSessionImportProfileName}
+                                    />
+                                  </label>
+                                </div>
+                                <button
+                                  className="button button-ghost"
+                                  disabled={
+                                    isImportProfileSaving ||
+                                    !workSessionImportProfileName.trim()
+                                  }
+                                  type="button"
+                                  onClick={() => void handleSaveWorkSessionImportProfile()}
+                                >
+                                  {isImportProfileSaving
+                                    ? "Salvando..."
+                                    : "Salvar configuracao"}
+                                </button>
+                              </div>
+
+                              <button
+                                className="button"
+                                disabled={
+                                  isWorkSessionImportSaving ||
+                                  workSessionImportPreview.valid_rows === 0
+                                }
+                                type="button"
+                                onClick={() => void handleConfirmWorkSessionImport()}
+                              >
+                                {isWorkSessionImportSaving
+                                  ? "Importando..."
+                                  : `Importar ${workSessionImportPreview.valid_rows} jornadas`}
+                              </button>
+                            </>
                           )}
                         </div>
                       ) : null}

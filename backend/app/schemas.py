@@ -17,6 +17,7 @@ OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
+CsvImportType = Literal["work_sessions"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -235,6 +236,71 @@ class WorkSessionImportResult(BaseModel):
     duplicates_skipped: int
     failed: int
     errors: list[WorkSessionImportError] = Field(default_factory=list)
+
+
+class CsvImportProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    import_type: CsvImportType
+    headers: list[str] = Field(min_length=1)
+    column_mapping: dict[str, str] = Field(min_length=1)
+    vehicle_id: int | None = Field(default=None, gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field is required.")
+        return normalized
+
+
+class CsvImportProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    import_type: CsvImportType | None = None
+    headers: list[str] | None = Field(default=None, min_length=1)
+    column_mapping: dict[str, str] | None = Field(default=None, min_length=1)
+    vehicle_id: int | None = Field(default=None, gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Field is required.")
+        return normalized
+
+
+class CsvImportProfilePublic(BaseModel):
+    id: int
+    name: str
+    import_type: CsvImportType
+    header_signature: str
+    column_mapping: dict[str, str]
+    vehicle_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CsvImportProfileMatchRequest(BaseModel):
+    import_type: CsvImportType
+    headers: list[str] = Field(min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CsvImportProfileMatchResponse(BaseModel):
+    profile: CsvImportProfilePublic | None
+    column_mapping: dict[str, str] | None = None
+    vehicle_id: int | None = None
 
 
 class ExpenseBase(BaseModel):
