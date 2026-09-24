@@ -121,6 +121,34 @@ def create_expense(
     assert response.status_code == 201
 
 
+def create_recurring_expense(
+    client: TestClient,
+    token: str,
+    amount: str,
+    frequency: str,
+    start_date: str,
+    vehicle_id: int | None = None,
+    category: str = "insurance",
+    end_date: str | None = None,
+    active: bool = True,
+) -> None:
+    response = client.post(
+        "/recurring-expenses",
+        json={
+            "vehicle_id": vehicle_id,
+            "category": category,
+            "amount": amount,
+            "frequency": frequency,
+            "start_date": start_date,
+            "end_date": end_date,
+            "description": None,
+            "active": active,
+        },
+        headers=auth_headers(token),
+    )
+    assert response.status_code == 201
+
+
 def create_cost_profile(
     client: TestClient,
     token: str,
@@ -249,6 +277,10 @@ def test_summary_empty_period_returns_zeroes_and_null_metrics(client: TestClient
     assert response.json()["gross_per_hour"] is None
     assert response.json()["gross_per_km"] is None
     assert response.json()["average_ticket"] is None
+    assert response.json()["recurring_expenses_total"] == "0.00"
+    assert response.json()["recurring_expenses_breakdown"] == []
+    assert response.json()["projected_economic_costs"] == "0.00"
+    assert response.json()["projected_economic_result"] == "0.00"
     assert response.json()["daily"] == []
 
 
@@ -281,6 +313,286 @@ def test_summary_money_precision_without_float_error(client: TestClient) -> None
     assert response.json()["gross_revenue"] == "0.30"
     assert response.json()["total_expenses"] == "0.03"
     assert response.json()["estimated_net_profit"] == "0.27"
+
+
+def test_summary_projects_weekly_monthly_and_yearly_recurring_expenses(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-calendar@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-01-10", "1000.00", "10.00", 60, 1)
+    create_recurring_expense(client, token, "10.00", "weekly", "2026-01-01", category="toll")
+    create_recurring_expense(
+        client,
+        token,
+        "100.00",
+        "monthly",
+        "2026-01-15",
+        category="insurance",
+    )
+    create_recurring_expense(
+        client,
+        token,
+        "25.00",
+        "yearly",
+        "2026-01-20",
+        category="washing",
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-31",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_expenses"] == "0.00"
+    assert response.json()["estimated_economic_costs"] == "0.00"
+    assert response.json()["recurring_expenses_total"] == "175.00"
+    assert response.json()["recurring_expenses_breakdown"] == [
+        {"category": "insurance", "amount": "100.00"},
+        {"category": "toll", "amount": "50.00"},
+        {"category": "washing", "amount": "25.00"},
+    ]
+    assert response.json()["projected_economic_costs"] == "175.00"
+    assert response.json()["projected_economic_result"] == "825.00"
+
+
+def test_summary_monthly_recurring_uses_last_valid_day_for_short_month(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-short-month@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-02-10", "100.00", "10.00", 60, 1)
+    create_recurring_expense(
+        client,
+        token,
+        "31.00",
+        "monthly",
+        "2026-01-31",
+        category="parking",
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2026-02-01&end_date=2026-02-28",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recurring_expenses_total"] == "31.00"
+    assert response.json()["recurring_expenses_breakdown"] == [
+        {"category": "parking", "amount": "31.00"},
+    ]
+
+
+def test_summary_yearly_recurring_handles_feb_29(client: TestClient) -> None:
+    token = register_and_login(client, "recurring-leap@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2025-02-10", "100.00", "10.00", 60, 1)
+    create_recurring_expense(
+        client,
+        token,
+        "29.00",
+        "yearly",
+        "2024-02-29",
+        category="insurance",
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2025-02-01&end_date=2025-02-28",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recurring_expenses_total"] == "29.00"
+
+
+def test_summary_recurring_respects_inclusive_dates_end_date_and_inactive(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-dates@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-01-10", "100.00", "10.00", 60, 1)
+    create_recurring_expense(
+        client,
+        token,
+        "5.00",
+        "weekly",
+        "2026-01-01",
+        category="toll",
+        end_date="2026-01-15",
+    )
+    create_recurring_expense(
+        client,
+        token,
+        "99.00",
+        "monthly",
+        "2025-01-01",
+        category="washing",
+        end_date="2025-12-31",
+    )
+    create_recurring_expense(
+        client,
+        token,
+        "88.00",
+        "monthly",
+        "2026-01-01",
+        category="parking",
+        active=False,
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-22",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recurring_expenses_total"] == "15.00"
+    assert response.json()["recurring_expenses_breakdown"] == [
+        {"category": "toll", "amount": "15.00"},
+    ]
+
+
+def test_summary_recurring_vehicle_filter_excludes_unlinked_recurring_expenses(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-vehicles@email.com")
+    vehicle_a = create_vehicle(client, token, "Carro A")
+    vehicle_b = create_vehicle(client, token, "Carro B")
+    create_work_session(client, token, vehicle_a, "2026-01-10", "100.00", "10.00", 60, 1)
+    create_work_session(client, token, vehicle_b, "2026-01-10", "200.00", "20.00", 60, 1)
+    create_recurring_expense(
+        client, token, "10.00", "monthly", "2026-01-01", vehicle_a, "insurance"
+    )
+    create_recurring_expense(
+        client, token, "20.00", "monthly", "2026-01-01", vehicle_b, "parking"
+    )
+    create_recurring_expense(client, token, "30.00", "monthly", "2026-01-01", category="toll")
+
+    all_response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-31",
+        headers=auth_headers(token),
+    )
+    vehicle_response = client.get(
+        f"/financial-summary?start_date=2026-01-01&end_date=2026-01-31&vehicle_id={vehicle_a}",
+        headers=auth_headers(token),
+    )
+
+    assert all_response.status_code == 200
+    assert all_response.json()["recurring_expenses_total"] == "60.00"
+    assert vehicle_response.status_code == 200
+    assert vehicle_response.json()["recurring_expenses_total"] == "10.00"
+    assert vehicle_response.json()["recurring_expenses_breakdown"] == [
+        {"category": "insurance", "amount": "10.00"},
+    ]
+
+
+def test_summary_recurring_deduplicates_real_expense_same_key(client: TestClient) -> None:
+    token = register_and_login(client, "recurring-real-dedup@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-01-10", "100.00", "10.00", 60, 1)
+    create_recurring_expense(
+        client,
+        token,
+        "100.00",
+        "monthly",
+        "2026-01-10",
+        vehicle_id,
+        "insurance",
+    )
+    create_expense(client, token, "2026-01-10", "100.00", vehicle_id, "insurance")
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-31",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_expenses"] == "100.00"
+    assert response.json()["recurring_expenses_total"] == "0.00"
+    assert response.json()["projected_economic_costs"] == "100.00"
+
+
+def test_summary_recurring_deduplicates_vehicle_cost_profile_categories(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-profile-dedup@email.com")
+    rented_vehicle = create_vehicle(client, token, "Alugado")
+    financed_vehicle = create_vehicle(client, token, "Financiado")
+    create_work_session(client, token, rented_vehicle, "2026-01-10", "700.00", "10.00", 60, 1)
+    create_work_session(client, token, financed_vehicle, "2026-01-10", "300.00", "5.00", 60, 1)
+    create_cost_profile(
+        client,
+        token,
+        rented_vehicle,
+        ownership_type="rented",
+        rental_monthly="310.00",
+        insurance_monthly="31.00",
+        maintenance_per_km="0.5000",
+    )
+    create_cost_profile(
+        client,
+        token,
+        financed_vehicle,
+        ownership_type="financed",
+        financing_monthly="620.00",
+    )
+    create_recurring_expense(
+        client, token, "100.00", "monthly", "2026-01-01", rented_vehicle, "rental"
+    )
+    create_recurring_expense(
+        client, token, "50.00", "monthly", "2026-01-01", rented_vehicle, "insurance"
+    )
+    create_recurring_expense(
+        client, token, "20.00", "monthly", "2026-01-01", rented_vehicle, "maintenance"
+    )
+    create_recurring_expense(
+        client, token, "200.00", "monthly", "2026-01-01", financed_vehicle, "financing"
+    )
+    create_recurring_expense(
+        client, token, "7.00", "monthly", "2026-01-01", rented_vehicle, "other"
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-31",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recurring_expenses_total"] == "7.00"
+    assert response.json()["recurring_expenses_breakdown"] == [
+        {"category": "other", "amount": "7.00"},
+    ]
+
+
+def test_summary_recurring_isolated_between_users_and_preserves_money_precision(
+    client: TestClient,
+) -> None:
+    user_a_token = register_and_login(client, "recurring-a@email.com")
+    user_b_token = register_and_login(client, "recurring-b@email.com")
+    user_a_vehicle = create_vehicle(client, user_a_token)
+    user_b_vehicle = create_vehicle(client, user_b_token)
+    create_work_session(
+        client, user_a_token, user_a_vehicle, "2026-01-10", "1.00", "1.00", 60, 1
+    )
+    create_work_session(
+        client, user_b_token, user_b_vehicle, "2026-01-10", "999.00", "1.00", 60, 1
+    )
+    create_recurring_expense(
+        client, user_a_token, "0.10", "monthly", "2026-01-01", category="parking"
+    )
+    create_recurring_expense(
+        client, user_b_token, "999.00", "monthly", "2026-01-01", category="parking"
+    )
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-03-31",
+        headers=auth_headers(user_a_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["recurring_expenses_total"] == "0.30"
+    assert response.json()["projected_economic_costs"] == "0.30"
+    assert response.json()["projected_economic_result"] == "0.70"
 
 
 def test_summary_without_cost_profile_uses_registered_expenses_only(

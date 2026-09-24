@@ -10,8 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Expense, User, Vehicle, VehicleCostProfile, WorkSession
-from app.schemas import FinancialDailySummary, FinancialStructuralCosts, FinancialSummary
+from app.models import Expense, RecurringExpense, User, Vehicle, VehicleCostProfile, WorkSession
+from app.schemas import (
+    FinancialDailySummary,
+    FinancialRecurringExpenseBreakdown,
+    FinancialStructuralCosts,
+    FinancialSummary,
+)
 
 router = APIRouter(tags=["financial-summary"])
 CENT = Decimal("0.01")
@@ -62,6 +67,10 @@ def days_in_year(year: int) -> int:
 
 def month_end(value: date) -> date:
     return date(value.year, value.month, monthrange(value.year, value.month)[1])
+
+
+def has_positive_money(value: Decimal | None) -> bool:
+    return value is not None and value > ZERO_MONEY
 
 
 def prorate_monthly(value: Decimal | None, start_date: date, end_date: date) -> Decimal:
@@ -234,6 +243,150 @@ def structural_costs_total(costs: FinancialStructuralCosts) -> Decimal:
     )
 
 
+def add_months(anchor_date: date, months: int) -> date:
+    month_index = anchor_date.month - 1 + months
+    year = anchor_date.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(anchor_date.day, monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+def yearly_occurrence(anchor_date: date, year: int) -> date:
+    day = min(anchor_date.day, monthrange(year, anchor_date.month)[1])
+    return date(year, anchor_date.month, day)
+
+
+def get_recurring_occurrences(
+    recurring_expense: RecurringExpense,
+    period_start: date,
+    period_end: date,
+) -> list[date]:
+    effective_start = max(period_start, recurring_expense.start_date)
+    effective_end = period_end
+    if recurring_expense.end_date is not None:
+        effective_end = min(effective_end, recurring_expense.end_date)
+
+    if effective_start > effective_end:
+        return []
+
+    occurrences: list[date] = []
+
+    if recurring_expense.frequency == "weekly":
+        days_after_start = (effective_start - recurring_expense.start_date).days
+        first_offset = 0 if days_after_start <= 0 else ((days_after_start + 6) // 7) * 7
+        current_date = recurring_expense.start_date + timedelta(days=first_offset)
+        while current_date <= effective_end:
+            occurrences.append(current_date)
+            current_date += timedelta(days=7)
+        return occurrences
+
+    if recurring_expense.frequency == "monthly":
+        month_offset = (
+            (effective_start.year - recurring_expense.start_date.year) * 12
+            + effective_start.month
+            - recurring_expense.start_date.month
+        )
+        month_offset = max(month_offset, 0)
+        current_date = add_months(recurring_expense.start_date, month_offset)
+        while current_date < effective_start:
+            month_offset += 1
+            current_date = add_months(recurring_expense.start_date, month_offset)
+        while current_date <= effective_end:
+            occurrences.append(current_date)
+            month_offset += 1
+            current_date = add_months(recurring_expense.start_date, month_offset)
+        return occurrences
+
+    year = max(effective_start.year, recurring_expense.start_date.year)
+    current_date = yearly_occurrence(recurring_expense.start_date, year)
+    while current_date < recurring_expense.start_date or current_date < effective_start:
+        year += 1
+        current_date = yearly_occurrence(recurring_expense.start_date, year)
+    while current_date <= effective_end:
+        occurrences.append(current_date)
+        year += 1
+        current_date = yearly_occurrence(recurring_expense.start_date, year)
+
+    return occurrences
+
+
+def should_skip_recurring_expense_for_profile(
+    recurring_expense: RecurringExpense,
+    profiles_by_vehicle_id: dict[int, VehicleCostProfile],
+) -> bool:
+    if recurring_expense.vehicle_id is None:
+        return False
+
+    profile = profiles_by_vehicle_id.get(recurring_expense.vehicle_id)
+    if profile is None:
+        return False
+
+    if (
+        recurring_expense.category == "rental"
+        and profile.ownership_type == "rented"
+        and has_positive_money(profile.rental_monthly)
+    ):
+        return True
+
+    if (
+        recurring_expense.category == "financing"
+        and profile.ownership_type == "financed"
+        and has_positive_money(profile.financing_monthly)
+    ):
+        return True
+
+    if recurring_expense.category == "insurance" and has_positive_money(profile.insurance_monthly):
+        return True
+
+    return (
+        recurring_expense.category == "maintenance"
+        and profile.maintenance_per_km is not None
+        and profile.maintenance_per_km > ZERO_MONEY
+    )
+
+
+def get_recurring_expense_breakdown(
+    recurring_expenses: list[RecurringExpense],
+    expenses: list[Expense],
+    profiles_by_vehicle_id: dict[int, VehicleCostProfile],
+    effective_period: tuple[date, date] | None,
+) -> list[FinancialRecurringExpenseBreakdown]:
+    if effective_period is None:
+        return []
+
+    period_start, period_end = effective_period
+    real_expense_keys = {
+        (expense.category, expense.vehicle_id, expense.expense_date) for expense in expenses
+    }
+    totals_by_category: defaultdict[str, int] = defaultdict(int)
+
+    for recurring_expense in recurring_expenses:
+        if should_skip_recurring_expense_for_profile(
+            recurring_expense=recurring_expense,
+            profiles_by_vehicle_id=profiles_by_vehicle_id,
+        ):
+            continue
+
+        for occurrence_date in get_recurring_occurrences(
+            recurring_expense=recurring_expense,
+            period_start=period_start,
+            period_end=period_end,
+        ):
+            key = (recurring_expense.category, recurring_expense.vehicle_id, occurrence_date)
+            if key in real_expense_keys:
+                continue
+
+            totals_by_category[recurring_expense.category] += recurring_expense.amount_cents
+
+    return [
+        FinancialRecurringExpenseBreakdown(
+            category=category,
+            amount=cents_to_decimal(amount_cents),
+        )
+        for category, amount_cents in sorted(totals_by_category.items())
+    ]
+
+
 @router.get("/financial-summary", response_model=FinancialSummary)
 def get_financial_summary(
     current_user: Annotated[User, Depends(get_current_user)],
@@ -247,6 +400,10 @@ def get_financial_summary(
 
     work_session_query = select(WorkSession).where(WorkSession.user_id == current_user.id)
     expense_query = select(Expense).where(Expense.user_id == current_user.id)
+    recurring_expense_query = select(RecurringExpense).where(
+        RecurringExpense.user_id == current_user.id,
+        RecurringExpense.active.is_(True),
+    )
 
     if start_date is not None:
         work_session_query = work_session_query.where(WorkSession.work_date >= start_date)
@@ -259,9 +416,13 @@ def get_financial_summary(
     if vehicle_id is not None:
         work_session_query = work_session_query.where(WorkSession.vehicle_id == vehicle_id)
         expense_query = expense_query.where(Expense.vehicle_id == vehicle_id)
+        recurring_expense_query = recurring_expense_query.where(
+            RecurringExpense.vehicle_id == vehicle_id
+        )
 
     work_sessions = list(db.scalars(work_session_query).all())
     expenses = list(db.scalars(expense_query).all())
+    recurring_expenses = list(db.scalars(recurring_expense_query).all())
     profile_query = (
         select(VehicleCostProfile).join(Vehicle).where(Vehicle.user_id == current_user.id)
     )
@@ -297,6 +458,24 @@ def get_financial_summary(
     )
     estimated_economic_costs = round_decimal(economic_expenses + estimated_structural_costs)
     estimated_economic_result = round_decimal(gross_revenue - estimated_economic_costs)
+    recurring_expenses_breakdown = get_recurring_expense_breakdown(
+        recurring_expenses=recurring_expenses,
+        expenses=expenses,
+        profiles_by_vehicle_id=profiles_by_vehicle_id,
+        effective_period=get_effective_period(
+            start_date=start_date,
+            end_date=end_date,
+            work_sessions=work_sessions,
+            expenses=expenses,
+        ),
+    )
+    recurring_expenses_total = round_decimal(
+        sum((item.amount for item in recurring_expenses_breakdown), ZERO_MONEY)
+    )
+    projected_economic_costs = round_decimal(
+        estimated_economic_costs + recurring_expenses_total
+    )
+    projected_economic_result = round_decimal(gross_revenue - projected_economic_costs)
 
     hours = Decimal(total_worked_minutes) / Decimal("60")
     daily_values: defaultdict[date, dict[str, int]] = defaultdict(
@@ -329,6 +508,10 @@ def get_financial_summary(
         estimated_structural_costs=estimated_structural_costs,
         estimated_economic_costs=estimated_economic_costs,
         estimated_economic_result=estimated_economic_result,
+        recurring_expenses_total=recurring_expenses_total,
+        recurring_expenses_breakdown=recurring_expenses_breakdown,
+        projected_economic_costs=projected_economic_costs,
+        projected_economic_result=projected_economic_result,
         structural_costs=structural_costs,
         total_distance_km=total_distance_km,
         total_worked_minutes=total_worked_minutes,

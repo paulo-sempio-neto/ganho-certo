@@ -317,6 +317,15 @@ class FinancialStructuralCosts(BaseModel):
         return f"{value:.2f}"
 
 
+class FinancialRecurringExpenseBreakdown(BaseModel):
+    category: str
+    amount: Decimal
+
+    @field_serializer("amount")
+    def serialize_amount(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
 class FinancialSummary(BaseModel):
     gross_revenue: Decimal
     total_expenses: Decimal
@@ -324,6 +333,10 @@ class FinancialSummary(BaseModel):
     estimated_structural_costs: Decimal
     estimated_economic_costs: Decimal
     estimated_economic_result: Decimal
+    recurring_expenses_total: Decimal
+    recurring_expenses_breakdown: list[FinancialRecurringExpenseBreakdown]
+    projected_economic_costs: Decimal
+    projected_economic_result: Decimal
     structural_costs: FinancialStructuralCosts
     total_distance_km: Decimal
     total_worked_minutes: int
@@ -343,6 +356,9 @@ class FinancialSummary(BaseModel):
         "estimated_structural_costs",
         "estimated_economic_costs",
         "estimated_economic_result",
+        "recurring_expenses_total",
+        "projected_economic_costs",
+        "projected_economic_result",
         "total_distance_km",
         "gross_per_hour",
         "net_per_hour",
