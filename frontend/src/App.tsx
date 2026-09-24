@@ -3559,7 +3559,7 @@ function App() {
       .filter(
         (expense) =>
           expense.expense_date === result.workDate &&
-          (expense.vehicle_id === null || expense.vehicle_id === result.vehicle.id),
+          expense.vehicle_id === result.vehicle.id,
       )
       .reduce((total, expense) => total + moneyValueToCents(expense.amount), 0n);
   }
@@ -3587,7 +3587,9 @@ function App() {
   const maintenanceAlert = getPrimaryMaintenanceAlert();
   const shouldShowCostPrecisionPrompt =
     vehicles.length > 0 &&
-    (!financialSummary || !isPositiveMoney(financialSummary.estimated_structural_costs));
+    !isDashboardLoading &&
+    financialSummary !== null &&
+    !isPositiveMoney(financialSummary.estimated_structural_costs);
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -4050,6 +4052,28 @@ function App() {
                       ))}
                     </select>
                   </label>
+
+                  {vehicles.length > 1 ? (
+                    <label>
+                      Veículo
+                      <select
+                        onChange={(event) =>
+                          setDailyExpenseForm({
+                            ...dailyExpenseForm,
+                            vehicle_id: event.target.value,
+                          })
+                        }
+                        value={dailyExpenseForm.vehicle_id}
+                      >
+                        <option value="">Gasto geral / sem veículo</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
 
                   <label>
                     Valor
@@ -4662,6 +4686,12 @@ function App() {
                 </p>
               </div>
 
+              <div className="result-context-nav" aria-label="Áreas de resultado">
+                <a href="#resultado">Visão geral</a>
+                <a href="#metas">Metas</a>
+                <a href="#insights">Insights</a>
+              </div>
+
               <div className="dashboard-filters">
                 <label>
                   Período
@@ -4837,7 +4867,7 @@ function App() {
                     </details>
                   </div>
 
-                  <div className="financial-insights">
+                  <div className="financial-insights" id="insights">
                     <div className="list-header">
                       <h3>Insights do seu periodo</h3>
                     </div>
