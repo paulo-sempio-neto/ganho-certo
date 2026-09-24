@@ -132,10 +132,25 @@ type FinancialDailySummary = {
   estimated_net_profit: string;
 };
 
+type FinancialStructuralCosts = {
+  ownership: string;
+  insurance: string;
+  ipva: string;
+  other_fixed: string;
+  maintenance: string;
+  tires: string;
+  oil: string;
+  depreciation: string;
+};
+
 type FinancialSummary = {
   gross_revenue: string;
   total_expenses: string;
   estimated_net_profit: string;
+  estimated_structural_costs: string;
+  estimated_economic_costs: string;
+  estimated_economic_result: string;
+  structural_costs: FinancialStructuralCosts;
   total_distance_km: string;
   total_worked_minutes: number;
   total_trip_count: number;
@@ -162,6 +177,17 @@ const ownershipOptions: Array<{ label: string; value: OwnershipType }> = [
   { label: "Proprio", value: "owned" },
   { label: "Financiado", value: "financed" },
   { label: "Alugado", value: "rented" },
+];
+
+const structuralCostLabels: Array<{ key: keyof FinancialStructuralCosts; label: string }> = [
+  { key: "ownership", label: "Aluguel/financiamento" },
+  { key: "insurance", label: "Seguro" },
+  { key: "ipva", label: "IPVA" },
+  { key: "other_fixed", label: "Outros custos fixos" },
+  { key: "maintenance", label: "Manutencao" },
+  { key: "tires", label: "Pneus" },
+  { key: "oil", label: "Oleo" },
+  { key: "depreciation", label: "Depreciacao" },
 ];
 
 const expenseCategoryOptions: Array<{ label: string; value: ExpenseCategory }> = [
@@ -479,6 +505,29 @@ function App() {
       getChartValue(dailyItem.estimated_net_profit),
     ]);
     return Math.max(...values, 1);
+  }
+
+  function isPositiveMoney(value: string): boolean {
+    return Number(value) > 0;
+  }
+
+  function isNegativeMoney(value: string): boolean {
+    return Number(value) < 0;
+  }
+
+  function getStructuralCostItems(summary: FinancialSummary) {
+    const totalStructuralCosts = Number(summary.estimated_structural_costs);
+
+    return structuralCostLabels
+      .map((item) => ({
+        ...item,
+        value: summary.structural_costs[item.key],
+        percentage:
+          totalStructuralCosts > 0
+            ? Math.round((Number(summary.structural_costs[item.key]) / totalStructuralCosts) * 100)
+            : null,
+      }))
+      .filter((item) => isPositiveMoney(item.value));
   }
 
   function buildFinancialSummaryPath() {
@@ -1176,6 +1225,90 @@ function App() {
 
               {!isDashboardLoading && financialSummary ? (
                 <>
+                  <div className="economic-panel">
+                    <div className="section-title">
+                      <p className="eyebrow">Seu resultado de verdade</p>
+                      <h3>Visao economica do periodo</h3>
+                      <p className="subtle-note">
+                        O resultado economico considera custos configurados do veiculo, como
+                        aluguel, financiamento, seguro, IPVA, manutencao, pneus, oleo e
+                        depreciacao.
+                      </p>
+                    </div>
+
+                    <div className="metric-grid economic-flow">
+                      <article className="metric-card">
+                        <span>Faturamento bruto</span>
+                        <strong>{formatMoney(financialSummary.gross_revenue)}</strong>
+                      </article>
+                      <article className="metric-card metric-expense">
+                        <span>Despesas registradas</span>
+                        <strong>{formatMoney(financialSummary.total_expenses)}</strong>
+                      </article>
+                      <article className="metric-card">
+                        <span>Sobra apos despesas</span>
+                        <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
+                      </article>
+                      <article className="metric-card metric-expense">
+                        <span>Custos estruturais estimados</span>
+                        <strong>{formatMoney(financialSummary.estimated_structural_costs)}</strong>
+                      </article>
+                      <article
+                        className={
+                          isNegativeMoney(financialSummary.estimated_economic_result)
+                            ? "metric-card economic-result-card metric-negative"
+                            : "metric-card economic-result-card metric-profit"
+                        }
+                      >
+                        <span>Resultado economico estimado</span>
+                        <strong>{formatMoney(financialSummary.estimated_economic_result)}</strong>
+                        <small>
+                          Com base nas despesas registradas e nos custos configurados do seu
+                          veiculo.
+                        </small>
+                        <small>
+                          Custos economicos considerados:{" "}
+                          {formatMoney(financialSummary.estimated_economic_costs)}
+                        </small>
+                      </article>
+                    </div>
+
+                    {!isPositiveMoney(financialSummary.estimated_structural_costs) ? (
+                      <p className="empty-state">
+                        Configure os custos do veiculo para obter uma estimativa economica mais
+                        completa. <a href="#veiculos">Ir para Veiculos</a>
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="structural-breakdown">
+                    <div className="list-header">
+                      <h3>Para onde seu dinheiro esta indo?</h3>
+                    </div>
+
+                    {getStructuralCostItems(financialSummary).length === 0 ? (
+                      <p className="empty-state">
+                        Nenhum custo estrutural estimado para o periodo selecionado.
+                      </p>
+                    ) : (
+                      <div className="structural-list">
+                        {getStructuralCostItems(financialSummary).map((item) => (
+                          <article className="structural-item" key={item.key}>
+                            <div>
+                              <strong>{item.label}</strong>
+                              <span>
+                                {item.percentage === null
+                                  ? "Participacao indisponivel"
+                                  : `${item.percentage}% dos custos estruturais`}
+                              </span>
+                            </div>
+                            <strong>{formatMoney(item.value)}</strong>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="metric-grid highlights">
                     <article className="metric-card metric-profit">
                       <span>Lucro líquido estimado</span>
