@@ -239,6 +239,40 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.account-menu {
+  min-width: 160px;
+}
+
+.account-menu summary {
+  list-style: none;
+  border: 1px solid #d9ded5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #26734d;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 9px 14px;
+  text-align: center;
+}
+
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.account-menu[open] summary {
+  border-color: #26734d;
+  background: #edf8ef;
+}
+
+.compact-user-data {
+  grid-template-columns: 1fr;
+  margin-top: 10px;
+  border: 1px solid #e4e8e1;
+  border-radius: 8px;
+  background: #fbfcfa;
+  padding: 12px;
+}
+
 .session-header {
   display: flex;
   gap: 16px;
@@ -341,8 +375,62 @@ select:focus {
   padding-top: 16px;
 }
 
+.activation-panel,
+.action-prompt,
+.simple-goal-intro {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #b9dec8;
+  border-radius: 10px;
+  background: #edf8ef;
+  padding: 16px;
+}
+
+.activation-panel h4,
+.activation-panel p,
+.action-prompt p,
+.simple-goal-intro p {
+  margin: 0;
+}
+
+.activation-panel h4,
+.action-prompt strong,
+.simple-goal-intro strong {
+  color: #111812;
+}
+
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-action-grid .button {
+  text-align: center;
+  text-decoration: none;
+}
+
+.action-prompt {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.maintenance-prompt {
+  border-color: #d9a845;
+  background: #fff8e7;
+}
+
 .daily-entry-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.daily-entry-primary-metrics,
+.result-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.secondary-metrics {
+  opacity: 0.92;
 }
 
 .daily-entry-actions {
@@ -532,6 +620,31 @@ select:focus {
 
 .projected-result-card strong {
   font-size: clamp(1.9rem, 5vw, 3rem);
+}
+
+.calculation-details,
+.advanced-options,
+.secondary-import-options {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #e4e8e1;
+  border-radius: 10px;
+  background: #fbfcfa;
+  padding: 14px;
+}
+
+.calculation-details summary,
+.advanced-options summary,
+.secondary-import-options summary {
+  cursor: pointer;
+  color: #26734d;
+  font-weight: 900;
+}
+
+.calculation-details[open],
+.advanced-options[open],
+.secondary-import-options[open] {
+  background: #ffffff;
 }
 
 .dashboard-layers {
@@ -1271,6 +1384,10 @@ select:focus {
   .daily-time-grid,
   .daily-entry-metrics,
   .daily-entry-actions,
+  .daily-entry-primary-metrics,
+  .result-summary-grid,
+  .quick-action-grid,
+  .action-prompt,
   .quick-start-progress,
   .quick-start-metrics,
   .quick-start-time {
@@ -1292,6 +1409,7 @@ select:focus {
     flex-direction: column;
   }
 
+  .account-menu,
   .session-header .button {
     width: 100%;
   }

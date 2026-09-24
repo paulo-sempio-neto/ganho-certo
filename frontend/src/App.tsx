@@ -687,11 +687,11 @@ function getMaintenanceCategoryLabel(value: MaintenanceCategory): string {
 
 function getMaintenanceStatusLabel(value: MaintenanceStatusType): string {
   if (value === "due") {
-    return "Manutencao necessaria";
+    return "Manutenção necessária";
   }
 
   if (value === "due_soon") {
-    return "Proxima manutencao";
+    return "Próxima manutenção";
   }
 
   return "Em dia";
@@ -917,6 +917,14 @@ function moneyInputToCents(value: string): bigint {
   return BigInt(moneyInputToApi(value).replace(".", ""));
 }
 
+function moneyValueToCents(value: string): bigint {
+  const isNegative = value.startsWith("-");
+  const safeValue = isNegative ? value.slice(1) : value;
+  const [reais, cents = "00"] = safeValue.split(".");
+  const amount = BigInt(`${reais}${`${cents}00`.slice(0, 2)}`);
+  return isNegative ? -amount : amount;
+}
+
 function parseNonNegativeDecimal(value: string, fieldName: string) {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   if (!/^\d+(\.\d+)?$/.test(normalized)) {
@@ -1026,6 +1034,7 @@ function App() {
   const [matchedWorkSessionImportProfile, setMatchedWorkSessionImportProfile] =
     useState<CsvImportProfile | null>(null);
   const [isWorkSessionImportVisible, setIsWorkSessionImportVisible] = useState(false);
+  const [isWorkSessionImportMappingVisible, setIsWorkSessionImportMappingVisible] = useState(false);
   const [isWorkSessionImportDragging, setIsWorkSessionImportDragging] = useState(false);
   const [expenseImportVehicleId, setExpenseImportVehicleId] = useState("");
   const [expenseImportFile, setExpenseImportFile] = useState<File | null>(null);
@@ -1040,6 +1049,7 @@ function App() {
   const [matchedExpenseImportProfile, setMatchedExpenseImportProfile] =
     useState<CsvImportProfile | null>(null);
   const [isExpenseImportVisible, setIsExpenseImportVisible] = useState(false);
+  const [isExpenseImportMappingVisible, setIsExpenseImportMappingVisible] = useState(false);
   const [isExpenseImportDragging, setIsExpenseImportDragging] = useState(false);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [recurringExpenseForm, setRecurringExpenseForm] =
@@ -1144,6 +1154,7 @@ function App() {
     setWorkSessionImportProfileName("");
     setMatchedWorkSessionImportProfile(null);
     setIsWorkSessionImportVisible(false);
+    setIsWorkSessionImportMappingVisible(false);
     setIsWorkSessionImportDragging(false);
     setExpenseImportVehicleId("");
     setExpenseImportFile(null);
@@ -1155,6 +1166,7 @@ function App() {
     setExpenseImportProfileName("");
     setMatchedExpenseImportProfile(null);
     setIsExpenseImportVisible(false);
+    setIsExpenseImportMappingVisible(false);
     setIsExpenseImportDragging(false);
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
@@ -1634,6 +1646,7 @@ function App() {
       setWorkSessionImportProfileName("");
       setMatchedWorkSessionImportProfile(null);
       setIsWorkSessionImportVisible(false);
+      setIsWorkSessionImportMappingVisible(false);
       setIsWorkSessionImportDragging(false);
       setExpenseImportVehicleId("");
       setExpenseImportFile(null);
@@ -1645,6 +1658,7 @@ function App() {
       setExpenseImportProfileName("");
       setMatchedExpenseImportProfile(null);
       setIsExpenseImportVisible(false);
+      setIsExpenseImportMappingVisible(false);
       setIsExpenseImportDragging(false);
       setMaintenancePlanForm(emptyMaintenancePlanForm);
       setMaintenanceRecordForm(emptyMaintenanceRecordForm);
@@ -1918,7 +1932,7 @@ function App() {
     await loadWorkSessions();
     await refreshDashboardData();
     requestAnimationFrame(() =>
-      document.getElementById("registro-rapido")?.scrollIntoView({ behavior: "smooth" }),
+      document.getElementById("hoje")?.scrollIntoView({ behavior: "smooth" }),
     );
   }
 
@@ -1959,19 +1973,17 @@ function App() {
     }
 
     requestAnimationFrame(() =>
-      document.getElementById("dashboard")?.scrollIntoView({ behavior: "smooth" }),
+      document.getElementById("resultado")?.scrollIntoView({ behavior: "smooth" }),
     );
   }
 
   function openDailyExpenseShortcut() {
-    if (!quickDailyEntryResult) {
-      return;
-    }
+    const vehicle = quickDailyEntryResult?.vehicle ?? getQuickDailyVehicle();
 
     setDailyExpenseForm({
       ...emptyExpenseForm,
-      expense_date: quickDailyEntryResult.workDate,
-      vehicle_id: String(quickDailyEntryResult.vehicle.id),
+      expense_date: quickDailyEntryResult?.workDate ?? toDateInputValue(new Date()),
+      vehicle_id: vehicle ? String(vehicle.id) : "",
     });
     setDailyExpenseVisible(true);
   }
@@ -2075,7 +2087,7 @@ function App() {
     await loadWorkSessions();
     await loadExpenses();
     await refreshDashboardData();
-    document.getElementById("jornadas")?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById("mais")?.scrollIntoView({ behavior: "smooth" });
   }
 
   async function handleQuickStartRegister() {
@@ -2429,6 +2441,7 @@ function App() {
     setWorkSessionImportError("");
     setWorkSessionImportProfileName("");
     setMatchedWorkSessionImportProfile(null);
+    setIsWorkSessionImportMappingVisible(false);
     setIsWorkSessionImportDragging(false);
   }
 
@@ -2452,6 +2465,7 @@ function App() {
     setWorkSessionImportError("");
     setWorkSessionImportProfileName("");
     setMatchedWorkSessionImportProfile(null);
+    setIsWorkSessionImportMappingVisible(false);
   }
 
   function handleWorkSessionImportFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -2502,6 +2516,7 @@ function App() {
 
       setMatchedWorkSessionImportProfile(match.profile);
       setWorkSessionImportMapping(profileToWorkSessionImportMapping(match.column_mapping));
+      setIsWorkSessionImportMappingVisible(false);
       if (
         match.column_mapping &&
         !areImportMappingsEqual(preview.column_mapping, match.column_mapping)
@@ -2672,9 +2687,15 @@ function App() {
           body: workSessionImportFile,
         },
       );
+      const nextMapping = previewToImportMapping(preview);
       setWorkSessionImportPreview(preview);
       setWorkSessionImportColumns(preview.columns_found);
-      setWorkSessionImportMapping(previewToImportMapping(preview));
+      setWorkSessionImportMapping(nextMapping);
+      setIsWorkSessionImportMappingVisible(
+        !workSessionImportMappingFields.every(
+          (item) => item.optional || Boolean(nextMapping[item.field]),
+        ),
+      );
       await matchWorkSessionImportProfile(preview.columns_found, preview);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -2791,6 +2812,7 @@ function App() {
     setExpenseImportError("");
     setExpenseImportProfileName("");
     setMatchedExpenseImportProfile(null);
+    setIsExpenseImportMappingVisible(false);
     setIsExpenseImportDragging(false);
   }
 
@@ -2814,6 +2836,7 @@ function App() {
     setExpenseImportError("");
     setExpenseImportProfileName("");
     setMatchedExpenseImportProfile(null);
+    setIsExpenseImportMappingVisible(false);
   }
 
   function handleExpenseImportFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -2861,6 +2884,7 @@ function App() {
 
       setMatchedExpenseImportProfile(match.profile);
       setExpenseImportMapping(profileToExpenseImportMapping(match.column_mapping));
+      setIsExpenseImportMappingVisible(false);
       if (
         match.column_mapping &&
         !areExpenseImportMappingsEqual(preview.column_mapping, match.column_mapping)
@@ -2950,9 +2974,15 @@ function App() {
           body: expenseImportFile,
         },
       );
+      const nextMapping = expensePreviewToImportMapping(preview);
       setExpenseImportPreview(preview);
       setExpenseImportColumns(preview.columns_found);
-      setExpenseImportMapping(expensePreviewToImportMapping(preview));
+      setExpenseImportMapping(nextMapping);
+      setIsExpenseImportMappingVisible(
+        !expenseImportMappingFields.every(
+          (item) => item.optional || Boolean(nextMapping[item.field]),
+        ),
+      );
       await matchExpenseImportProfile(preview.columns_found, preview);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -3524,9 +3554,40 @@ function App() {
     );
   }
 
+  function getQuickDailyExpenseTotalCents(result: QuickDailyEntryResult): bigint {
+    return expenses
+      .filter(
+        (expense) =>
+          expense.expense_date === result.workDate &&
+          (expense.vehicle_id === null || expense.vehicle_id === result.vehicle.id),
+      )
+      .reduce((total, expense) => total + moneyValueToCents(expense.amount), 0n);
+  }
+
+  function getPrimaryMaintenanceAlert(): { plan: MaintenancePlan; status: MaintenancePlanStatus } | null {
+    for (const plan of maintenancePlans) {
+      const status = maintenanceStatusesById[plan.id];
+      if (plan.active && status && (status.status === "due" || status.status === "due_soon")) {
+        return { plan, status };
+      }
+    }
+
+    return null;
+  }
+
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
   const visibleFinancialInsights = financialInsights.slice(0, 5);
+  const quickDailyExpenseTotalCents = quickDailyEntryResult
+    ? getQuickDailyExpenseTotalCents(quickDailyEntryResult)
+    : 0n;
+  const quickDailyRemainingCents = quickDailyEntryResult
+    ? quickDailyEntryResult.grossRevenueCents - quickDailyExpenseTotalCents
+    : 0n;
+  const maintenanceAlert = getPrimaryMaintenanceAlert();
+  const shouldShowCostPrecisionPrompt =
+    vehicles.length > 0 &&
+    (!financialSummary || !isPositiveMoney(financialSummary.estimated_structural_costs));
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -3541,62 +3602,38 @@ function App() {
           <div className="session">
             <div className="session-header">
               <div>
-                <p className="eyebrow">Sessao autenticada</p>
-                <h2>Bem-vindo ao GanhoCerto, {user.name}.</h2>
+                <p className="eyebrow">GanhoCerto</p>
+                <h2>{workSessions.length === 0 ? "Descubra seu GanhoCerto" : `Ola, ${user.name}.`}</h2>
               </div>
-              <button className="button button-secondary" type="button" onClick={handleLogout}>
-                Sair
-              </button>
+              <details className="account-menu">
+                <summary>Conta</summary>
+                <dl className="user-data compact-user-data">
+                  <div>
+                    <dt>Nome</dt>
+                    <dd>{user.name}</dd>
+                  </div>
+                  <div>
+                    <dt>Email</dt>
+                    <dd>{user.email}</dd>
+                  </div>
+                </dl>
+                <button className="button button-secondary" type="button" onClick={handleLogout}>
+                  Sair
+                </button>
+              </details>
             </div>
-
-            <dl className="user-data">
-              <div>
-                <dt>Nome</dt>
-                <dd>{user.name}</dd>
-              </div>
-              <div>
-                <dt>Email</dt>
-                <dd>{user.email}</dd>
-              </div>
-            </dl>
 
             {message ? <p className="form-message">{message}</p> : null}
             {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
             <nav className="dashboard-nav" aria-label="Navegacao principal">
-              <button
-                className="daily-entry-nav-button"
-                type="button"
-                onClick={() =>
-                  document.getElementById("registro-rapido")?.scrollIntoView({ behavior: "smooth" })
-                }
-              >
-                Registrar meu dia
-              </button>
-              {workSessions.length > 0 ? <a href="#dashboard">Dashboard</a> : null}
-              {workSessions.length > 0 ? (
-                <button
-                  className="quick-start-nav-button"
-                  type="button"
-                  onClick={() => {
-                    setQuickStartVisible(true);
-                    requestAnimationFrame(() =>
-                      document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
-                    );
-                  }}
-                >
-                  Simular um dia
-                </button>
-              ) : null}
-              <a href="#metas">Metas</a>
-              <a href="#jornadas">Jornadas</a>
-              <a href="#despesas">Despesas</a>
-              <a href="#despesas-recorrentes">Recorrentes</a>
-              <a href="#manutencao">Manutencao</a>
-              <a href="#veiculos">Veículos</a>
+              <a href="#hoje">Hoje</a>
+              {workSessions.length > 0 ? <a href="#resultado">Resultado</a> : <a href="#quick-start">Resultado</a>}
+              <a href="#custos">Custos</a>
+              <a href="#mais">Mais</a>
             </nav>
 
-            <section className="daily-entry" id="registro-rapido">
+            <section className="daily-entry" id="hoje">
               <div className="section-title">
                 <p className="eyebrow">Registro rapido</p>
                 <h3>Registrar meu dia</h3>
@@ -3604,6 +3641,78 @@ function App() {
                   Preencha o essencial e salve sua jornada em poucos segundos.
                 </p>
               </div>
+
+              {workSessions.length === 0 ? (
+                <div className="activation-panel">
+                  <h4>Descubra seu GanhoCerto</h4>
+                  <p>
+                    Comece registrando seu dia. Se quiser testar primeiro, use a simulação sem salvar.
+                  </p>
+                  <div className="quick-action-grid">
+                    <a className="button" href="#hoje">
+                      Registrar meu dia
+                    </a>
+                    <button
+                      className="button button-ghost"
+                      type="button"
+                      onClick={() => {
+                        setQuickStartVisible(true);
+                        requestAnimationFrame(() =>
+                          document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
+                        );
+                      }}
+                    >
+                      Simular sem salvar
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="quick-action-grid" aria-label="Ações rápidas de hoje">
+                <a className="button" href="#hoje">
+                  Registrar meu dia
+                </a>
+                <button className="button button-ghost" type="button" onClick={openDailyExpenseShortcut}>
+                  Adicionar gasto
+                </button>
+              </div>
+
+              {shouldShowCostPrecisionPrompt ? (
+                <div className="action-prompt">
+                  <div>
+                    <strong>Melhore a precisão do seu GanhoCerto</strong>
+                    <p>Configure os principais custos do veículo para obter uma estimativa mais completa.</p>
+                  </div>
+                  <a className="button button-ghost" href="#veiculos">
+                    Configurar custos
+                  </a>
+                </div>
+              ) : null}
+
+              {maintenanceAlert ? (
+                <div className="action-prompt maintenance-prompt">
+                  <div>
+                    <strong>Próxima manutenção</strong>
+                    <p>
+                      {maintenanceAlert.plan.name}
+                      {maintenanceAlert.status.km_remaining
+                        ? ` - faltam aproximadamente ${formatDistance(maintenanceAlert.status.km_remaining)} km`
+                        : maintenanceAlert.status.days_remaining !== null
+                          ? ` - faltam ${maintenanceAlert.status.days_remaining} dias`
+                          : " - atenção necessária"}
+                    </p>
+                    {maintenanceAlert.status.recommended_reserve_per_km ? (
+                      <small>
+                        Reserva sugerida:{" "}
+                        {formatMoneyPerKm(maintenanceAlert.status.recommended_reserve_per_km)}
+                      </small>
+                    ) : null}
+                  </div>
+                  <a className="text-button" href="#manutencao">
+                    Ver manutenção
+                  </a>
+                </div>
+              ) : null}
 
               <form className="auth-form daily-entry-form" onSubmit={handleQuickDailyEntrySubmit}>
                 <div className="daily-date-row">
@@ -3759,11 +3868,48 @@ function App() {
 
               {quickDailyEntryResult ? (
                 <div className="daily-entry-result">
-                  <div className="metric-grid daily-entry-metrics">
+                  <div className="section-title">
+                    <p className="eyebrow">Resultado parcial de hoje</p>
+                    <h3>O que já dá para ver</h3>
+                    <p className="subtle-note">
+                      Este valor considera os gastos de hoje que já foram registrados. Não é lucro final.
+                    </p>
+                  </div>
+
+                  <div className="metric-grid daily-entry-metrics daily-entry-primary-metrics">
                     <article className="metric-card metric-profit">
                       <span>Faturamento</span>
                       <strong>{formatCents(quickDailyEntryResult.grossRevenueCents)}</strong>
                     </article>
+                    <article className="metric-card metric-expense">
+                      <span>Gastos registrados hoje</span>
+                      <strong>{formatCents(quickDailyExpenseTotalCents)}</strong>
+                    </article>
+                    <article
+                      className={
+                        quickDailyRemainingCents < 0n
+                          ? "metric-card metric-negative"
+                          : "metric-card metric-profit"
+                      }
+                    >
+                      <span>Sobra após gastos</span>
+                      <strong>{formatCents(quickDailyRemainingCents)}</strong>
+                    </article>
+                  </div>
+
+                  {quickDailyExpenseTotalCents === 0n ? (
+                    <div className="action-prompt">
+                      <div>
+                        <strong>Você ainda não adicionou gastos de hoje.</strong>
+                        <p>Inclua combustivel, recarga ou outros custos para melhorar a sobra parcial.</p>
+                      </div>
+                      <button className="button" type="button" onClick={openDailyExpenseShortcut}>
+                        Adicionar gasto de hoje
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="metric-grid daily-entry-metrics secondary-metrics">
                     <article className="metric-card">
                       <span>R$/hora</span>
                       <strong>
@@ -3789,11 +3935,11 @@ function App() {
                   </div>
 
                   <div className="daily-entry-actions">
-                    <button className="button" type="button" onClick={handleViewCompleteResult}>
-                      Ver meu resultado completo
+                    <button className="button" type="button" onClick={openDailyExpenseShortcut}>
+                      Adicionar gasto de hoje
                     </button>
-                    <button className="button button-ghost" type="button" onClick={openDailyExpenseShortcut}>
-                      + Adicionar gasto de hoje
+                    <button className="button button-ghost" type="button" onClick={handleViewCompleteResult}>
+                      Ver resultado completo
                     </button>
                   </div>
 
@@ -3875,6 +4021,82 @@ function App() {
                     </form>
                   ) : null}
                 </div>
+              ) : null}
+
+              {dailyExpenseVisible && !quickDailyEntryResult ? (
+                <form className="auth-form daily-expense-form" onSubmit={handleDailyExpenseSubmit}>
+                  <div className="section-title">
+                    <p className="eyebrow">Gasto de hoje</p>
+                    <h3>Adicionar gasto</h3>
+                    <p className="subtle-note">Data {formatDate(dailyExpenseForm.expense_date)}.</p>
+                  </div>
+
+                  <label>
+                    Categoria
+                    <select
+                      onChange={(event) =>
+                        setDailyExpenseForm({
+                          ...dailyExpenseForm,
+                          category: event.target.value as ExpenseCategory,
+                        })
+                      }
+                      required
+                      value={dailyExpenseForm.category}
+                    >
+                      {expenseCategoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Valor
+                    <input
+                      inputMode="decimal"
+                      onChange={(event) =>
+                        setDailyExpenseForm({
+                          ...dailyExpenseForm,
+                          amount: event.target.value,
+                        })
+                      }
+                      placeholder="89,90"
+                      required
+                      type="text"
+                      value={dailyExpenseForm.amount}
+                    />
+                  </label>
+
+                  <label>
+                    Descricao <span className="optional-label">(opcional)</span>
+                    <input
+                      maxLength={255}
+                      onChange={(event) =>
+                        setDailyExpenseForm({
+                          ...dailyExpenseForm,
+                          description: event.target.value,
+                        })
+                      }
+                      placeholder="Ex: Combustivel"
+                      type="text"
+                      value={dailyExpenseForm.description}
+                    />
+                  </label>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isDailyExpenseSaving} type="submit">
+                      {isDailyExpenseSaving ? "Salvando..." : "Salvar gasto"}
+                    </button>
+                    <button
+                      className="button button-ghost"
+                      type="button"
+                      onClick={() => setDailyExpenseVisible(false)}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
               ) : null}
             </section>
 
@@ -4141,34 +4363,39 @@ function App() {
                 <form className="auth-form vehicle-form" onSubmit={handleFinancialGoalSubmit}>
                   <h3>{editingFinancialGoalId ? "Editar meta" : "Criar meta"}</h3>
 
-                  <label>
-                    Tipo de meta
-                    <select
-                      name="financial-goal-type"
-                      onChange={(event) =>
-                        setFinancialGoalForm({
-                          ...financialGoalForm,
-                          goal_type: event.target.value as FinancialGoalType,
-                        })
-                      }
-                      required
-                      value={financialGoalForm.goal_type}
-                    >
-                      {financialGoalTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="simple-goal-intro">
+                    <strong>Quanto você quer que sobre?</strong>
+                    <p>
+                      Por padrão, a meta acompanha a sobra após as despesas que você registrou.
+                    </p>
+                  </div>
 
-                  <p className="subtle-note">
-                    Meta de sobra apos despesas usa somente despesas registradas.
-                  </p>
-                  <p className="subtle-note">
-                    Meta de resultado projetado considera tambem custos estruturais e despesas
-                    recorrentes previstas.
-                  </p>
+                  <details
+                    className="advanced-options"
+                    open={financialGoalForm.goal_type === "projected"}
+                  >
+                    <summary>Opção avançada</summary>
+                    <label className="toggle-field">
+                      <input
+                        checked={financialGoalForm.goal_type === "projected"}
+                        name="financial-goal-type"
+                        onChange={(event) =>
+                          setFinancialGoalForm({
+                            ...financialGoalForm,
+                            goal_type: event.target.checked ? "projected" : "net",
+                          })
+                        }
+                        type="checkbox"
+                      />
+                      <span>Usar resultado projetado</span>
+                    </label>
+                    {financialGoalForm.goal_type === "projected" ? (
+                      <p className="subtle-note">
+                        O resultado projetado também considera custos do veículo e despesas
+                        recorrentes previstas.
+                      </p>
+                    ) : null}
+                  </details>
 
                   <label>
                     Valor da meta
@@ -4426,12 +4653,12 @@ function App() {
             </section>
 
             {workSessions.length > 0 ? (
-              <section className="manager-section dashboard-section" id="dashboard">
+              <section className="manager-section dashboard-section" id="resultado">
               <div className="section-title">
-                <p className="eyebrow">Dashboard</p>
+                <p className="eyebrow">Resultado</p>
                 <h3>Resumo financeiro</h3>
                 <p className="subtle-note">
-                  Lucro líquido estimado com base nas despesas registradas.
+                  Veja quanto entrou, quanto saiu e como os custos do veículo afetam sua estimativa.
                 </p>
               </div>
 
@@ -4493,13 +4720,40 @@ function App() {
                 <>
                   <div className="economic-panel">
                     <div className="section-title">
-                      <p className="eyebrow">Visao em camadas</p>
-                      <h3>Do realizado ao projetado</h3>
+                      <p className="eyebrow">Resultado</p>
+                      <h3>Quanto realmente esta sobrando?</h3>
                       <p className="subtle-note">
-                        Separe o que ja aconteceu, os custos estimados e as despesas recorrentes
-                        previstas para o periodo.
+                        Primeiro veja a sobra do caixa e o impacto estimado do veículo. Os detalhes
+                        continuam disponíveis abaixo.
                       </p>
                     </div>
+
+                    <div className="metric-grid result-summary-grid">
+                      <article className="metric-card metric-profit">
+                        <span>Sobrou no caixa</span>
+                        <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
+                        <small>Faturamento menos despesas registradas.</small>
+                      </article>
+                      <article className="metric-card metric-expense">
+                        <span>Custos estimados do veículo</span>
+                        <strong>{formatMoney(financialSummary.estimated_structural_costs)}</strong>
+                        <small>Custos configurados que nem sempre aparecem como gasto do dia.</small>
+                      </article>
+                      <article
+                        className={
+                          isNegativeMoney(financialSummary.estimated_economic_result)
+                            ? "metric-card metric-negative"
+                            : "metric-card metric-profit"
+                        }
+                      >
+                        <span>Resultado estimado</span>
+                        <strong>{formatMoney(financialSummary.estimated_economic_result)}</strong>
+                        <small>Depois de considerar os custos estimados do veículo.</small>
+                      </article>
+                    </div>
+
+                    <details className="calculation-details">
+                      <summary>Ver detalhes do cálculo</summary>
 
                     <article
                       className={
@@ -4580,6 +4834,7 @@ function App() {
                         completa. <a href="#veiculos">Ir para Veiculos</a>
                       </p>
                     ) : null}
+                    </details>
                   </div>
 
                   <div className="financial-insights">
@@ -4760,7 +5015,7 @@ function App() {
                               <strong>{formatMoney(dailyItem.expenses)}</strong>
                             </div>
                             <div className="bar-line profit-bar">
-                              <span>Lucro est.</span>
+                              <span>Resultado est.</span>
                               <div>
                                 <i
                                   style={{
@@ -4780,7 +5035,7 @@ function App() {
               </section>
             ) : null}
 
-            <section className="manager-section" id="jornadas">
+            <section className="manager-section" id="mais">
               <div className="section-title">
                 <p className="eyebrow">Jornadas</p>
                 <h3>Registro diario de trabalho</h3>
@@ -4806,7 +5061,7 @@ function App() {
                     <div>
                       <h3>Importar jornadas por CSV</h3>
                       <p className="subtle-note">
-                        Escolha o veículo, envie o arquivo e revise o preview antes de gravar.
+                        Escolha o veículo, envie o arquivo e revise os registros antes de gravar.
                       </p>
                     </div>
                     <button className="text-button" type="button" onClick={downloadWorkSessionImportTemplate}>
@@ -4815,19 +5070,20 @@ function App() {
                   </div>
 
                   <div className="import-template-help">
-                    <span>date: AAAA-MM-DD</span>
-                    <span>gross_revenue: faturamento</span>
-                    <span>distance_km: km rodados</span>
-                    <span>worked_minutes: minutos trabalhados</span>
-                    <span>trip_count: número de corridas</span>
+                    <span>Data</span>
+                    <span>Faturamento</span>
+                    <span>Km rodados</span>
+                    <span>Tempo trabalhado</span>
+                    <span>Corridas</span>
                   </div>
 
-                  <div className="import-preview">
+                  <details className="import-preview secondary-import-options">
+                    <summary>Configurações salvas</summary>
                     <div className="list-header">
                       <div>
-                        <h4>Configuracoes salvas</h4>
+                        <h4>Modelos salvos</h4>
                         <p className="subtle-note">
-                          Use perfis para reaproveitar o mesmo mapeamento em CSVs iguais.
+                          Use modelos para lembrar colunas de arquivos iguais.
                         </p>
                       </div>
                       <button
@@ -4877,7 +5133,7 @@ function App() {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </details>
 
                   {vehicles.length === 0 ? (
                     <p className="empty-state compact-empty-state">
@@ -4943,7 +5199,20 @@ function App() {
                         </p>
                       ) : null}
 
-                      {workSessionImportColumns.length ? (
+                      {workSessionImportColumns.length && !isWorkSessionImportMappingVisible ? (
+                        <p className="subtle-note">
+                          Colunas reconhecidas.{" "}
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => setIsWorkSessionImportMappingVisible(true)}
+                          >
+                            Editar colunas
+                          </button>
+                        </p>
+                      ) : null}
+
+                      {workSessionImportColumns.length && isWorkSessionImportMappingVisible ? (
                         <div className="import-mapping">
                           <div>
                             <h4>Qual coluna corresponde a cada informação?</h4>
@@ -4998,8 +5267,8 @@ function App() {
                           {isWorkSessionImportPreviewLoading
                             ? "Validando..."
                             : workSessionImportColumns.length
-                              ? "Confirmar mapping e visualizar preview"
-                              : "Ler colunas e visualizar preview"}
+                              ? "Conferir registros"
+                              : "Ler arquivo e conferir registros"}
                         </button>
                       </div>
 
@@ -5078,7 +5347,7 @@ function App() {
                                 <div>
                                   <h4>Salvar esta configuracao</h4>
                                   <p className="subtle-note">
-                                    Opcional: guarde este mapeamento para CSVs com as mesmas colunas.
+                                    Opcional: lembre este modelo para arquivos com as mesmas colunas.
                                   </p>
                                 </div>
                                 <div className="form-grid">
@@ -5401,7 +5670,7 @@ function App() {
               </div>
             </section>
 
-            <section className="manager-section" id="despesas">
+            <section className="manager-section" id="custos">
               <div className="section-title">
                 <p className="eyebrow">Despesas</p>
                 <h3>Custos da operação</h3>
@@ -5427,7 +5696,7 @@ function App() {
                     <div>
                       <h3>Importar despesas por CSV</h3>
                       <p className="subtle-note">
-                        Envie o arquivo, confira as colunas e revise o preview antes de gravar.
+                        Envie o arquivo, confira os registros e grave apenas depois da revisão.
                       </p>
                     </div>
                     <button className="text-button" type="button" onClick={downloadExpenseImportTemplate}>
@@ -5436,18 +5705,19 @@ function App() {
                   </div>
 
                   <div className="import-template-help">
-                    <span>expense_date: AAAA-MM-DD</span>
-                    <span>amount: valor</span>
-                    <span>category: categoria</span>
-                    <span>description: descricao opcional</span>
+                    <span>Data</span>
+                    <span>Valor</span>
+                    <span>Categoria</span>
+                    <span>Descrição</span>
                   </div>
 
-                  <div className="import-preview">
+                  <details className="import-preview secondary-import-options">
+                    <summary>Configurações salvas</summary>
                     <div className="list-header">
                       <div>
-                        <h4>Configuracoes salvas</h4>
+                        <h4>Modelos salvos</h4>
                         <p className="subtle-note">
-                          Perfis de despesas ficam separados dos perfis de jornadas.
+                          Modelos de despesas ficam separados dos modelos de jornadas.
                         </p>
                       </div>
                       <button
@@ -5494,10 +5764,10 @@ function App() {
                                 </button>
                               </div>
                             </article>
-                          ))}
+                        ))}
                       </div>
                     )}
-                  </div>
+                  </details>
 
                   <div className="form-grid">
                     <label>
@@ -5567,12 +5837,25 @@ function App() {
                     </p>
                   ) : null}
 
-                  {expenseImportColumns.length ? (
+                  {expenseImportColumns.length && !isExpenseImportMappingVisible ? (
+                    <p className="subtle-note">
+                      Colunas reconhecidas.{" "}
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => setIsExpenseImportMappingVisible(true)}
+                      >
+                        Editar colunas
+                      </button>
+                    </p>
+                  ) : null}
+
+                  {expenseImportColumns.length && isExpenseImportMappingVisible ? (
                     <div className="import-mapping">
                       <div>
                         <h4>Qual coluna corresponde a cada informacao?</h4>
                         <p className="subtle-note">
-                          Confira as sugestoes e ajuste se precisar antes do preview.
+                          Confira as sugestoes e ajuste se precisar antes de revisar.
                         </p>
                       </div>
                       <div className="form-grid">
@@ -5621,8 +5904,8 @@ function App() {
                       {isExpenseImportPreviewLoading
                         ? "Validando..."
                         : expenseImportColumns.length
-                          ? "Confirmar mapping e visualizar preview"
-                          : "Ler colunas e visualizar preview"}
+                          ? "Conferir registros"
+                          : "Ler arquivo e conferir registros"}
                     </button>
                   </div>
 
@@ -5692,9 +5975,9 @@ function App() {
                         <>
                           <div className="import-mapping">
                             <div>
-                              <h4>Salvar esta configuracao para proximas importacoes</h4>
+                              <h4>Salvar este modelo para proximas importacoes</h4>
                               <p className="subtle-note">
-                                Opcional: informe um nome amigavel para reutilizar este mapeamento.
+                                Opcional: informe um nome amigavel para lembrar estas colunas.
                               </p>
                             </div>
                             <div className="form-grid">
@@ -5971,8 +6254,8 @@ function App() {
                   Cadastre custos que se repetem para nÃ£o precisar informÃ¡-los novamente todos os meses.
                 </p>
                 <p className="subtle-note">
-                  Por enquanto, estes custos ficam apenas configurados: ainda nÃ£o sÃ£o lanÃ§ados como
-                  despesas nem aplicados ao dashboard.
+                  Despesas recorrentes entram nas projeções do GanhoCerto, mas não são registradas
+                  automaticamente como despesas já pagas.
                 </p>
               </div>
 
@@ -6838,8 +7121,8 @@ function App() {
                       como despesas no dia a dia.
                     </p>
                     <p className="subtle-note">
-                      Combustivel e recarga continuam sendo lancados em Despesas. Estes dados ainda
-                      nao alteram o dashboard financeiro.
+                      Combustivel e recarga continuam sendo lancados em Despesas. Os custos abaixo
+                      melhoram as estimativas do Resultado.
                     </p>
                   </div>
 
@@ -6848,7 +7131,7 @@ function App() {
                   ) : null}
 
                   <fieldset className="form-group" disabled={isCostProfileLoading}>
-                    <legend>Tipo de posse</legend>
+                    <legend>Essencial</legend>
                     <label>
                       Tipo de posse
                       <select
@@ -6871,7 +7154,7 @@ function App() {
                   </fieldset>
 
                   <fieldset className="form-group" disabled={isCostProfileLoading}>
-                    <legend>Custos fixos</legend>
+                    <legend>Essencial - valores principais</legend>
                     <div className="form-grid">
                       <label
                         className={
@@ -6954,31 +7237,17 @@ function App() {
                           value={costProfileForm.ipva_annual}
                         />
                       </label>
-
-                      <label>
-                        Outros fixos mensais
-                        <input
-                          inputMode="decimal"
-                          name="other-fixed-monthly"
-                          onChange={(event) =>
-                            setCostProfileForm({
-                              ...costProfileForm,
-                              other_fixed_monthly: event.target.value,
-                            })
-                          }
-                          placeholder="Ex: 75,00"
-                          type="text"
-                          value={costProfileForm.other_fixed_monthly}
-                        />
-                      </label>
                     </div>
                   </fieldset>
 
+                  <details className="advanced-options cost-advanced-options">
+                    <summary>Avançado</summary>
+
                   <fieldset className="form-group" disabled={isCostProfileLoading}>
-                    <legend>Provisoes por km</legend>
+                    <legend>Provisões por km</legend>
                     <div className="form-grid">
                       <label>
-                        Manutencao por km
+                        Manutenção por km
                         <input
                           inputMode="decimal"
                           name="maintenance-per-km"
@@ -7052,6 +7321,23 @@ function App() {
                   <fieldset className="form-group" disabled={isCostProfileLoading}>
                     <legend>Adicional</legend>
                     <label>
+                      Outros fixos mensais
+                      <input
+                        inputMode="decimal"
+                        name="other-fixed-monthly"
+                        onChange={(event) =>
+                          setCostProfileForm({
+                            ...costProfileForm,
+                            other_fixed_monthly: event.target.value,
+                          })
+                        }
+                        placeholder="Ex: 75,00"
+                        type="text"
+                        value={costProfileForm.other_fixed_monthly}
+                      />
+                    </label>
+
+                    <label>
                       Consumo medio em km/l
                       <input
                         inputMode="decimal"
@@ -7068,6 +7354,7 @@ function App() {
                       />
                     </label>
                   </fieldset>
+                  </details>
 
                   <div className="form-actions">
                     <button
