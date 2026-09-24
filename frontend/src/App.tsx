@@ -11,6 +11,7 @@ type OwnershipType = "owned" | "financed" | "rented";
 type DashboardPeriod = "today" | "last7" | "month" | "custom";
 type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
 type FinancialGoalType = "net" | "projected";
+type FinancialInsightType = "info" | "positive" | "attention";
 
 type User = {
   id: number;
@@ -274,6 +275,17 @@ type FinancialSummary = {
   expense_per_km: string | null;
   average_ticket: string | null;
   daily: FinancialDailySummary[];
+};
+
+type FinancialInsight = {
+  code: string;
+  type: FinancialInsightType;
+  title: string;
+  message: string;
+};
+
+type FinancialInsightsResponse = {
+  insights: FinancialInsight[];
 };
 
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
@@ -656,6 +668,7 @@ function App() {
     Record<number, FinancialGoalProgress>
   >({});
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
+  const [financialInsights, setFinancialInsights] = useState<FinancialInsight[]>([]);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [costProfileForm, setCostProfileForm] =
     useState<VehicleCostProfileForm>(emptyCostProfileForm);
@@ -693,6 +706,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dashboardError, setDashboardError] = useState("");
+  const [financialInsightsError, setFinancialInsightsError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
@@ -700,6 +714,7 @@ function App() {
   const [isRecurringExpensesLoading, setIsRecurringExpensesLoading] = useState(false);
   const [isFinancialGoalsLoading, setIsFinancialGoalsLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isFinancialInsightsLoading, setIsFinancialInsightsLoading] = useState(false);
   const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
@@ -721,6 +736,7 @@ function App() {
     setFinancialGoals([]);
     setFinancialGoalProgressById({});
     setFinancialSummary(null);
+    setFinancialInsights([]);
     setEditingVehicleId(null);
     setCostProfileVehicleId(null);
     setEditingWorkSessionId(null);
@@ -747,6 +763,7 @@ function App() {
     setPassword("");
     setSuccessMessage("");
     setDashboardError("");
+    setFinancialInsightsError("");
     setMessage(nextMessage);
   }
 
@@ -825,7 +842,7 @@ function App() {
     return summary.recurring_expenses_breakdown.filter((item) => isPositiveMoney(item.amount));
   }
 
-  function buildFinancialSummaryPath() {
+  function buildDashboardPath(endpoint: string) {
     const params = new URLSearchParams();
     const { startDate, endDate } = getPeriodDates(
       dashboardPeriod,
@@ -846,7 +863,15 @@ function App() {
     }
 
     const query = params.toString();
-    return `/financial-summary${query ? `?${query}` : ""}`;
+    return `${endpoint}${query ? `?${query}` : ""}`;
+  }
+
+  function buildFinancialSummaryPath() {
+    return buildDashboardPath("/financial-summary");
+  }
+
+  function buildFinancialInsightsPath() {
+    return buildDashboardPath("/financial-insights");
   }
 
   async function loadVehicles(currentToken = token) {
@@ -1014,6 +1039,35 @@ function App() {
     }
   }
 
+  async function loadFinancialInsights(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsFinancialInsightsLoading(true);
+    setFinancialInsightsError("");
+    try {
+      const response = await requestApi<FinancialInsightsResponse>(buildFinancialInsightsPath(), {
+        headers: getAuthHeaders(currentToken),
+      });
+      setFinancialInsights(response.insights);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setFinancialInsights([]);
+        setFinancialInsightsError("Não foi possível carregar os insights agora.");
+      }
+    } finally {
+      setIsFinancialInsightsLoading(false);
+    }
+  }
+
+  async function refreshDashboardData(currentToken = token) {
+    await loadFinancialSummary(currentToken);
+    await loadFinancialInsights(currentToken);
+  }
+
   async function loadVehicleCostProfile(vehicleId: number, currentToken = token) {
     if (!currentToken) {
       return;
@@ -1054,6 +1108,7 @@ function App() {
       setFinancialGoals([]);
       setFinancialGoalProgressById({});
       setFinancialSummary(null);
+      setFinancialInsights([]);
       setCostProfileVehicleId(null);
       setCostProfileForm(emptyCostProfileForm);
       return;
@@ -1071,7 +1126,7 @@ function App() {
         await loadExpenses(token);
         await loadRecurringExpenses(token);
         await loadFinancialGoals(token);
-        await loadFinancialSummary(token);
+        await refreshDashboardData(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
       }
@@ -1085,7 +1140,7 @@ function App() {
       return;
     }
 
-    void loadFinancialSummary(token);
+    void refreshDashboardData(token);
   }, [dashboardPeriod, dashboardVehicleId, customStartDate, customEndDate]);
 
   function resetForm(nextMode: AuthMode) {
@@ -1320,7 +1375,7 @@ function App() {
     setQuickDailyEntryShowDate(false);
     setSuccessMessage("Dia registrado com sucesso.");
     await loadWorkSessions();
-    await loadFinancialSummary();
+    await refreshDashboardData();
     requestAnimationFrame(() =>
       document.getElementById("registro-rapido")?.scrollIntoView({ behavior: "smooth" }),
     );
@@ -1403,7 +1458,7 @@ function App() {
       setDailyExpenseForm(emptyExpenseForm);
       setSuccessMessage("Gasto de hoje adicionado com sucesso.");
       await loadExpenses();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1486,7 +1541,7 @@ function App() {
     setSuccessMessage("Seu primeiro dia foi registrado com os dados da simulação.");
     await loadWorkSessions();
     await loadExpenses();
-    await loadFinancialSummary();
+    await refreshDashboardData();
     document.getElementById("jornadas")?.scrollIntoView({ behavior: "smooth" });
   }
 
@@ -1586,7 +1641,7 @@ function App() {
       await loadVehicles();
       await loadWorkSessions();
       await loadExpenses();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1706,7 +1761,7 @@ function App() {
 
       resetWorkSessionForm();
       await loadWorkSessions();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1734,7 +1789,7 @@ function App() {
       });
       setSuccessMessage("Jornada excluida com sucesso.");
       await loadWorkSessions();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1795,7 +1850,7 @@ function App() {
 
       resetExpenseForm();
       await loadExpenses();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1823,7 +1878,7 @@ function App() {
       });
       setSuccessMessage("Despesa excluida com sucesso.");
       await loadExpenses();
-      await loadFinancialSummary();
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2095,6 +2150,7 @@ function App() {
 
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
+  const visibleFinancialInsights = financialInsights.slice(0, 5);
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -3146,6 +3202,39 @@ function App() {
                         Configure os custos do veiculo para obter uma estimativa economica mais
                         completa. <a href="#veiculos">Ir para Veiculos</a>
                       </p>
+                    ) : null}
+                  </div>
+
+                  <div className="financial-insights">
+                    <div className="list-header">
+                      <h3>Insights do seu periodo</h3>
+                    </div>
+
+                    {isFinancialInsightsLoading ? (
+                      <p className="empty-state compact-empty-state">Carregando insights...</p>
+                    ) : null}
+                    {financialInsightsError ? (
+                      <p className="form-message compact-message">{financialInsightsError}</p>
+                    ) : null}
+
+                    {!isFinancialInsightsLoading && !financialInsightsError ? (
+                      visibleFinancialInsights.length > 0 ? (
+                        <div className="financial-insights-list">
+                          {visibleFinancialInsights.map((insight) => (
+                            <article
+                              className={`financial-insight financial-insight-${insight.type}`}
+                              key={insight.code}
+                            >
+                              <strong>{insight.title}</strong>
+                              <p>{insight.message}</p>
+                            </article>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="empty-state compact-empty-state">
+                          Ainda não há dados suficientes para gerar insights deste período.
+                        </p>
+                      )
                     ) : null}
                   </div>
 
