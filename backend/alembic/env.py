@@ -5,7 +5,14 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from app.config import get_settings
 from app.database import Base
-from app.models import Expense, RecurringExpense, User, Vehicle, WorkSession  # noqa: F401
+from app.models import (  # noqa: F401
+    Expense,
+    FinancialGoal,
+    RecurringExpense,
+    User,
+    Vehicle,
+    WorkSession,
+)
 
 config = context.config
 

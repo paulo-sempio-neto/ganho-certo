@@ -15,6 +15,7 @@ from pydantic import (
 FuelType = Literal["gasoline", "ethanol", "flex", "diesel", "electric", "hybrid", "other"]
 OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
+FinancialGoalType = Literal["net", "projected"]
 ExpenseCategory = Literal[
     "fuel",
     "charging",
@@ -279,6 +280,77 @@ class RecurringExpensePublic(RecurringExpenseBase):
 
     @field_serializer("amount")
     def serialize_amount(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class FinancialGoalBase(BaseModel):
+    vehicle_id: int | None = Field(default=None, gt=0)
+    goal_type: FinancialGoalType
+    target_amount: Decimal = Field(gt=Decimal("0"))
+    start_date: date
+    end_date: date
+    active: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "FinancialGoalBase":
+        if self.end_date < self.start_date:
+            raise ValueError("end_date cannot be earlier than start_date.")
+
+        return self
+
+
+class FinancialGoalCreate(FinancialGoalBase):
+    pass
+
+
+class FinancialGoalUpdate(FinancialGoalBase):
+    pass
+
+
+class FinancialGoalPublic(FinancialGoalBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("target_amount")
+    def serialize_target_amount(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class FinancialGoalProgress(BaseModel):
+    target_amount: Decimal
+    current_amount: Decimal
+    remaining_amount: Decimal
+    progress_percentage: Decimal
+    days_total: int
+    days_elapsed: int
+    days_remaining: int
+    required_daily_amount: Decimal
+    projected_completion_amount: Decimal
+    on_track: bool
+    average_net_per_hour: Decimal | None = None
+    average_projected_per_hour: Decimal | None = None
+    estimated_hours_remaining: Decimal | None = None
+
+    @field_serializer(
+        "target_amount",
+        "current_amount",
+        "remaining_amount",
+        "progress_percentage",
+        "required_daily_amount",
+        "projected_completion_amount",
+        "average_net_per_hour",
+        "average_projected_per_hour",
+        "estimated_hours_remaining",
+    )
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
         return f"{value:.2f}"
 
 

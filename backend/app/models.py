@@ -25,6 +25,7 @@ class User(Base):
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
     expenses: Mapped[list[Expense]] = relationship(back_populates="user")
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="user")
+    financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="user")
 
 
 class Vehicle(Base):
@@ -46,6 +47,7 @@ class Vehicle(Base):
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="vehicle")
     expenses: Mapped[list[Expense]] = relationship(back_populates="vehicle")
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="vehicle")
+    financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="vehicle")
     cost_profile: Mapped[VehicleCostProfile | None] = relationship(
         back_populates="vehicle",
         uselist=False,
@@ -178,6 +180,40 @@ class Expense(Base):
     @property
     def amount(self) -> Decimal:
         return Decimal(self.amount_cents) / Decimal("100")
+
+
+class FinancialGoal(Base):
+    __tablename__ = "financial_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    vehicle_id: Mapped[int | None] = mapped_column(
+        ForeignKey("vehicles.id"),
+        nullable=True,
+        index=True,
+    )
+    goal_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_amount_cents: Mapped[int] = mapped_column(Integer(), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    end_date: Mapped[date] = mapped_column(Date(), nullable=False, index=True)
+    active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="financial_goals")
+    vehicle: Mapped[Vehicle | None] = relationship(back_populates="financial_goals")
+
+    @property
+    def target_amount(self) -> Decimal:
+        return Decimal(self.target_amount_cents) / Decimal("100")
 
 
 class RecurringExpense(Base):
