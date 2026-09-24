@@ -78,7 +78,58 @@ cd backend
 alembic upgrade head
 ```
 
-Ainda nao ha modelos de dominio nem migracoes de negocio nesta fase.
+## Production deployment
+
+Arquitetura planejada:
+
+- Frontend React/Vite na Vercel
+- Backend FastAPI no Render
+- Banco PostgreSQL gerenciado
+
+### Backend no Render
+
+Configure o servico apontando para a pasta `backend`.
+
+Build command:
+
+```bash
+python -m pip install -e .
+```
+
+Release command:
+
+```bash
+python -m alembic upgrade head
+```
+
+Start command:
+
+```bash
+python -m app.server
+```
+
+Variaveis obrigatorias no Render:
+
+```text
+APP_ENV=production
+DATABASE_URL=<URL do PostgreSQL gerenciado>
+JWT_SECRET=<segredo forte gerado para producao>
+CORS_ALLOWED_ORIGINS=<URL publica do frontend na Vercel>
+```
+
+O `PORT` e fornecido pelo Render automaticamente. Nao versionar segredos reais.
+
+### Frontend na Vercel
+
+Configure o projeto apontando para a pasta `frontend`.
+
+Variavel obrigatoria na Vercel:
+
+```text
+VITE_API_BASE_URL=<URL publica do backend no Render>
+```
+
+Nao exponha `DATABASE_URL` ou `JWT_SECRET` no frontend.
 
 ## Fora do escopo desta fase
 
