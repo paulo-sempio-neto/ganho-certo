@@ -9,6 +9,13 @@ type AuthMode = "login" | "register";
 type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
 type OwnershipType = "owned" | "financed" | "rented";
 type DashboardPeriod = "today" | "last7" | "month" | "custom";
+type HistoryPeriodPreset = "last7" | "last30" | "last90" | "month" | "custom";
+type FinancialHistoryGrouping = "daily" | "weekly" | "monthly";
+type FinancialHistoryTrendDirection = "increased" | "decreased" | "unchanged";
+type HistoryChartMetric =
+  | "estimated_result"
+  | "estimated_result_per_hour"
+  | "estimated_result_per_km";
 type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
 type FinancialGoalType = "net" | "projected";
 type FinancialInsightType = "info" | "positive" | "attention";
@@ -437,6 +444,66 @@ type FinancialInsightsResponse = {
   insights: FinancialInsight[];
 };
 
+type FinancialHistoryPeriod = {
+  period_start: string;
+  period_end: string;
+  gross_revenue: string;
+  registered_expenses: string;
+  estimated_structural_costs: string;
+  recurring_projected_expenses: string;
+  cash_remaining: string;
+  estimated_result: string;
+  projected_result: string;
+  worked_minutes: number;
+  distance_km: string;
+  trip_count: number;
+  revenue_per_hour: string | null;
+  estimated_result_per_hour: string | null;
+  revenue_per_km: string | null;
+  estimated_result_per_km: string | null;
+};
+
+type FinancialHistoryMetricComparison = {
+  current: string | null;
+  previous: string | null;
+  absolute_delta: string | null;
+  percentage_delta: string | null;
+};
+
+type FinancialHistoryComparison = {
+  current_period_start: string;
+  current_period_end: string;
+  previous_period_start: string;
+  previous_period_end: string;
+  gross_revenue: FinancialHistoryMetricComparison;
+  registered_expenses: FinancialHistoryMetricComparison;
+  estimated_result: FinancialHistoryMetricComparison;
+  projected_result: FinancialHistoryMetricComparison;
+  worked_minutes: FinancialHistoryMetricComparison;
+  distance_km: FinancialHistoryMetricComparison;
+  estimated_result_per_hour: FinancialHistoryMetricComparison;
+  estimated_result_per_km: FinancialHistoryMetricComparison;
+};
+
+type FinancialHistoryTrendFact = {
+  metric: string;
+  direction: FinancialHistoryTrendDirection;
+  current: string;
+  previous: string;
+  absolute_delta: string;
+  percentage_delta: string | null;
+};
+
+type FinancialHistoryResponse = {
+  start_date: string;
+  end_date: string;
+  vehicle_id: number | null;
+  grouping: FinancialHistoryGrouping;
+  periods: FinancialHistoryPeriod[];
+  comparison: FinancialHistoryComparison;
+  trend_facts: FinancialHistoryTrendFact[];
+};
+
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
   { label: "Gasolina", value: "gasoline" },
   { label: "Etanol", value: "ethanol" },
@@ -486,6 +553,26 @@ const recurringFrequencyOptions: Array<{ label: string; value: RecurringExpenseF
 const financialGoalTypeOptions: Array<{ label: string; value: FinancialGoalType }> = [
   { label: "Meta de sobra apos despesas", value: "net" },
   { label: "Meta de resultado projetado", value: "projected" },
+];
+
+const historyPeriodOptions: Array<{ label: string; value: HistoryPeriodPreset }> = [
+  { label: "7 dias", value: "last7" },
+  { label: "30 dias", value: "last30" },
+  { label: "90 dias", value: "last90" },
+  { label: "Este mês", value: "month" },
+  { label: "Personalizado", value: "custom" },
+];
+
+const historyGroupingOptions: Array<{ label: string; value: FinancialHistoryGrouping }> = [
+  { label: "Dia", value: "daily" },
+  { label: "Semana", value: "weekly" },
+  { label: "Mês", value: "monthly" },
+];
+
+const historyChartMetricOptions: Array<{ label: string; value: HistoryChartMetric }> = [
+  { label: "Resultado estimado", value: "estimated_result" },
+  { label: "R$/hora", value: "estimated_result_per_hour" },
+  { label: "R$/km", value: "estimated_result_per_km" },
 ];
 
 const maintenanceCategoryOptions: Array<{ label: string; value: MaintenanceCategory }> = [
@@ -643,6 +730,24 @@ function toDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function addDays(date: Date, days: number): Date {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function parseDateInput(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getInclusiveDateCount(startDate: string, endDate: string): number {
+  const start = parseDateInput(startDate);
+  const end = parseDateInput(endDate);
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  return Math.max(1, Math.round((end.getTime() - start.getTime()) / millisecondsPerDay) + 1);
+}
+
 function getPeriodDates(period: DashboardPeriod, customStartDate: string, customEndDate: string) {
   const today = new Date();
 
@@ -663,6 +768,48 @@ function getPeriodDates(period: DashboardPeriod, customStartDate: string, custom
   }
 
   return { startDate: customStartDate, endDate: customEndDate };
+}
+
+function getHistoryPeriodDates(
+  period: HistoryPeriodPreset,
+  customStartDate: string,
+  customEndDate: string,
+) {
+  const today = new Date();
+
+  if (period === "last7") {
+    return { startDate: toDateInputValue(addDays(today, -6)), endDate: toDateInputValue(today) };
+  }
+
+  if (period === "last30") {
+    return { startDate: toDateInputValue(addDays(today, -29)), endDate: toDateInputValue(today) };
+  }
+
+  if (period === "last90") {
+    return { startDate: toDateInputValue(addDays(today, -89)), endDate: toDateInputValue(today) };
+  }
+
+  if (period === "month") {
+    return {
+      startDate: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)),
+      endDate: toDateInputValue(today),
+    };
+  }
+
+  return { startDate: customStartDate, endDate: customEndDate };
+}
+
+function getDefaultHistoryGrouping(startDate: string, endDate: string): FinancialHistoryGrouping {
+  const days = getInclusiveDateCount(startDate, endDate);
+  if (days <= 14) {
+    return "daily";
+  }
+
+  if (days <= 60) {
+    return "weekly";
+  }
+
+  return "monthly";
 }
 
 function getFuelLabel(value: FuelType): string {
@@ -991,6 +1138,7 @@ async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T
 }
 
 function App() {
+  const initialHistoryRange = getHistoryPeriodDates("last30", "", "");
   const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -1015,6 +1163,7 @@ function App() {
   >({});
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [financialInsights, setFinancialInsights] = useState<FinancialInsight[]>([]);
+  const [financialHistory, setFinancialHistory] = useState<FinancialHistoryResponse | null>(null);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
   const [costProfileForm, setCostProfileForm] =
     useState<VehicleCostProfileForm>(emptyCostProfileForm);
@@ -1086,10 +1235,20 @@ function App() {
   const [dashboardVehicleId, setDashboardVehicleId] = useState("");
   const [customStartDate, setCustomStartDate] = useState(toDateInputValue(new Date()));
   const [customEndDate, setCustomEndDate] = useState(toDateInputValue(new Date()));
+  const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriodPreset>("last30");
+  const [historyStartDate, setHistoryStartDate] = useState(initialHistoryRange.startDate);
+  const [historyEndDate, setHistoryEndDate] = useState(initialHistoryRange.endDate);
+  const [historyGrouping, setHistoryGrouping] = useState<FinancialHistoryGrouping>(
+    getDefaultHistoryGrouping(initialHistoryRange.startDate, initialHistoryRange.endDate),
+  );
+  const [historyVehicleId, setHistoryVehicleId] = useState("");
+  const [historyChartMetric, setHistoryChartMetric] =
+    useState<HistoryChartMetric>("estimated_result");
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dashboardError, setDashboardError] = useState("");
   const [financialInsightsError, setFinancialInsightsError] = useState("");
+  const [financialHistoryError, setFinancialHistoryError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
@@ -1099,6 +1258,7 @@ function App() {
   const [isMaintenanceLoading, setIsMaintenanceLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isFinancialInsightsLoading, setIsFinancialInsightsLoading] = useState(false);
+  const [isFinancialHistoryLoading, setIsFinancialHistoryLoading] = useState(false);
   const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
   const [isVehicleSaving, setIsVehicleSaving] = useState(false);
   const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
@@ -1134,6 +1294,7 @@ function App() {
     setMaintenanceRecordsByPlanId({});
     setFinancialSummary(null);
     setFinancialInsights([]);
+    setFinancialHistory(null);
     setEditingVehicleId(null);
     setCostProfileVehicleId(null);
     setEditingWorkSessionId(null);
@@ -1189,6 +1350,8 @@ function App() {
     setSuccessMessage("");
     setDashboardError("");
     setFinancialInsightsError("");
+    setFinancialHistoryError("");
+    setHistoryVehicleId("");
     setMessage(nextMessage);
   }
 
@@ -1299,6 +1462,179 @@ function App() {
     return buildDashboardPath("/financial-insights");
   }
 
+  function buildFinancialHistoryPath() {
+    const params = new URLSearchParams();
+    params.set("start_date", historyStartDate);
+    params.set("end_date", historyEndDate);
+    params.set("grouping", historyGrouping);
+
+    if (historyVehicleId) {
+      params.set("vehicle_id", historyVehicleId);
+    }
+
+    return `/financial-history?${params.toString()}`;
+  }
+
+  function handleHistoryPeriodChange(nextPeriod: HistoryPeriodPreset) {
+    const { startDate, endDate } = getHistoryPeriodDates(
+      nextPeriod,
+      historyStartDate,
+      historyEndDate,
+    );
+    setHistoryPeriod(nextPeriod);
+    setHistoryStartDate(startDate);
+    setHistoryEndDate(endDate);
+    setHistoryGrouping(getDefaultHistoryGrouping(startDate, endDate));
+  }
+
+  function handleHistoryDateChange(field: "start" | "end", value: string) {
+    const nextStartDate = field === "start" ? value : historyStartDate;
+    const nextEndDate = field === "end" ? value : historyEndDate;
+    setHistoryPeriod("custom");
+    setHistoryStartDate(nextStartDate);
+    setHistoryEndDate(nextEndDate);
+    setHistoryGrouping(getDefaultHistoryGrouping(nextStartDate, nextEndDate));
+  }
+
+  function getHistoryMetricLabel(metric: string): string {
+    const labels: Record<string, string> = {
+      gross_revenue: "Faturamento",
+      registered_expenses: "Gastos",
+      estimated_result: "Resultado estimado",
+      projected_result: "Resultado projetado",
+      worked_minutes: "Tempo trabalhado",
+      distance_km: "Km rodados",
+      estimated_result_per_hour: "Resultado por hora",
+      estimated_result_per_km: "Resultado por km",
+    };
+
+    return labels[metric] ?? metric;
+  }
+
+  function formatHistoryMoneyPerHour(value: string): string {
+    return `${formatMoney(value)}/h`;
+  }
+
+  function formatHistoryMetricValue(metric: string, value: string | null): string {
+    if (value === null) {
+      return "—";
+    }
+
+    if (metric === "worked_minutes") {
+      return formatWorkTime(Math.round(Number(value)));
+    }
+
+    if (metric === "distance_km") {
+      return `${formatDistance(value)} km`;
+    }
+
+    if (metric.endsWith("_per_km")) {
+      return formatMoneyPerKm(value);
+    }
+
+    if (metric.endsWith("_per_hour")) {
+      return formatHistoryMoneyPerHour(value);
+    }
+
+    return formatMoney(value);
+  }
+
+  function getHistoryChartMetricLabel(metric: HistoryChartMetric): string {
+    return historyChartMetricOptions.find((option) => option.value === metric)?.label ?? metric;
+  }
+
+  function getHistoryChartValue(period: FinancialHistoryPeriod): number {
+    const rawValue = period[historyChartMetric];
+    if (rawValue === null) {
+      return 0;
+    }
+
+    const parsedValue = Number(rawValue);
+    return Number.isFinite(parsedValue) ? parsedValue : 0;
+  }
+
+  function formatHistoryChartValue(value: string | null): string {
+    if (historyChartMetric === "estimated_result_per_hour") {
+      return getMetricValue(value, formatHistoryMoneyPerHour);
+    }
+
+    if (historyChartMetric === "estimated_result_per_km") {
+      return getMetricValue(value, formatMoneyPerKm);
+    }
+
+    return getMetricValue(value, formatMoney);
+  }
+
+  function hasHistoryData(history: FinancialHistoryResponse): boolean {
+    return history.periods.some(
+      (period) =>
+        Number(period.gross_revenue) !== 0 ||
+        Number(period.registered_expenses) !== 0 ||
+        Number(period.estimated_structural_costs) !== 0 ||
+        Number(period.recurring_projected_expenses) !== 0 ||
+        period.worked_minutes > 0 ||
+        Number(period.distance_km) > 0 ||
+        period.trip_count > 0,
+    );
+  }
+
+  function hasPreviousComparisonData(history: FinancialHistoryResponse): boolean {
+    return [
+      history.comparison.gross_revenue.previous,
+      history.comparison.registered_expenses.previous,
+      history.comparison.estimated_result.previous,
+      history.comparison.projected_result.previous,
+      history.comparison.worked_minutes.previous,
+      history.comparison.distance_km.previous,
+    ].some((value) => value !== null && Number(value) !== 0);
+  }
+
+  function getComparisonDirectionLabel(comparison: FinancialHistoryMetricComparison): string {
+    if (comparison.absolute_delta === null || Number(comparison.absolute_delta) === 0) {
+      return "sem mudança";
+    }
+
+    return Number(comparison.absolute_delta) > 0 ? "aumentou" : "diminuiu";
+  }
+
+  function getComparisonSummary(metric: string, comparison: FinancialHistoryMetricComparison) {
+    if (comparison.current === null || comparison.previous === null) {
+      return "Comparação indisponível para esta métrica.";
+    }
+
+    const direction = getComparisonDirectionLabel(comparison);
+    const percent =
+      comparison.percentage_delta === null ? "" : ` ${formatPercent(comparison.percentage_delta)}`;
+    return `${getHistoryMetricLabel(metric)} ${direction}${percent}.`;
+  }
+
+  function getHistoryTrendMessage(fact: FinancialHistoryTrendFact): string {
+    const direction = fact.direction === "increased" ? "aumentou" : "diminuiu";
+    const metric = getHistoryMetricLabel(fact.metric).toLowerCase();
+
+    if (fact.direction === "unchanged") {
+      return `${getHistoryMetricLabel(fact.metric)} ficou estável.`;
+    }
+
+    if (fact.metric === "registered_expenses") {
+      return `Seus gastos ${fact.direction === "increased" ? "ficaram maiores" : "ficaram menores"} que no período anterior.`;
+    }
+
+    if (fact.metric === "worked_minutes") {
+      return `Você trabalhou ${fact.direction === "increased" ? "mais" : "menos"} horas neste período.`;
+    }
+
+    return `Seu ${metric} ${direction}.`;
+  }
+
+  function getHistoryPeriodLabel(period: FinancialHistoryPeriod): string {
+    if (period.period_start === period.period_end) {
+      return formatDate(period.period_start);
+    }
+
+    return `${formatDate(period.period_start)}–${formatDate(period.period_end)}`;
+  }
+
   async function loadVehicles(currentToken = token) {
     if (!currentToken) {
       return;
@@ -1344,6 +1680,17 @@ function App() {
         return "";
       });
       setExpenseImportVehicleId((currentVehicleId) => {
+        if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
+          return currentVehicleId;
+        }
+
+        return "";
+      });
+      setHistoryVehicleId((currentVehicleId) => {
+        if (nextVehicles.length === 1) {
+          return String(nextVehicles[0].id);
+        }
+
         if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
           return currentVehicleId;
         }
@@ -1584,9 +1931,34 @@ function App() {
     }
   }
 
+  async function loadFinancialHistory(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsFinancialHistoryLoading(true);
+    setFinancialHistoryError("");
+    try {
+      const history = await requestApi<FinancialHistoryResponse>(buildFinancialHistoryPath(), {
+        headers: getAuthHeaders(currentToken),
+      });
+      setFinancialHistory(history);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setFinancialHistory(null);
+        setFinancialHistoryError("Não foi possível carregar sua evolução agora.");
+      }
+    } finally {
+      setIsFinancialHistoryLoading(false);
+    }
+  }
+
   async function refreshDashboardData(currentToken = token) {
     await loadFinancialSummary(currentToken);
     await loadFinancialInsights(currentToken);
+    await loadFinancialHistory(currentToken);
   }
 
   async function loadVehicleCostProfile(vehicleId: number, currentToken = token) {
@@ -1634,6 +2006,8 @@ function App() {
       setMaintenanceRecordsByPlanId({});
       setFinancialSummary(null);
       setFinancialInsights([]);
+      setFinancialHistory(null);
+      setFinancialHistoryError("");
       setCostProfileVehicleId(null);
       setCostProfileForm(emptyCostProfileForm);
       setWorkSessionImportVehicleId("");
@@ -1697,6 +2071,14 @@ function App() {
 
     void refreshDashboardData(token);
   }, [dashboardPeriod, dashboardVehicleId, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    if (!token || !user) {
+      return;
+    }
+
+    void loadFinancialHistory(token);
+  }, [historyPeriod, historyStartDate, historyEndDate, historyGrouping, historyVehicleId]);
 
   function resetForm(nextMode: AuthMode) {
     setMode(nextMode);
@@ -3578,6 +3960,51 @@ function App() {
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
   const visibleFinancialInsights = financialInsights.slice(0, 5);
+  const historyComparisonItems: Array<{
+    metric: string;
+    comparison: FinancialHistoryMetricComparison;
+  }> = financialHistory
+    ? [
+        { metric: "estimated_result", comparison: financialHistory.comparison.estimated_result },
+        {
+          metric: "estimated_result_per_hour",
+          comparison: financialHistory.comparison.estimated_result_per_hour,
+        },
+        {
+          metric: "estimated_result_per_km",
+          comparison: financialHistory.comparison.estimated_result_per_km,
+        },
+        {
+          metric: "registered_expenses",
+          comparison: financialHistory.comparison.registered_expenses,
+        },
+      ]
+    : [];
+  const historyChartPeriods = financialHistory?.periods ?? [];
+  const historyChartValues = historyChartPeriods.map(getHistoryChartValue);
+  const historyChartMin = Math.min(0, ...historyChartValues);
+  const historyChartMax = Math.max(0, ...historyChartValues);
+  const historyChartRange =
+    historyChartMax === historyChartMin ? 1 : historyChartMax - historyChartMin;
+  const historyChartWidth = 320;
+  const historyChartHeight = 150;
+  const historyChartTop = 16;
+  const historyChartBottom = 118;
+  const historyChartInnerHeight = historyChartBottom - historyChartTop;
+  const historyChartXStep =
+    historyChartPeriods.length <= 1 ? 0 : 260 / (historyChartPeriods.length - 1);
+  const historyChartPoints = historyChartValues
+    .map((value, index) => {
+      const x = 30 + index * historyChartXStep;
+      const y =
+        historyChartTop +
+        ((historyChartMax - value) / historyChartRange) * historyChartInnerHeight;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const historyChartZeroY =
+    historyChartTop +
+    ((historyChartMax - 0) / historyChartRange) * historyChartInnerHeight;
   const quickDailyExpenseTotalCents = quickDailyEntryResult
     ? getQuickDailyExpenseTotalCents(quickDailyEntryResult)
     : 0n;
@@ -4690,6 +5117,7 @@ function App() {
                 <a href="#resultado">Visão geral</a>
                 <a href="#metas">Metas</a>
                 <a href="#insights">Insights</a>
+                <a href="#evolucao">EvoluÃ§Ã£o</a>
               </div>
 
               <div className="dashboard-filters">
@@ -4896,6 +5324,294 @@ function App() {
                         <p className="empty-state compact-empty-state">
                           Ainda não há dados suficientes para gerar insights deste período.
                         </p>
+                      )
+                    ) : null}
+                  </div>
+
+                  <div className="financial-history" id="evolucao">
+                    <div className="section-title">
+                      <p className="eyebrow">EvoluÃ§Ã£o</p>
+                      <h3>Como seu resultado esta mudando?</h3>
+                      <p className="subtle-note">
+                        Veja como seus ganhos e sua eficiÃªncia estÃ£o mudando com o tempo.
+                      </p>
+                    </div>
+
+                    <div className="dashboard-filters history-filters">
+                      <label>
+                        PerÃ­odo
+                        <select
+                          onChange={(event) =>
+                            handleHistoryPeriodChange(event.target.value as HistoryPeriodPreset)
+                          }
+                          value={historyPeriod}
+                        >
+                          {historyPeriodOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      {historyPeriod === "custom" ? (
+                        <>
+                          <label>
+                            InÃ­cio
+                            <input
+                              onChange={(event) => handleHistoryDateChange("start", event.target.value)}
+                              type="date"
+                              value={historyStartDate}
+                            />
+                          </label>
+                          <label>
+                            Fim
+                            <input
+                              onChange={(event) => handleHistoryDateChange("end", event.target.value)}
+                              type="date"
+                              value={historyEndDate}
+                            />
+                          </label>
+                        </>
+                      ) : null}
+
+                      {vehicles.length > 1 ? (
+                        <label>
+                          VeÃ­culo
+                          <select
+                            onChange={(event) => setHistoryVehicleId(event.target.value)}
+                            value={historyVehicleId}
+                          >
+                            <option value="">Todos os veÃ­culos</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : (
+                        <p className="history-single-vehicle">
+                          {vehicles[0] ? getVehicleLabel(vehicles[0].id) : "Todos os veÃ­culos"}
+                        </p>
+                      )}
+
+                      <label>
+                        Agrupar por
+                        <select
+                          onChange={(event) =>
+                            setHistoryGrouping(event.target.value as FinancialHistoryGrouping)
+                          }
+                          value={historyGrouping}
+                        >
+                          {historyGroupingOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    {isFinancialHistoryLoading ? (
+                      <p className="empty-state compact-empty-state">Carregando evoluÃ§Ã£o...</p>
+                    ) : null}
+
+                    {financialHistoryError ? (
+                      <div className="history-error">
+                        <p className="form-message compact-message">{financialHistoryError}</p>
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => void loadFinancialHistory()}
+                        >
+                          Tentar novamente
+                        </button>
+                      </div>
+                    ) : null}
+
+                    {!isFinancialHistoryLoading && !financialHistoryError && financialHistory ? (
+                      hasHistoryData(financialHistory) ? (
+                        <>
+                          <div className="history-comparison">
+                            <div className="list-header">
+                              <div>
+                                <h3>Como vocÃª estÃ¡ em relaÃ§Ã£o ao perÃ­odo anterior?</h3>
+                                {!hasPreviousComparisonData(financialHistory) ? (
+                                  <p className="subtle-note">
+                                    Continue registrando seus dias para comparar sua evoluÃ§Ã£o com
+                                    perÃ­odos anteriores.
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+
+                            <div className="metric-grid history-comparison-grid">
+                              {historyComparisonItems.map(({ metric, comparison }) => (
+                                <article className="metric-card history-comparison-card" key={metric}>
+                                  <span>{getHistoryMetricLabel(metric as string)}</span>
+                                  <strong>
+                                    {formatHistoryMetricValue(
+                                      metric as string,
+                                      comparison.current,
+                                    )}
+                                  </strong>
+                                  <small>
+                                    Anterior:{" "}
+                                    {formatHistoryMetricValue(
+                                      metric as string,
+                                      comparison.previous,
+                                    )}
+                                  </small>
+                                  <small>
+                                    {getComparisonSummary(metric as string, comparison)}
+                                  </small>
+                                </article>
+                              ))}
+                            </div>
+                          </div>
+
+                          {financialHistory.trend_facts.length > 0 ? (
+                            <div className="history-facts">
+                              {financialHistory.trend_facts.map((fact) => (
+                                <article className="financial-insight financial-insight-info" key={fact.metric}>
+                                  <strong>{getHistoryMetricLabel(fact.metric)}</strong>
+                                  <p>{getHistoryTrendMessage(fact)}</p>
+                                </article>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          <div className="history-chart-panel">
+                            <div className="list-header">
+                              <div>
+                                <h3>{getHistoryChartMetricLabel(historyChartMetric)}</h3>
+                                <p className="subtle-note">
+                                  Uma visÃ£o simples da evoluÃ§Ã£o no perÃ­odo selecionado.
+                                </p>
+                                <p className="subtle-note">
+                                  Faixa: {formatHistoryChartValue(historyChartMin.toFixed(2))} a{" "}
+                                  {formatHistoryChartValue(historyChartMax.toFixed(2))}
+                                </p>
+                              </div>
+                              <label>
+                                MÃ©trica
+                                <select
+                                  onChange={(event) =>
+                                    setHistoryChartMetric(event.target.value as HistoryChartMetric)
+                                  }
+                                  value={historyChartMetric}
+                                >
+                                  {historyChartMetricOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            </div>
+
+                            <div className="history-chart" aria-label="GrÃ¡fico de evoluÃ§Ã£o">
+                              <svg
+                                role="img"
+                                viewBox={`0 0 ${historyChartWidth} ${historyChartHeight}`}
+                                preserveAspectRatio="none"
+                              >
+                                <line
+                                  className="history-chart-zero"
+                                  x1="24"
+                                  x2="304"
+                                  y1={historyChartZeroY}
+                                  y2={historyChartZeroY}
+                                />
+                                {historyChartPoints ? (
+                                  <polyline className="history-chart-line" points={historyChartPoints} />
+                                ) : null}
+                                {historyChartValues.map((value, index) => {
+                                  const x = 30 + index * historyChartXStep;
+                                  const y =
+                                    historyChartTop +
+                                    ((historyChartMax - value) / historyChartRange) *
+                                      historyChartInnerHeight;
+                                  return (
+                                    <circle
+                                      className="history-chart-point"
+                                      cx={x}
+                                      cy={y}
+                                      key={`${historyChartPeriods[index]?.period_start}-${index}`}
+                                      r="3.5"
+                                    />
+                                  );
+                                })}
+                              </svg>
+                              <div className="history-chart-labels">
+                                {historyChartPeriods.map((period) => (
+                                  <span key={`${period.period_start}-${period.period_end}`}>
+                                    {getHistoryPeriodLabel(period)}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <details className="calculation-details history-details">
+                            <summary>Ver detalhes por perÃ­odo</summary>
+                            <div className="history-period-list">
+                              {financialHistory.periods.map((period) => (
+                                <article
+                                  className="dashboard-layer history-period-card"
+                                  key={`${period.period_start}-${period.period_end}`}
+                                >
+                                  <h4>{getHistoryPeriodLabel(period)}</h4>
+                                  <dl>
+                                    <div>
+                                      <dt>Faturamento</dt>
+                                      <dd>{formatMoney(period.gross_revenue)}</dd>
+                                    </div>
+                                    <div>
+                                      <dt>Gastos</dt>
+                                      <dd>{formatMoney(period.registered_expenses)}</dd>
+                                    </div>
+                                    <div>
+                                      <dt>Resultado estimado</dt>
+                                      <dd>{formatMoney(period.estimated_result)}</dd>
+                                    </div>
+                                    <div>
+                                      <dt>Horas trabalhadas</dt>
+                                      <dd>{formatWorkTime(period.worked_minutes)}</dd>
+                                    </div>
+                                    <div>
+                                      <dt>Km rodados</dt>
+                                      <dd>{formatDistance(period.distance_km)} km</dd>
+                                    </div>
+                                    <div>
+                                      <dt>R$/hora</dt>
+                                      <dd>
+                                        {getMetricValue(
+                                          period.estimated_result_per_hour,
+                                          formatHistoryMoneyPerHour,
+                                        )}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt>R$/km</dt>
+                                      <dd>
+                                        {getMetricValue(period.estimated_result_per_km, formatMoneyPerKm)}
+                                      </dd>
+                                    </div>
+                                  </dl>
+                                </article>
+                              ))}
+                            </div>
+                          </details>
+                        </>
+                      ) : (
+                        <div className="empty-state history-empty-state">
+                          <p>VocÃª ainda nÃ£o tem dados suficientes para acompanhar sua evoluÃ§Ã£o.</p>
+                          <a className="button button-primary" href="#quick-start">
+                            Registrar meu dia
+                          </a>
+                        </div>
                       )
                     ) : null}
                   </div>

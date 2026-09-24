@@ -735,6 +735,139 @@ select:focus {
   gap: 10px;
 }
 
+.financial-history {
+  display: grid;
+  gap: 16px;
+  border-top: 1px solid #e4e8e1;
+  padding-top: 18px;
+}
+
+.history-filters {
+  align-items: end;
+}
+
+.history-single-vehicle {
+  align-self: end;
+  margin: 0;
+  border: 1px solid #e4e8e1;
+  border-radius: 10px;
+  background: #fbfcfa;
+  color: #58625a;
+  font-weight: 800;
+  padding: 12px 14px;
+}
+
+.history-error {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.history-comparison {
+  display: grid;
+  gap: 12px;
+}
+
+.history-comparison-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.history-comparison-card strong {
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+}
+
+.history-facts {
+  display: grid;
+  gap: 10px;
+}
+
+.history-chart-panel {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d9ded5;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.history-chart-panel .list-header {
+  align-items: end;
+}
+
+.history-chart-panel label {
+  min-width: min(220px, 100%);
+}
+
+.history-chart {
+  display: grid;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.history-chart svg {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid #e4e8e1;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fbfcfa, #ffffff);
+}
+
+.history-chart-zero {
+  stroke: #cbd3ca;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.5;
+}
+
+.history-chart-line {
+  fill: none;
+  stroke: #26734d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.history-chart-point {
+  fill: #26734d;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+
+.history-chart-labels {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  color: #677069;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.history-chart-labels span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.history-period-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-period-card h4 {
+  margin: 0;
+  color: #111812;
+}
+
+.history-empty-state {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.history-empty-state p {
+  margin: 0;
+}
+
 .financial-insight {
   display: grid;
   gap: 6px;
@@ -1398,6 +1531,7 @@ select:focus {
   .recurring-metrics,
   .goal-metrics,
   .goal-summary-metrics,
+  .history-comparison-grid,
   .daily-time-grid,
   .daily-entry-metrics,
   .daily-entry-actions,
