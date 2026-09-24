@@ -12,6 +12,18 @@ type DashboardPeriod = "today" | "last7" | "month" | "custom";
 type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
 type FinancialGoalType = "net" | "projected";
 type FinancialInsightType = "info" | "positive" | "attention";
+type MaintenanceCategory =
+  | "oil"
+  | "tires"
+  | "brakes"
+  | "filters"
+  | "alignment"
+  | "battery"
+  | "inspection"
+  | "transmission"
+  | "cooling"
+  | "other";
+type MaintenanceStatusType = "ok" | "due_soon" | "due";
 type WorkSessionImportField =
   | "date"
   | "gross_revenue"
@@ -203,6 +215,37 @@ type FinancialGoalProgress = {
   estimated_hours_remaining: string | null;
 };
 
+type MaintenancePlan = {
+  id: number;
+  vehicle_id: number;
+  name: string;
+  category: MaintenanceCategory;
+  interval_km: string | null;
+  interval_days: number | null;
+  estimated_cost: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type MaintenanceRecord = {
+  id: number;
+  maintenance_plan_id: number;
+  service_date: string;
+  notes: string | null;
+  created_at: string;
+};
+
+type MaintenancePlanStatus = {
+  status: MaintenanceStatusType;
+  km_since_last_service: string | null;
+  km_remaining: string | null;
+  days_since_last_service: number | null;
+  days_remaining: number | null;
+  estimated_cost: string | null;
+  recommended_reserve_per_km: string | null;
+};
+
 type VehicleForm = {
   name: string;
   brand: string;
@@ -278,6 +321,21 @@ type FinancialGoalForm = {
   start_date: string;
   end_date: string;
   vehicle_id: string;
+};
+
+type MaintenancePlanForm = {
+  name: string;
+  category: MaintenanceCategory;
+  interval_km: string;
+  interval_days: string;
+  estimated_cost: string;
+  vehicle_id: string;
+  active: boolean;
+};
+
+type MaintenanceRecordForm = {
+  service_date: string;
+  notes: string;
 };
 
 type QuickStartForm = {
@@ -430,6 +488,19 @@ const financialGoalTypeOptions: Array<{ label: string; value: FinancialGoalType 
   { label: "Meta de resultado projetado", value: "projected" },
 ];
 
+const maintenanceCategoryOptions: Array<{ label: string; value: MaintenanceCategory }> = [
+  { label: "Oleo", value: "oil" },
+  { label: "Pneus", value: "tires" },
+  { label: "Freios", value: "brakes" },
+  { label: "Filtros", value: "filters" },
+  { label: "Alinhamento", value: "alignment" },
+  { label: "Bateria", value: "battery" },
+  { label: "Revisao", value: "inspection" },
+  { label: "Transmissao", value: "transmission" },
+  { label: "Arrefecimento", value: "cooling" },
+  { label: "Outros", value: "other" },
+];
+
 const emptyVehicleForm: VehicleForm = {
   name: "",
   brand: "",
@@ -527,6 +598,21 @@ const emptyFinancialGoalForm: FinancialGoalForm = {
   vehicle_id: "",
 };
 
+const emptyMaintenancePlanForm: MaintenancePlanForm = {
+  name: "",
+  category: "oil",
+  interval_km: "",
+  interval_days: "",
+  estimated_cost: "",
+  vehicle_id: "",
+  active: true,
+};
+
+const emptyMaintenanceRecordForm: MaintenanceRecordForm = {
+  service_date: new Date().toISOString().slice(0, 10),
+  notes: "",
+};
+
 const emptyQuickStartForm: QuickStartForm = {
   gross_revenue: "",
   distance_km: "",
@@ -595,6 +681,34 @@ function getFinancialGoalTypeLabel(value: FinancialGoalType): string {
   return financialGoalTypeOptions.find((option) => option.value === value)?.label ?? value;
 }
 
+function getMaintenanceCategoryLabel(value: MaintenanceCategory): string {
+  return maintenanceCategoryOptions.find((option) => option.value === value)?.label ?? value;
+}
+
+function getMaintenanceStatusLabel(value: MaintenanceStatusType): string {
+  if (value === "due") {
+    return "Manutencao necessaria";
+  }
+
+  if (value === "due_soon") {
+    return "Proxima manutencao";
+  }
+
+  return "Em dia";
+}
+
+function getMaintenanceStatusClass(value: MaintenanceStatusType): string {
+  if (value === "due") {
+    return "status-pill status-inactive";
+  }
+
+  if (value === "due_soon") {
+    return "status-pill status-warning";
+  }
+
+  return "status-pill status-active";
+}
+
 function getErrorMessage(status: number): string {
   if (status === 401) {
     return "Sessao expirada ou invalida. Entre novamente.";
@@ -657,6 +771,13 @@ function formatMoney(value: string): string {
   const [reais, cents = "00"] = value.split(".");
   const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `R$ ${groupedReais},${`${cents}00`.slice(0, 2)}`;
+}
+
+function formatMoneyPerKm(value: string): string {
+  const [reais, fraction = ""] = value.split(".");
+  const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const safeFraction = fraction ? `,${fraction}` : "";
+  return `R$ ${groupedReais}${safeFraction}/km`;
 }
 
 function formatOptionalMoneyForInput(value: string | null): string {
@@ -831,6 +952,13 @@ function App() {
   const [financialGoalProgressById, setFinancialGoalProgressById] = useState<
     Record<number, FinancialGoalProgress>
   >({});
+  const [maintenancePlans, setMaintenancePlans] = useState<MaintenancePlan[]>([]);
+  const [maintenanceStatusesById, setMaintenanceStatusesById] = useState<
+    Record<number, MaintenancePlanStatus>
+  >({});
+  const [maintenanceRecordsByPlanId, setMaintenanceRecordsByPlanId] = useState<
+    Record<number, MaintenanceRecord[]>
+  >({});
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [financialInsights, setFinancialInsights] = useState<FinancialInsight[]>([]);
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
@@ -872,6 +1000,11 @@ function App() {
     useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
   const [financialGoalForm, setFinancialGoalForm] =
     useState<FinancialGoalForm>(emptyFinancialGoalForm);
+  const [maintenancePlanForm, setMaintenancePlanForm] =
+    useState<MaintenancePlanForm>(emptyMaintenancePlanForm);
+  const [maintenanceRecordForm, setMaintenanceRecordForm] =
+    useState<MaintenanceRecordForm>(emptyMaintenanceRecordForm);
+  const [recordingMaintenancePlanId, setRecordingMaintenancePlanId] = useState<number | null>(null);
   const [quickStartForm, setQuickStartForm] = useState<QuickStartForm>(emptyQuickStartForm);
   const [quickStartResult, setQuickStartResult] = useState<QuickStartResult | null>(null);
   const [quickStartVisible, setQuickStartVisible] = useState(false);
@@ -892,6 +1025,7 @@ function App() {
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [editingRecurringExpenseId, setEditingRecurringExpenseId] = useState<number | null>(null);
   const [editingFinancialGoalId, setEditingFinancialGoalId] = useState<number | null>(null);
+  const [editingMaintenancePlanId, setEditingMaintenancePlanId] = useState<number | null>(null);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
   const [dashboardVehicleId, setDashboardVehicleId] = useState("");
   const [customStartDate, setCustomStartDate] = useState(toDateInputValue(new Date()));
@@ -906,6 +1040,7 @@ function App() {
   const [isExpensesLoading, setIsExpensesLoading] = useState(false);
   const [isRecurringExpensesLoading, setIsRecurringExpensesLoading] = useState(false);
   const [isFinancialGoalsLoading, setIsFinancialGoalsLoading] = useState(false);
+  const [isMaintenanceLoading, setIsMaintenanceLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isFinancialInsightsLoading, setIsFinancialInsightsLoading] = useState(false);
   const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
@@ -922,6 +1057,8 @@ function App() {
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
   const [isFinancialGoalSaving, setIsFinancialGoalSaving] = useState(false);
+  const [isMaintenanceSaving, setIsMaintenanceSaving] = useState(false);
+  const [isMaintenanceRecordSaving, setIsMaintenanceRecordSaving] = useState(false);
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
 
@@ -936,6 +1073,9 @@ function App() {
     setImportProfiles([]);
     setFinancialGoals([]);
     setFinancialGoalProgressById({});
+    setMaintenancePlans([]);
+    setMaintenanceStatusesById({});
+    setMaintenanceRecordsByPlanId({});
     setFinancialSummary(null);
     setFinancialInsights([]);
     setEditingVehicleId(null);
@@ -944,6 +1084,7 @@ function App() {
     setEditingExpenseId(null);
     setEditingRecurringExpenseId(null);
     setEditingFinancialGoalId(null);
+    setEditingMaintenancePlanId(null);
     setVehicleForm(emptyVehicleForm);
     setCostProfileForm(emptyCostProfileForm);
     setWorkSessionForm(emptyWorkSessionForm);
@@ -972,6 +1113,9 @@ function App() {
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
     setFinancialGoalForm(emptyFinancialGoalForm);
+    setMaintenancePlanForm(emptyMaintenancePlanForm);
+    setMaintenanceRecordForm(emptyMaintenanceRecordForm);
+    setRecordingMaintenancePlanId(null);
     setQuickStartForm(emptyQuickStartForm);
     setQuickStartResult(null);
     setQuickStartVisible(false);
@@ -1119,6 +1263,12 @@ function App() {
           (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
       }));
       setDailyExpenseForm((currentForm) => ({
+        ...currentForm,
+        vehicle_id:
+          currentForm.vehicle_id ||
+          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
+      }));
+      setMaintenancePlanForm((currentForm) => ({
         ...currentForm,
         vehicle_id:
           currentForm.vehicle_id ||
@@ -1281,6 +1431,52 @@ function App() {
     }
   }
 
+  async function loadMaintenancePlans(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsMaintenanceLoading(true);
+    try {
+      const nextPlans = await requestApi<MaintenancePlan[]>("/maintenance-plans", {
+        headers: getAuthHeaders(currentToken),
+      });
+      const statusEntries = await Promise.all(
+        nextPlans.map(async (plan) => {
+          const statusResponse = await requestApi<MaintenancePlanStatus>(
+            `/maintenance-plans/${plan.id}/status`,
+            {
+              headers: getAuthHeaders(currentToken),
+            },
+          );
+          return [plan.id, statusResponse] as const;
+        }),
+      );
+      const recordEntries = await Promise.all(
+        nextPlans.map(async (plan) => {
+          const records = await requestApi<MaintenanceRecord[]>(
+            `/maintenance-plans/${plan.id}/records`,
+            {
+              headers: getAuthHeaders(currentToken),
+            },
+          );
+          return [plan.id, records] as const;
+        }),
+      );
+      setMaintenancePlans(nextPlans);
+      setMaintenanceStatusesById(Object.fromEntries(statusEntries));
+      setMaintenanceRecordsByPlanId(Object.fromEntries(recordEntries));
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao carregar manutencoes.");
+      }
+    } finally {
+      setIsMaintenanceLoading(false);
+    }
+  }
+
   async function loadFinancialSummary(currentToken = token) {
     if (!currentToken) {
       return;
@@ -1375,6 +1571,9 @@ function App() {
       setImportProfiles([]);
       setFinancialGoals([]);
       setFinancialGoalProgressById({});
+      setMaintenancePlans([]);
+      setMaintenanceStatusesById({});
+      setMaintenanceRecordsByPlanId({});
       setFinancialSummary(null);
       setFinancialInsights([]);
       setCostProfileVehicleId(null);
@@ -1401,6 +1600,10 @@ function App() {
       setMatchedExpenseImportProfile(null);
       setIsExpenseImportVisible(false);
       setIsExpenseImportDragging(false);
+      setMaintenancePlanForm(emptyMaintenancePlanForm);
+      setMaintenanceRecordForm(emptyMaintenanceRecordForm);
+      setRecordingMaintenancePlanId(null);
+      setEditingMaintenancePlanId(null);
       return;
     }
 
@@ -1417,6 +1620,7 @@ function App() {
         await loadExpenses(token);
         await loadRecurringExpenses(token);
         await loadFinancialGoals(token);
+        await loadMaintenancePlans(token);
         await refreshDashboardData(token);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
@@ -3130,6 +3334,158 @@ function App() {
     }
   }
 
+  function resetMaintenancePlanForm() {
+    setEditingMaintenancePlanId(null);
+    setMaintenancePlanForm({
+      ...emptyMaintenancePlanForm,
+      vehicle_id: vehicles.length === 1 ? String(vehicles[0].id) : "",
+    });
+  }
+
+  function handleEditMaintenancePlan(plan: MaintenancePlan) {
+    setEditingMaintenancePlanId(plan.id);
+    setMaintenancePlanForm({
+      name: plan.name,
+      category: plan.category,
+      interval_km: plan.interval_km ? plan.interval_km.replace(".", ",") : "",
+      interval_days: plan.interval_days ? String(plan.interval_days) : "",
+      estimated_cost: formatOptionalMoneyForInput(plan.estimated_cost),
+      vehicle_id: String(plan.vehicle_id),
+      active: plan.active,
+    });
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  function buildMaintenancePlanPayload(form: MaintenancePlanForm) {
+    if (!form.interval_km.trim() && !form.interval_days.trim()) {
+      throw new Error("Informe intervalo em km ou em dias.");
+    }
+
+    return {
+      vehicle_id: Number(form.vehicle_id),
+      name: form.name.trim(),
+      category: form.category,
+      interval_km: optionalDecimalInputToApi(form.interval_km),
+      interval_days: form.interval_days.trim() ? Number(form.interval_days) : null,
+      estimated_cost: optionalMoneyInputToApi(form.estimated_cost),
+      active: form.active,
+    };
+  }
+
+  async function handleMaintenancePlanSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsMaintenanceSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      const payload = buildMaintenancePlanPayload(maintenancePlanForm);
+
+      if (editingMaintenancePlanId) {
+        await requestApi<MaintenancePlan>(`/maintenance-plans/${editingMaintenancePlanId}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Plano de manutencao atualizado com sucesso.");
+      } else {
+        await requestApi<MaintenancePlan>("/maintenance-plans", {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload),
+        });
+        setSuccessMessage("Plano de manutencao cadastrado com sucesso.");
+      }
+
+      resetMaintenancePlanForm();
+      await loadMaintenancePlans();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao salvar manutencao.");
+      }
+    } finally {
+      setIsMaintenanceSaving(false);
+    }
+  }
+
+  async function handleDeleteMaintenancePlan(plan: MaintenancePlan) {
+    const shouldDelete = window.confirm(`Excluir o plano "${plan.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<void>(`/maintenance-plans/${plan.id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      setSuccessMessage("Plano de manutencao excluido com sucesso.");
+      await loadMaintenancePlans();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao excluir manutencao.");
+      }
+    }
+  }
+
+  function handleStartMaintenanceRecord(planId: number) {
+    setRecordingMaintenancePlanId(planId);
+    setMaintenanceRecordForm(emptyMaintenanceRecordForm);
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  async function handleMaintenanceRecordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!recordingMaintenancePlanId) {
+      return;
+    }
+
+    setIsMaintenanceRecordSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+
+    try {
+      await requestApi<MaintenanceRecord>(
+        `/maintenance-plans/${recordingMaintenancePlanId}/records`,
+        {
+          method: "POST",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            service_date: maintenanceRecordForm.service_date,
+            notes: maintenanceRecordForm.notes.trim() || null,
+          }),
+        },
+      );
+      setSuccessMessage("Manutencao registrada com sucesso.");
+      setRecordingMaintenancePlanId(null);
+      setMaintenanceRecordForm(emptyMaintenanceRecordForm);
+      await loadMaintenancePlans();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Erro ao registrar manutencao.");
+      }
+    } finally {
+      setIsMaintenanceRecordSaving(false);
+    }
+  }
+
+  function getMaintenancePlansByStatus(statusValue: MaintenanceStatusType) {
+    return maintenancePlans.filter(
+      (plan) => maintenanceStatusesById[plan.id]?.status === statusValue,
+    );
+  }
+
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
   const visibleFinancialInsights = financialInsights.slice(0, 5);
@@ -3198,6 +3554,7 @@ function App() {
               <a href="#jornadas">Jornadas</a>
               <a href="#despesas">Despesas</a>
               <a href="#despesas-recorrentes">Recorrentes</a>
+              <a href="#manutencao">Manutencao</a>
               <a href="#veiculos">Veículos</a>
             </nav>
 
@@ -5851,6 +6208,408 @@ function App() {
                       </div>
                     </article>
                   ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="manager-section" id="manutencao">
+              <div className="section-title">
+                <p className="eyebrow">Manutencao</p>
+                <h3>Manutencao preventiva</h3>
+                <p className="subtle-note">
+                  Acompanhe revisoes por tempo ou km trabalhados, sem criar despesas
+                  automaticamente.
+                </p>
+              </div>
+
+              <div className="vehicles-layout">
+                <form className="auth-form vehicle-form" onSubmit={handleMaintenancePlanSubmit}>
+                  <h3>{editingMaintenancePlanId ? "Editar manutencao" : "Adicionar manutencao"}</h3>
+
+                  <div className="form-grid">
+                    <label>
+                      Nome
+                      <input
+                        maxLength={120}
+                        name="maintenance-name"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            name: event.target.value,
+                          })
+                        }
+                        placeholder="Troca de oleo"
+                        required
+                        type="text"
+                        value={maintenancePlanForm.name}
+                      />
+                    </label>
+
+                    <label>
+                      Categoria
+                      <select
+                        name="maintenance-category"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            category: event.target.value as MaintenanceCategory,
+                          })
+                        }
+                        required
+                        value={maintenancePlanForm.category}
+                      >
+                        {maintenanceCategoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Veiculo
+                      <select
+                        name="maintenance-vehicle"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            vehicle_id: event.target.value,
+                          })
+                        }
+                        required
+                        value={maintenancePlanForm.vehicle_id}
+                      >
+                        <option value="">Selecione</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Custo estimado <span className="optional-label">(opcional)</span>
+                      <input
+                        inputMode="decimal"
+                        name="maintenance-estimated-cost"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            estimated_cost: event.target.value,
+                          })
+                        }
+                        placeholder="280,00"
+                        type="text"
+                        value={maintenancePlanForm.estimated_cost}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="form-grid">
+                    <label>
+                      Intervalo em km <span className="optional-label">(opcional)</span>
+                      <input
+                        inputMode="decimal"
+                        name="maintenance-interval-km"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            interval_km: event.target.value,
+                          })
+                        }
+                        placeholder="10000"
+                        type="text"
+                        value={maintenancePlanForm.interval_km}
+                      />
+                    </label>
+
+                    <label>
+                      Intervalo em dias <span className="optional-label">(opcional)</span>
+                      <input
+                        inputMode="numeric"
+                        min="1"
+                        name="maintenance-interval-days"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            interval_days: event.target.value,
+                          })
+                        }
+                        placeholder="180"
+                        type="number"
+                        value={maintenancePlanForm.interval_days}
+                      />
+                    </label>
+                  </div>
+
+                  <p className="subtle-note">
+                    Informe pelo menos um intervalo: km ou dias.
+                  </p>
+
+                  <label className="toggle-field">
+                    <input
+                      checked={maintenancePlanForm.active}
+                      name="maintenance-active"
+                      onChange={(event) =>
+                        setMaintenancePlanForm({
+                          ...maintenancePlanForm,
+                          active: event.target.checked,
+                        })
+                      }
+                      type="checkbox"
+                    />
+                    <span>Plano ativo</span>
+                  </label>
+
+                  <div className="form-actions">
+                    <button className="button" disabled={isMaintenanceSaving} type="submit">
+                      {isMaintenanceSaving
+                        ? "Salvando..."
+                        : editingMaintenancePlanId
+                          ? "Salvar manutencao"
+                          : "Adicionar manutencao"}
+                    </button>
+                    {editingMaintenancePlanId ? (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={resetMaintenancePlanForm}
+                      >
+                        Cancelar
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="vehicles-list" aria-busy={isMaintenanceLoading}>
+                  <div className="list-header">
+                    <h3>Minhas manutencoes</h3>
+                    <button
+                      className="text-button"
+                      disabled={isMaintenanceLoading}
+                      type="button"
+                      onClick={() => void loadMaintenancePlans()}
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {isMaintenanceLoading ? (
+                    <p className="empty-state">Carregando manutencoes...</p>
+                  ) : null}
+
+                  {!isMaintenanceLoading && maintenancePlans.length === 0 ? (
+                    <p className="empty-state">
+                      Configure suas manutencoes para saber quando revisar o veiculo e quanto reservar.{" "}
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() =>
+                          document.getElementById("manutencao")?.scrollIntoView({
+                            behavior: "smooth",
+                          })
+                        }
+                      >
+                        Adicionar manutencao
+                      </button>
+                    </p>
+                  ) : null}
+
+                  {(["due", "due_soon", "ok"] as MaintenanceStatusType[]).map((statusValue) => {
+                    const plans = getMaintenancePlansByStatus(statusValue);
+                    if (plans.length === 0) {
+                      return null;
+                    }
+
+                    return (
+                      <div className="daily-breakdown" key={statusValue}>
+                        <div className="list-header">
+                          <h3>{getMaintenanceStatusLabel(statusValue)}</h3>
+                        </div>
+
+                        {plans.map((plan) => {
+                          const planStatus = maintenanceStatusesById[plan.id];
+                          const records = maintenanceRecordsByPlanId[plan.id] ?? [];
+
+                          return (
+                            <article className="vehicle-card session-card" key={plan.id}>
+                              <div>
+                                <div className="recurring-card-title">
+                                  <div>
+                                    <h4>{plan.name}</h4>
+                                    <p>
+                                      {getMaintenanceCategoryLabel(plan.category)} ·{" "}
+                                      {getVehicleLabel(plan.vehicle_id)}
+                                    </p>
+                                  </div>
+                                  <span className={getMaintenanceStatusClass(planStatus.status)}>
+                                    {getMaintenanceStatusLabel(planStatus.status)}
+                                  </span>
+                                </div>
+
+                                {planStatus.km_remaining !== null && planStatus.status !== "due" ? (
+                                  <p className="subtle-note">
+                                    Faltam aproximadamente {formatDistance(planStatus.km_remaining)} km.
+                                  </p>
+                                ) : null}
+
+                                <dl className="session-metrics recurring-metrics">
+                                  <div>
+                                    <dt>Km desde a ultima</dt>
+                                    <dd>
+                                      {planStatus.km_since_last_service
+                                        ? `${formatDistance(planStatus.km_since_last_service)} km`
+                                        : "—"}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Km restantes</dt>
+                                    <dd>
+                                      {planStatus.km_remaining
+                                        ? `${formatDistance(planStatus.km_remaining)} km`
+                                        : "—"}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Dias desde a ultima</dt>
+                                    <dd>
+                                      {planStatus.days_since_last_service ?? "—"}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Dias restantes</dt>
+                                    <dd>{planStatus.days_remaining ?? "—"}</dd>
+                                  </div>
+                                  <div>
+                                    <dt>Custo estimado</dt>
+                                    <dd>
+                                      {planStatus.estimated_cost
+                                        ? formatMoney(planStatus.estimated_cost)
+                                        : "—"}
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Reserva sugerida</dt>
+                                    <dd>
+                                      {planStatus.recommended_reserve_per_km
+                                        ? formatMoneyPerKm(planStatus.recommended_reserve_per_km)
+                                        : "—"}
+                                    </dd>
+                                  </div>
+                                </dl>
+
+                                <div className="import-preview">
+                                  <div className="list-header">
+                                    <h4>Historico</h4>
+                                  </div>
+                                  {records.length === 0 ? (
+                                    <p className="subtle-note">
+                                      Nenhuma manutencao registrada ainda.
+                                    </p>
+                                  ) : (
+                                    <div className="import-preview-list">
+                                      {records.map((record) => (
+                                        <article className="vehicle-card session-card" key={record.id}>
+                                          <div>
+                                            <h4>{formatDate(record.service_date)}</h4>
+                                            <p>{record.notes ?? "Sem observacao"}</p>
+                                          </div>
+                                        </article>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {recordingMaintenancePlanId === plan.id ? (
+                                    <form
+                                      className="auth-form"
+                                      onSubmit={handleMaintenanceRecordSubmit}
+                                    >
+                                      <div className="form-grid">
+                                        <label>
+                                          Data
+                                          <input
+                                            onChange={(event) =>
+                                              setMaintenanceRecordForm({
+                                                ...maintenanceRecordForm,
+                                                service_date: event.target.value,
+                                              })
+                                            }
+                                            required
+                                            type="date"
+                                            value={maintenanceRecordForm.service_date}
+                                          />
+                                        </label>
+                                        <label>
+                                          Observacao <span className="optional-label">(opcional)</span>
+                                          <input
+                                            maxLength={255}
+                                            onChange={(event) =>
+                                              setMaintenanceRecordForm({
+                                                ...maintenanceRecordForm,
+                                                notes: event.target.value,
+                                              })
+                                            }
+                                            placeholder="Ex.: troca feita na oficina"
+                                            type="text"
+                                            value={maintenanceRecordForm.notes}
+                                          />
+                                        </label>
+                                      </div>
+                                      <div className="form-actions">
+                                        <button
+                                          className="button"
+                                          disabled={isMaintenanceRecordSaving}
+                                          type="submit"
+                                        >
+                                          {isMaintenanceRecordSaving
+                                            ? "Registrando..."
+                                            : "Salvar registro"}
+                                        </button>
+                                        <button
+                                          className="button button-ghost"
+                                          type="button"
+                                          onClick={() => setRecordingMaintenancePlanId(null)}
+                                        >
+                                          Cancelar
+                                        </button>
+                                      </div>
+                                    </form>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="card-actions">
+                                <button
+                                  className="text-button"
+                                  type="button"
+                                  onClick={() => handleStartMaintenanceRecord(plan.id)}
+                                >
+                                  Registrar manutencao realizada
+                                </button>
+                                <button
+                                  className="text-button"
+                                  type="button"
+                                  onClick={() => handleEditMaintenancePlan(plan)}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  className="text-button danger"
+                                  type="button"
+                                  onClick={() => void handleDeleteMaintenancePlan(plan)}
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </section>
