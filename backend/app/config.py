@@ -59,6 +59,12 @@ class Settings(BaseSettings):
         if is_production and self.jwt_secret_key in unsafe_jwt_secrets:
             raise ValueError("JWT_SECRET must be a strong secret in production.")
 
+        if is_production and len(self.jwt_secret_key) < 48:
+            raise ValueError("JWT_SECRET must have at least 48 characters in production.")
+
+        if is_production and len(set(self.jwt_secret_key)) < 12:
+            raise ValueError("JWT_SECRET must have enough character diversity in production.")
+
         if is_production and "*" in self.cors_origins:
             raise ValueError("CORS_ALLOWED_ORIGINS cannot contain '*' in production.")
 

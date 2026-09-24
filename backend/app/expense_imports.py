@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -26,11 +26,13 @@ from app.schemas import (
     WorkSessionImportError,
 )
 from app.work_session_imports import (
+    MAX_IMPORT_ERRORS,
     MAX_ROWS,
     decode_csv,
     is_dangerous_cell,
     parse_date,
     parse_money,
+    read_limited_csv_body,
 )
 
 router = APIRouter(prefix="/imports/expenses", tags=["imports"])
@@ -299,7 +301,13 @@ def parse_csv_content(
     parsed_rows: list[ParsedExpenseImportRow] = []
     preview_rows: list[ExpenseImportRow] = []
     errors: list[WorkSessionImportError] = []
+    invalid_row_numbers: set[int] = set()
     total_rows = 0
+
+    def add_error(error: WorkSessionImportError) -> None:
+        invalid_row_numbers.add(error.row)
+        if len(errors) < MAX_IMPORT_ERRORS:
+            errors.append(error)
 
     for row_number, raw_row in enumerate(reader, start=2):
         if raw_row is None:
@@ -307,7 +315,7 @@ def parse_csv_content(
 
         if None in raw_row:
             total_rows += 1
-            errors.append(
+            add_error(
                 WorkSessionImportError(
                     row=row_number,
                     field="file",
@@ -321,14 +329,14 @@ def parse_csv_content(
 
         total_rows += 1
         if total_rows > MAX_ROWS:
-            errors.append(
+            add_error(
                 WorkSessionImportError(
                     row=row_number,
                     field="file",
                     message="Limite de linhas excedido.",
                 )
             )
-            continue
+            break
 
         row_errors: list[WorkSessionImportError] = []
 
@@ -360,7 +368,8 @@ def parse_csv_content(
             )
 
         if row_errors:
-            errors.extend(row_errors)
+            for error in row_errors:
+                add_error(error)
             continue
 
         parsed_row = ParsedExpenseImportRow(
@@ -382,7 +391,7 @@ def parse_csv_content(
         preview_rows.append(csv_row_to_preview_row(parsed_row))
 
     if total_rows == 0 and not errors:
-        errors.append(
+        add_error(
             WorkSessionImportError(
                 row=1,
                 field="file",
@@ -393,7 +402,7 @@ def parse_csv_content(
     preview = ExpenseImportPreview(
         total_rows=total_rows,
         valid_rows=len(parsed_rows),
-        invalid_rows=len({error.row for error in errors}),
+        invalid_rows=len(invalid_row_numbers),
         columns_found=columns,
         suggested_mapping=suggested_mapping,
         column_mapping=effective_mapping,
@@ -404,14 +413,15 @@ def parse_csv_content(
 
 
 @router.post("/preview", response_model=ExpenseImportPreview)
-def preview_expense_import(
+async def preview_expense_import(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    request: Request,
     vehicle_id: Annotated[int | None, Query(gt=0)] = None,
     column_mapping: Annotated[str | None, Query()] = None,
-    csv_content: Annotated[bytes, Body(media_type="text/csv")] = b"",
 ) -> ExpenseImportPreview:
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+    csv_content = await read_limited_csv_body(request)
     preview, _ = parse_csv_content(
         content=csv_content,
         user_id=current_user.id,
@@ -422,14 +432,15 @@ def preview_expense_import(
 
 
 @router.post("", response_model=ExpenseImportResult)
-def import_expenses(
+async def import_expenses(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    request: Request,
     vehicle_id: Annotated[int | None, Query(gt=0)] = None,
     column_mapping: Annotated[str | None, Query()] = None,
-    csv_content: Annotated[bytes, Body(media_type="text/csv")] = b"",
 ) -> ExpenseImportResult:
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+    csv_content = await read_limited_csv_body(request)
     preview, parsed_rows = parse_csv_content(
         content=csv_content,
         user_id=current_user.id,

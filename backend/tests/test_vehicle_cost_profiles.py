@@ -3,6 +3,7 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -219,6 +220,99 @@ def test_money_is_stored_as_cents_without_float_imprecision(
     assert response.json()["financing_monthly"] == "1800.55"
     assert profile is not None
     assert profile.financing_monthly_cents == 180055
+
+
+def test_cost_profile_normalizes_fields_incompatible_with_ownership_type(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "normalize-ownership@email.com")
+    owned_vehicle = create_vehicle(client, token, "Proprio")
+    rented_vehicle = create_vehicle(client, token, "Alugado")
+    financed_vehicle = create_vehicle(client, token, "Financiado")
+
+    owned_payload = cost_profile_payload()
+    owned_payload["ownership_type"] = "owned"
+    owned_payload["rental_monthly"] = "1000.00"
+    owned_payload["financing_monthly"] = "2000.00"
+    rented_payload = cost_profile_payload()
+    rented_payload["ownership_type"] = "rented"
+    rented_payload["rental_monthly"] = "1000.00"
+    rented_payload["financing_monthly"] = "2000.00"
+    financed_payload = cost_profile_payload()
+    financed_payload["ownership_type"] = "financed"
+    financed_payload["rental_monthly"] = "1000.00"
+    financed_payload["financing_monthly"] = "2000.00"
+
+    owned_response = client.put(
+        f"/vehicles/{owned_vehicle}/cost-profile",
+        json=owned_payload,
+        headers=auth_headers(token),
+    )
+    rented_response = client.put(
+        f"/vehicles/{rented_vehicle}/cost-profile",
+        json=rented_payload,
+        headers=auth_headers(token),
+    )
+    financed_response = client.put(
+        f"/vehicles/{financed_vehicle}/cost-profile",
+        json=financed_payload,
+        headers=auth_headers(token),
+    )
+    profiles = {
+        profile.vehicle_id: profile
+        for profile in db_session.scalars(select(VehicleCostProfile)).all()
+    }
+
+    assert owned_response.status_code == 200
+    assert owned_response.json()["rental_monthly"] is None
+    assert owned_response.json()["financing_monthly"] is None
+    assert profiles[owned_vehicle].rental_monthly_cents is None
+    assert profiles[owned_vehicle].financing_monthly_cents is None
+    assert rented_response.status_code == 200
+    assert rented_response.json()["rental_monthly"] == "1000.00"
+    assert rented_response.json()["financing_monthly"] is None
+    assert profiles[rented_vehicle].rental_monthly_cents == 100000
+    assert profiles[rented_vehicle].financing_monthly_cents is None
+    assert financed_response.status_code == 200
+    assert financed_response.json()["rental_monthly"] is None
+    assert financed_response.json()["financing_monthly"] == "2000.00"
+    assert profiles[financed_vehicle].rental_monthly_cents is None
+    assert profiles[financed_vehicle].financing_monthly_cents == 200000
+
+
+def test_cost_profile_integrity_error_returns_conflict_and_rolls_back(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = register_and_login(client, "cost-profile-race@email.com")
+    vehicle_id = create_vehicle(client, token)
+    original_commit = db_session.commit
+    should_fail = True
+
+    def fail_once() -> None:
+        nonlocal should_fail
+        if should_fail:
+            should_fail = False
+            raise IntegrityError("simulated cost profile race", {}, Exception())
+        original_commit()
+
+    monkeypatch.setattr(db_session, "commit", fail_once)
+
+    response = client.put(
+        f"/vehicles/{vehicle_id}/cost-profile",
+        json=cost_profile_payload(),
+        headers=auth_headers(token),
+    )
+    profile_count = db_session.scalar(select(func.count()).select_from(VehicleCostProfile))
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "Vehicle cost profile was updated concurrently. Please retry."
+    )
+    assert profile_count == 0
 
 
 def test_only_one_profile_per_vehicle(client: TestClient, db_session: Session) -> None:

@@ -356,7 +356,8 @@ def get_recurring_expense_breakdown(
 
     period_start, period_end = effective_period
     real_expense_keys = {
-        (expense.category, expense.vehicle_id, expense.expense_date) for expense in expenses
+        (expense.category, expense.vehicle_id, expense.expense_date, expense.amount_cents)
+        for expense in expenses
     }
     totals_by_category: defaultdict[str, int] = defaultdict(int)
 
@@ -372,7 +373,12 @@ def get_recurring_expense_breakdown(
             period_start=period_start,
             period_end=period_end,
         ):
-            key = (recurring_expense.category, recurring_expense.vehicle_id, occurrence_date)
+            key = (
+                recurring_expense.category,
+                recurring_expense.vehicle_id,
+                occurrence_date,
+                recurring_expense.amount_cents,
+            )
             if key in real_expense_keys:
                 continue
 

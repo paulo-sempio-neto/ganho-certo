@@ -28,18 +28,29 @@ def upgrade() -> None:
         ["import_fingerprint"],
         unique=False,
     )
-    op.create_unique_constraint(
-        "uq_work_sessions_user_import_fingerprint",
-        "work_sessions",
-        ["user_id", "import_fingerprint"],
-    )
+    if op.get_bind().dialect.name == "sqlite":
+        op.create_index(
+            "uq_work_sessions_user_import_fingerprint",
+            "work_sessions",
+            ["user_id", "import_fingerprint"],
+            unique=True,
+        )
+    else:
+        op.create_unique_constraint(
+            "uq_work_sessions_user_import_fingerprint",
+            "work_sessions",
+            ["user_id", "import_fingerprint"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "uq_work_sessions_user_import_fingerprint",
-        "work_sessions",
-        type_="unique",
-    )
+    if op.get_bind().dialect.name == "sqlite":
+        op.drop_index("uq_work_sessions_user_import_fingerprint", table_name="work_sessions")
+    else:
+        op.drop_constraint(
+            "uq_work_sessions_user_import_fingerprint",
+            "work_sessions",
+            type_="unique",
+        )
     op.drop_index(op.f("ix_work_sessions_import_fingerprint"), table_name="work_sessions")
     op.drop_column("work_sessions", "import_fingerprint")

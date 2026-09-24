@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import Select, desc, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -73,6 +74,17 @@ def ensure_single_active_goal(
             status_code=status.HTTP_409_CONFLICT,
             detail="An active goal already exists for this vehicle and goal type.",
         )
+
+
+def commit_goal_changes(db: Session) -> None:
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An active goal already exists for this vehicle and goal type.",
+        ) from exc
 
 
 def goal_to_progress_end(goal: FinancialGoal, today: date) -> date | None:
@@ -201,7 +213,7 @@ def create_financial_goal(
         active=payload.active,
     )
     db.add(goal)
-    db.commit()
+    commit_goal_changes(db)
     db.refresh(goal)
     return goal
 
@@ -254,7 +266,7 @@ def update_financial_goal(
     goal.end_date = payload.end_date
     goal.active = payload.active
 
-    db.commit()
+    commit_goal_changes(db)
     db.refresh(goal)
     return goal
 

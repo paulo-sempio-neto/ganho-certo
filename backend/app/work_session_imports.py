@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -40,9 +40,11 @@ FIELD_ALIASES = {
 }
 MAX_FILE_SIZE_BYTES = 1024 * 1024
 MAX_ROWS = 1000
+MAX_IMPORT_ERRORS = 100
 MONEY_QUANT = Decimal("0.01")
 DISTANCE_QUANT = Decimal("0.01")
 DANGEROUS_PREFIXES = ("=", "+", "-", "@")
+csv.field_size_limit(MAX_FILE_SIZE_BYTES)
 
 
 @dataclass(frozen=True)
@@ -66,13 +68,29 @@ def get_user_vehicle(vehicle_id: int, user_id: int, db: Session) -> Vehicle:
     return vehicle
 
 
+async def read_limited_csv_body(request: Request) -> bytes:
+    chunks: list[bytes] = []
+    total_size = 0
+
+    async for chunk in request.stream():
+        total_size += len(chunk)
+        if total_size > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="CSV too large.",
+            )
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 def decode_csv(content: bytes) -> str:
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file is empty.")
 
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="CSV too large.",
         )
 
@@ -343,7 +361,13 @@ def parse_csv_content(
     parsed_rows: list[ParsedWorkSessionImportRow] = []
     preview_rows: list[WorkSessionImportRow] = []
     errors: list[WorkSessionImportError] = []
+    invalid_row_numbers: set[int] = set()
     total_rows = 0
+
+    def add_error(error: WorkSessionImportError) -> None:
+        invalid_row_numbers.add(error.row)
+        if len(errors) < MAX_IMPORT_ERRORS:
+            errors.append(error)
 
     for row_number, raw_row in enumerate(reader, start=2):
         if raw_row is None:
@@ -351,7 +375,7 @@ def parse_csv_content(
 
         if None in raw_row:
             total_rows += 1
-            errors.append(
+            add_error(
                 WorkSessionImportError(
                     row=row_number,
                     field="file",
@@ -365,14 +389,14 @@ def parse_csv_content(
 
         total_rows += 1
         if total_rows > MAX_ROWS:
-            errors.append(
+            add_error(
                 WorkSessionImportError(
                     row=row_number,
                     field="file",
                     message="Limite de linhas excedido.",
                 )
             )
-            continue
+            break
 
         row_errors: list[WorkSessionImportError] = []
 
@@ -431,7 +455,8 @@ def parse_csv_content(
                 trip_count = 0
 
         if row_errors:
-            errors.extend(row_errors)
+            for error in row_errors:
+                add_error(error)
             continue
 
         parsed_row = ParsedWorkSessionImportRow(
@@ -454,7 +479,7 @@ def parse_csv_content(
         preview_rows.append(csv_row_to_preview_row(parsed_row))
 
     if total_rows == 0 and not errors:
-        errors.append(
+        add_error(
             WorkSessionImportError(
                 row=1,
                 field="file",
@@ -465,7 +490,7 @@ def parse_csv_content(
     preview = WorkSessionImportPreview(
         total_rows=total_rows,
         valid_rows=len(parsed_rows),
-        invalid_rows=len({error.row for error in errors}),
+        invalid_rows=len(invalid_row_numbers),
         columns_found=columns,
         suggested_mapping=suggested_mapping,
         column_mapping=effective_mapping,
@@ -476,14 +501,15 @@ def parse_csv_content(
 
 
 @router.post("/preview", response_model=WorkSessionImportPreview)
-def preview_work_session_import(
+async def preview_work_session_import(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    request: Request,
     vehicle_id: Annotated[int, Query(gt=0)],
     column_mapping: Annotated[str | None, Query()] = None,
-    csv_content: Annotated[bytes, Body(media_type="text/csv")] = b"",
 ) -> WorkSessionImportPreview:
     get_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+    csv_content = await read_limited_csv_body(request)
     preview, _ = parse_csv_content(
         content=csv_content,
         vehicle_id=vehicle_id,
@@ -493,14 +519,15 @@ def preview_work_session_import(
 
 
 @router.post("", response_model=WorkSessionImportResult)
-def import_work_sessions(
+async def import_work_sessions(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    request: Request,
     vehicle_id: Annotated[int, Query(gt=0)],
     column_mapping: Annotated[str | None, Query()] = None,
-    csv_content: Annotated[bytes, Body(media_type="text/csv")] = b"",
 ) -> WorkSessionImportResult:
     get_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+    csv_content = await read_limited_csv_body(request)
     preview, parsed_rows = parse_csv_content(
         content=csv_content,
         vehicle_id=vehicle_id,

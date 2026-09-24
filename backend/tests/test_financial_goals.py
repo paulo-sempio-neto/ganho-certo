@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app import financial_goals as financial_goals_module
 from app.database import Base, get_db
 from app.main import app
 from app.models import FinancialGoal
@@ -305,6 +306,63 @@ def test_reject_duplicate_active_goal_for_same_combination(client: TestClient) -
 
     assert duplicate_response.status_code == 409
     assert inactive_response.status_code == 201
+
+
+def test_database_rejects_duplicate_active_goal_without_vehicle(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = register_and_login(client, "duplicate-db-no-vehicle@email.com")
+    create_goal(client, token)
+    monkeypatch.setattr(
+        financial_goals_module,
+        "ensure_single_active_goal",
+        lambda *args, **kwargs: None,
+    )
+
+    response = client.post(
+        "/financial-goals",
+        json=goal_payload(target_amount="2000.00"),
+        headers=auth_headers(token),
+    )
+    goals = db_session.scalars(select(FinancialGoal)).all()
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "An active goal already exists for this vehicle and goal type."
+    )
+    assert len(goals) == 1
+
+
+def test_database_rejects_duplicate_active_goal_with_vehicle(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = register_and_login(client, "duplicate-db-vehicle@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_goal(client, token, vehicle_id=vehicle_id)
+    monkeypatch.setattr(
+        financial_goals_module,
+        "ensure_single_active_goal",
+        lambda *args, **kwargs: None,
+    )
+
+    response = client.post(
+        "/financial-goals",
+        json=goal_payload(vehicle_id=vehicle_id, target_amount="2000.00"),
+        headers=auth_headers(token),
+    )
+    goals = db_session.scalars(select(FinancialGoal)).all()
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "An active goal already exists for this vehicle and goal type."
+    )
+    assert len(goals) == 1
 
 
 def test_progress_net_goal_partially_reached_with_required_pace_and_hours(

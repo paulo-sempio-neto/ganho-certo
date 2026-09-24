@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -23,6 +24,20 @@ def money_to_cents(value: Decimal | None) -> int | None:
 
 def get_profile(vehicle_id: int, db: Session) -> VehicleCostProfile | None:
     return db.scalar(select(VehicleCostProfile).where(VehicleCostProfile.vehicle_id == vehicle_id))
+
+
+def normalized_rental_monthly(payload: VehicleCostProfileUpdate) -> Decimal | None:
+    if payload.ownership_type != "rented":
+        return None
+
+    return payload.rental_monthly
+
+
+def normalized_financing_monthly(payload: VehicleCostProfileUpdate) -> Decimal | None:
+    if payload.ownership_type != "financed":
+        return None
+
+    return payload.financing_monthly
 
 
 @router.get("/{vehicle_id}/cost-profile", response_model=VehicleCostProfilePublic)
@@ -57,8 +72,8 @@ def upsert_vehicle_cost_profile(
         db.add(profile)
 
     profile.ownership_type = payload.ownership_type
-    profile.rental_monthly_cents = money_to_cents(payload.rental_monthly)
-    profile.financing_monthly_cents = money_to_cents(payload.financing_monthly)
+    profile.rental_monthly_cents = money_to_cents(normalized_rental_monthly(payload))
+    profile.financing_monthly_cents = money_to_cents(normalized_financing_monthly(payload))
     profile.insurance_monthly_cents = money_to_cents(payload.insurance_monthly)
     profile.ipva_annual_cents = money_to_cents(payload.ipva_annual)
     profile.other_fixed_monthly_cents = money_to_cents(payload.other_fixed_monthly)
@@ -68,6 +83,14 @@ def upsert_vehicle_cost_profile(
     profile.depreciation_per_km = payload.depreciation_per_km
     profile.fuel_efficiency_km_per_liter = payload.fuel_efficiency_km_per_liter
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vehicle cost profile was updated concurrently. Please retry.",
+        ) from exc
+
     db.refresh(profile)
     return profile

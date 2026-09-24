@@ -113,10 +113,12 @@ Variaveis obrigatorias no Render:
 ```text
 APP_ENV=production
 DATABASE_URL=<URL do PostgreSQL gerenciado>
-JWT_SECRET=<segredo forte gerado para producao>
+JWT_SECRET=<segredo forte e aleatorio gerado para producao>
 CORS_ALLOWED_ORIGINS=<URL publica do frontend na Vercel>
 ```
 
+O `APP_ENV=production` e obrigatorio em deploy publico: nesse modo a API desabilita
+Swagger/ReDoc/OpenAPI publicos e rejeita `JWT_SECRET` conhecido, curto ou fraco.
 O `PORT` e fornecido pelo Render automaticamente. Nao versionar segredos reais.
 
 ### Frontend na Vercel

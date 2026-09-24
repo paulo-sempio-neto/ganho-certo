@@ -486,6 +486,34 @@ def test_summary_recurring_vehicle_filter_excludes_unlinked_recurring_expenses(
     ]
 
 
+def test_summary_recurring_keeps_occurrence_when_real_expense_amount_differs(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "recurring-real-different-amount@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-01-10", "1000.00", "10.00", 60, 1)
+    create_recurring_expense(
+        client,
+        token,
+        "500.00",
+        "monthly",
+        "2026-01-10",
+        vehicle_id,
+        "insurance",
+    )
+    create_expense(client, token, "2026-01-10", "50.00", vehicle_id, "insurance")
+
+    response = client.get(
+        "/financial-summary?start_date=2026-01-01&end_date=2026-01-31",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total_expenses"] == "50.00"
+    assert response.json()["recurring_expenses_total"] == "500.00"
+    assert response.json()["projected_economic_costs"] == "550.00"
+
+
 def test_summary_recurring_deduplicates_real_expense_same_key(client: TestClient) -> None:
     token = register_and_login(client, "recurring-real-dedup@email.com")
     vehicle_id = create_vehicle(client, token)

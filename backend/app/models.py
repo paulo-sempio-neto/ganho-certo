@@ -9,10 +9,12 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -213,6 +215,25 @@ class Expense(Base):
 
 class FinancialGoal(Base):
     __tablename__ = "financial_goals"
+    __table_args__ = (
+        Index(
+            "uq_financial_goals_active_vehicle",
+            "user_id",
+            "goal_type",
+            "vehicle_id",
+            unique=True,
+            postgresql_where=text("active IS TRUE AND vehicle_id IS NOT NULL"),
+            sqlite_where=text("active = 1 AND vehicle_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_financial_goals_active_without_vehicle",
+            "user_id",
+            "goal_type",
+            unique=True,
+            postgresql_where=text("active IS TRUE AND vehicle_id IS NULL"),
+            sqlite_where=text("active = 1 AND vehicle_id IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)

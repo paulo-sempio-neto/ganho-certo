@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 from app.models import WorkSession
+from app.work_session_imports import MAX_FILE_SIZE_BYTES, MAX_IMPORT_ERRORS, MAX_ROWS
 
 CSV_HEADER = "date,gross_revenue,distance_km,worked_minutes,trip_count\n"
 
@@ -433,6 +434,67 @@ def test_preview_rejects_empty_file(client: TestClient) -> None:
     response = post_preview(client, token, vehicle_id, "")
 
     assert response.status_code == 400
+
+
+def test_preview_rejects_body_above_size_limit(client: TestClient) -> None:
+    token = register_and_login(client, "oversized-work-sessions@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = "x" * (MAX_FILE_SIZE_BYTES + 1)
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "CSV too large."
+
+
+def test_preview_accepts_body_at_exact_size_limit(client: TestClient) -> None:
+    token = register_and_login(client, "exact-size-work-sessions@email.com")
+    vehicle_id = create_vehicle(client, token)
+    header = CSV_HEADER.rstrip("\n") + ",ignored\n"
+    row_prefix = "2026-09-20,10.00,1.00,60,1,"
+    suffix = "\n"
+    filler_size = MAX_FILE_SIZE_BYTES - len((header + row_prefix + suffix).encode("utf-8"))
+    csv_content = header + row_prefix + ("x" * filler_size) + suffix
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["valid_rows"] == 1
+    assert response.json()["errors"] == []
+
+
+def test_preview_stops_when_row_limit_is_exceeded(client: TestClient) -> None:
+    token = register_and_login(client, "row-limit-work-sessions@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = CSV_HEADER + ("2026-09-20,10.00,1.00,60,1\n" * (MAX_ROWS + 1))
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["total_rows"] == MAX_ROWS + 1
+    assert response.json()["valid_rows"] == MAX_ROWS
+    assert response.json()["invalid_rows"] == 1
+    assert response.json()["errors"] == [
+        {
+            "row": MAX_ROWS + 2,
+            "field": "file",
+            "message": "Limite de linhas excedido.",
+        }
+    ]
+
+
+def test_preview_limits_returned_errors(client: TestClient) -> None:
+    token = register_and_login(client, "error-limit-work-sessions@email.com")
+    vehicle_id = create_vehicle(client, token)
+    csv_content = CSV_HEADER + (
+        "invalid,valor,km,0,-1\n" * (MAX_IMPORT_ERRORS + 10)
+    )
+
+    response = post_preview(client, token, vehicle_id, csv_content)
+
+    assert response.status_code == 200
+    assert response.json()["invalid_rows"] == MAX_IMPORT_ERRORS + 10
+    assert len(response.json()["errors"]) == MAX_IMPORT_ERRORS
 
 
 def test_preview_skips_empty_lines(client: TestClient) -> None:
