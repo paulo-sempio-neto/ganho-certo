@@ -58,6 +58,24 @@ export type Vehicle = {
   created_at: string;
 };
 
+export type VehicleCostProfile = {
+  id: number;
+  vehicle_id: number;
+  ownership_type: OwnershipType;
+  rental_monthly: string | null;
+  financing_monthly: string | null;
+  insurance_monthly: string | null;
+  ipva_annual: string | null;
+  other_fixed_monthly: string | null;
+  maintenance_per_km: string | null;
+  tires_per_km: string | null;
+  oil_per_km: string | null;
+  depreciation_per_km: string | null;
+  fuel_efficiency_km_per_liter: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WorkSession = {
   id: number;
   vehicle_id: number;

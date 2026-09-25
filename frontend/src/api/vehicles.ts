@@ -1,5 +1,5 @@
 import { requestApi } from "./client";
-import type { Vehicle } from "../types/domain";
+import type { Vehicle, VehicleCostProfile } from "../types/domain";
 
 type AuthHeaders = Record<string, string>;
 
@@ -27,5 +27,21 @@ export function deleteVehicle(headers: AuthHeaders, vehicleId: number) {
   return requestApi<void>(`/vehicles/${vehicleId}`, {
     method: "DELETE",
     headers,
+  });
+}
+
+export function getVehicleCostProfile(headers: AuthHeaders, vehicleId: number) {
+  return requestApi<VehicleCostProfile>(`/vehicles/${vehicleId}/cost-profile`, { headers });
+}
+
+export function updateVehicleCostProfile(
+  headers: AuthHeaders,
+  vehicleId: number,
+  payload: unknown,
+) {
+  return requestApi<VehicleCostProfile>(`/vehicles/${vehicleId}/cost-profile`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(payload),
   });
 }
