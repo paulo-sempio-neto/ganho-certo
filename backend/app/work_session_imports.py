@@ -541,13 +541,18 @@ async def import_work_sessions(
             errors=preview.errors,
         )
 
-    existing_fingerprints = set(
-        db.scalars(
-            select(WorkSession.import_fingerprint).where(
-                WorkSession.user_id == current_user.id,
-                WorkSession.import_fingerprint.is_not(None),
-            )
-        ).all()
+    parsed_fingerprints = {row.fingerprint for row in parsed_rows}
+    existing_fingerprints = (
+        set(
+            db.scalars(
+                select(WorkSession.import_fingerprint).where(
+                    WorkSession.user_id == current_user.id,
+                    WorkSession.import_fingerprint.in_(parsed_fingerprints),
+                )
+            ).all()
+        )
+        if parsed_fingerprints
+        else set()
     )
     batch_fingerprints: set[str] = set()
     work_sessions: list[WorkSession] = []

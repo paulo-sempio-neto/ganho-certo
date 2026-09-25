@@ -160,6 +160,8 @@ class WorkSession(Base):
             "import_fingerprint",
             name="uq_work_sessions_user_import_fingerprint",
         ),
+        Index("ix_work_sessions_user_work_date_created_at", "user_id", "work_date", "created_at"),
+        Index("ix_work_sessions_vehicle_work_date", "vehicle_id", "work_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -198,6 +200,8 @@ class Expense(Base):
             "import_fingerprint",
             name="uq_expenses_user_import_fingerprint",
         ),
+        Index("ix_expenses_user_expense_date_created_at", "user_id", "expense_date", "created_at"),
+        Index("ix_expenses_vehicle_expense_date", "vehicle_id", "expense_date"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -251,6 +255,12 @@ class FinancialGoal(Base):
             postgresql_where=text("active IS TRUE AND vehicle_id IS NULL"),
             sqlite_where=text("active = 1 AND vehicle_id IS NULL"),
         ),
+        Index(
+            "ix_financial_goals_user_start_date_created_at",
+            "user_id",
+            "start_date",
+            "created_at",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -286,6 +296,15 @@ class FinancialGoal(Base):
 
 class RecurringExpense(Base):
     __tablename__ = "recurring_expenses"
+    __table_args__ = (
+        Index(
+            "ix_recurring_expenses_user_active_start_date_created_at",
+            "user_id",
+            "active",
+            "start_date",
+            "created_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -322,6 +341,21 @@ class RecurringExpense(Base):
 
 class CsvImportProfile(Base):
     __tablename__ = "csv_import_profiles"
+    __table_args__ = (
+        Index(
+            "ix_csv_import_profiles_user_updated_created",
+            "user_id",
+            "updated_at",
+            "created_at",
+        ),
+        Index(
+            "ix_csv_import_profiles_user_type_header_updated",
+            "user_id",
+            "import_type",
+            "header_signature",
+            "updated_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
@@ -351,6 +385,9 @@ class CsvImportProfile(Base):
 
 class MaintenancePlan(Base):
     __tablename__ = "maintenance_plans"
+    __table_args__ = (
+        Index("ix_maintenance_plans_vehicle_created_at", "vehicle_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"), nullable=False, index=True)
@@ -387,6 +424,14 @@ class MaintenancePlan(Base):
 
 class MaintenanceRecord(Base):
     __tablename__ = "maintenance_records"
+    __table_args__ = (
+        Index(
+            "ix_maintenance_records_plan_service_date_created_at",
+            "maintenance_plan_id",
+            "service_date",
+            "created_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     maintenance_plan_id: Mapped[int] = mapped_column(

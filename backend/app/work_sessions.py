@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Expense, User, Vehicle, WorkSession
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import QuickStartDayCreate, WorkSessionCreate, WorkSessionPublic, WorkSessionUpdate
 
 router = APIRouter(prefix="/work-sessions", tags=["work-sessions"])
@@ -108,14 +109,19 @@ def create_quick_start_day(
 def list_work_sessions(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[WorkSession]:
-    return list(
-        db.scalars(
-            select(WorkSession)
-            .where(WorkSession.user_id == current_user.id)
-            .order_by(desc(WorkSession.work_date), desc(WorkSession.created_at))
-        ).all()
+    query = (
+        select(WorkSession)
+        .where(WorkSession.user_id == current_user.id)
+        .order_by(desc(WorkSession.work_date), desc(WorkSession.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{session_id}", response_model=WorkSessionPublic)

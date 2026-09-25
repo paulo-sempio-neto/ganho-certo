@@ -455,13 +455,18 @@ async def import_expenses(
             errors=preview.errors,
         )
 
-    existing_fingerprints = set(
-        db.scalars(
-            select(Expense.import_fingerprint).where(
-                Expense.user_id == current_user.id,
-                Expense.import_fingerprint.is_not(None),
-            )
-        ).all()
+    parsed_fingerprints = {row.fingerprint for row in parsed_rows}
+    existing_fingerprints = (
+        set(
+            db.scalars(
+                select(Expense.import_fingerprint).where(
+                    Expense.user_id == current_user.id,
+                    Expense.import_fingerprint.in_(parsed_fingerprints),
+                )
+            ).all()
+        )
+        if parsed_fingerprints
+        else set()
     )
     batch_fingerprints: set[str] = set()
     expenses: list[Expense] = []

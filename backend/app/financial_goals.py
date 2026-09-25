@@ -17,6 +17,7 @@ from app.financial_summary import (
     round_decimal,
 )
 from app.models import FinancialGoal, User
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import (
     FinancialGoalCreate,
     FinancialGoalProgress,
@@ -222,14 +223,19 @@ def create_financial_goal(
 def list_financial_goals(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[FinancialGoal]:
-    return list(
-        db.scalars(
-            select(FinancialGoal)
-            .where(FinancialGoal.user_id == current_user.id)
-            .order_by(desc(FinancialGoal.start_date), desc(FinancialGoal.created_at))
-        ).all()
+    query = (
+        select(FinancialGoal)
+        .where(FinancialGoal.user_id == current_user.id)
+        .order_by(desc(FinancialGoal.start_date), desc(FinancialGoal.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{goal_id}", response_model=FinancialGoalPublic)

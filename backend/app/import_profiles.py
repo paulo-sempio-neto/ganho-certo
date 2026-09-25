@@ -11,6 +11,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.expense_imports import validate_column_mapping as validate_expense_column_mapping
 from app.models import CsvImportProfile, User, Vehicle
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import (
     CsvImportProfileCreate,
     CsvImportProfileMatchRequest,
@@ -90,14 +91,19 @@ def profile_to_public(
     profile: CsvImportProfile,
     user_id: int,
     db: Session,
+    valid_vehicle_ids: set[int] | None = None,
 ) -> CsvImportProfilePublic:
+    if valid_vehicle_ids is None:
+        vehicle_id = safe_profile_vehicle_id(profile=profile, user_id=user_id, db=db)
+    else:
+        vehicle_id = profile.vehicle_id if profile.vehicle_id in valid_vehicle_ids else None
     return CsvImportProfilePublic(
         id=profile.id,
         name=profile.name,
         import_type=profile.import_type,
         header_signature=profile.header_signature,
         column_mapping=profile.column_mapping,
-        vehicle_id=safe_profile_vehicle_id(profile=profile, user_id=user_id, db=db),
+        vehicle_id=vehicle_id,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
@@ -153,15 +159,42 @@ def create_import_profile(
 def list_import_profiles(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[CsvImportProfilePublic]:
-    profiles = db.scalars(
+    query = (
         select(CsvImportProfile)
         .where(CsvImportProfile.user_id == current_user.id)
         .order_by(desc(CsvImportProfile.updated_at), desc(CsvImportProfile.created_at))
-    ).all()
+    )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    profiles = db.scalars(query).all()
+    profile_vehicle_ids = {
+        profile.vehicle_id for profile in profiles if profile.vehicle_id is not None
+    }
+    valid_vehicle_ids = (
+        set(
+            db.scalars(
+                select(Vehicle.id).where(
+                    Vehicle.user_id == current_user.id,
+                    Vehicle.id.in_(profile_vehicle_ids),
+                )
+            ).all()
+        )
+        if profile_vehicle_ids
+        else set()
+    )
 
     return [
-        profile_to_public(profile=profile, user_id=current_user.id, db=db)
+        profile_to_public(
+            profile=profile,
+            user_id=current_user.id,
+            db=db,
+            valid_vehicle_ids=valid_vehicle_ids,
+        )
         for profile in profiles
     ]
 

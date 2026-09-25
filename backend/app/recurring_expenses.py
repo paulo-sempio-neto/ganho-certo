@@ -8,6 +8,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.expenses import money_to_cents, validate_user_vehicle
 from app.models import RecurringExpense, User
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import RecurringExpenseCreate, RecurringExpensePublic, RecurringExpenseUpdate
 
 router = APIRouter(prefix="/recurring-expenses", tags=["recurring-expenses"])
@@ -61,14 +62,19 @@ def create_recurring_expense(
 def list_recurring_expenses(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[RecurringExpense]:
-    return list(
-        db.scalars(
-            select(RecurringExpense)
-            .where(RecurringExpense.user_id == current_user.id)
-            .order_by(desc(RecurringExpense.start_date), desc(RecurringExpense.created_at))
-        ).all()
+    query = (
+        select(RecurringExpense)
+        .where(RecurringExpense.user_id == current_user.id)
+        .order_by(desc(RecurringExpense.start_date), desc(RecurringExpense.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{recurring_expense_id}", response_model=RecurringExpensePublic)

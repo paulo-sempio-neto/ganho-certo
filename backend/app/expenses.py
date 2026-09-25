@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Expense, User, Vehicle
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import ExpenseCreate, ExpensePublic, ExpenseUpdate
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -63,14 +64,19 @@ def create_expense(
 def list_expenses(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[Expense]:
-    return list(
-        db.scalars(
-            select(Expense)
-            .where(Expense.user_id == current_user.id)
-            .order_by(desc(Expense.expense_date), desc(Expense.created_at))
-        ).all()
+    query = (
+        select(Expense)
+        .where(Expense.user_id == current_user.id)
+        .order_by(desc(Expense.expense_date), desc(Expense.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{expense_id}", response_model=ExpensePublic)

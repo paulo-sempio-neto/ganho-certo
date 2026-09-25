@@ -1,4 +1,6 @@
 from collections.abc import Generator
+from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Expense, WorkSession
+from app.models import Expense, Vehicle, WorkSession
 
 
 @pytest.fixture
@@ -95,6 +97,24 @@ def create_work_session(client: TestClient, token: str, vehicle_id: int) -> int:
     )
     assert response.status_code == 201
     return int(response.json()["id"])
+
+
+def seed_work_sessions(db_session: Session, vehicle_id: int, total: int) -> None:
+    vehicle = db_session.get(Vehicle, vehicle_id)
+    assert vehicle is not None
+    db_session.add_all(
+        WorkSession(
+            user_id=vehicle.user_id,
+            vehicle_id=vehicle_id,
+            work_date=date(2026, 9, (index % 28) + 1),
+            gross_revenue_cents=10000 + index,
+            distance_km=Decimal("10.00"),
+            worked_minutes=60,
+            trip_count=1,
+        )
+        for index in range(total)
+    )
+    db_session.commit()
 
 
 def quick_start_payload(
@@ -222,6 +242,42 @@ def test_list_only_current_user_work_sessions(client: TestClient) -> None:
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["vehicle_id"] == user_a_vehicle
+
+
+def test_list_work_sessions_without_limit_keeps_existing_behavior(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "work-session-no-default-limit@email.com")
+    vehicle_id = create_vehicle(client, token)
+    seed_work_sessions(db_session, vehicle_id=vehicle_id, total=105)
+
+    response = client.get("/work-sessions", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert len(response.json()) == 105
+
+
+def test_list_work_sessions_supports_limit_and_offset(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "work-session-pagination@email.com")
+    vehicle_id = create_vehicle(client, token)
+    seed_work_sessions(db_session, vehicle_id=vehicle_id, total=5)
+
+    response = client.get("/work-sessions?limit=2&offset=2", headers=auth_headers(token))
+
+    assert response.status_code == 200
+    assert len(response.json()) == 2
+
+
+def test_list_work_sessions_rejects_limit_above_maximum(client: TestClient) -> None:
+    token = register_and_login(client, "work-session-max-limit@email.com")
+
+    response = client.get("/work-sessions?limit=501", headers=auth_headers(token))
+
+    assert response.status_code == 422
 
 
 def test_get_own_work_session(client: TestClient) -> None:

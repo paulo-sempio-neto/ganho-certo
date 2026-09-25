@@ -11,6 +11,7 @@ from app.database import get_db
 from app.expenses import money_to_cents, validate_user_vehicle
 from app.financial_summary import divide_or_none, round_decimal
 from app.models import MaintenancePlan, MaintenanceRecord, User, Vehicle, WorkSession
+from app.pagination import PaginationParams, get_pagination_params
 from app.schemas import (
     MaintenancePlanCreate,
     MaintenancePlanPublic,
@@ -45,6 +46,7 @@ def latest_record(plan_id: int, db: Session) -> MaintenanceRecord | None:
         select(MaintenanceRecord)
         .where(MaintenanceRecord.maintenance_plan_id == plan_id)
         .order_by(desc(MaintenanceRecord.service_date), desc(MaintenanceRecord.created_at))
+        .limit(1)
     )
 
 
@@ -169,15 +171,20 @@ def create_maintenance_plan(
 def list_maintenance_plans(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[MaintenancePlan]:
-    return list(
-        db.scalars(
-            select(MaintenancePlan)
-            .join(Vehicle)
-            .where(Vehicle.user_id == current_user.id)
-            .order_by(desc(MaintenancePlan.created_at))
-        ).all()
+    query = (
+        select(MaintenancePlan)
+        .join(Vehicle)
+        .where(Vehicle.user_id == current_user.id)
+        .order_by(desc(MaintenancePlan.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{plan_id}", response_model=MaintenancePlanPublic)
@@ -253,15 +260,20 @@ def list_maintenance_records(
     plan_id: int,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
+    pagination: Annotated[PaginationParams, Depends(get_pagination_params)],
 ) -> list[MaintenanceRecord]:
     get_user_maintenance_plan(plan_id=plan_id, user_id=current_user.id, db=db)
-    return list(
-        db.scalars(
-            select(MaintenanceRecord)
-            .where(MaintenanceRecord.maintenance_plan_id == plan_id)
-            .order_by(desc(MaintenanceRecord.service_date), desc(MaintenanceRecord.created_at))
-        ).all()
+    query = (
+        select(MaintenanceRecord)
+        .where(MaintenanceRecord.maintenance_plan_id == plan_id)
+        .order_by(desc(MaintenanceRecord.service_date), desc(MaintenanceRecord.created_at))
     )
+    if pagination.limit is not None:
+        query = query.limit(pagination.limit)
+    if pagination.offset:
+        query = query.offset(pagination.offset)
+
+    return list(db.scalars(query).all())
 
 
 @router.get("/{plan_id}/status", response_model=MaintenancePlanStatus)
