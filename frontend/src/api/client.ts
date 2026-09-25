@@ -5,6 +5,10 @@ export function getDefaultErrorMessage(status: number): string {
     return "Sessao expirada ou invalida. Entre novamente.";
   }
 
+  if (status === 429) {
+    return "Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.";
+  }
+
   if (status === 409) {
     return "Conflito ao concluir a solicitacao.";
   }
@@ -21,7 +25,7 @@ export function getDefaultErrorMessage(status: number): string {
 }
 
 export async function getErrorMessage(response: Response): Promise<string> {
-  if (response.status !== 409) {
+  if (response.status !== 400 && response.status !== 409) {
     return getDefaultErrorMessage(response.status);
   }
 

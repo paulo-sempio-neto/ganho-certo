@@ -1,4 +1,4 @@
-export type AuthMode = "login" | "register";
+export type AuthMode = "login" | "register" | "forgot-password";
 export type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
 export type OwnershipType = "owned" | "financed" | "rented";
 export type DashboardPeriod = "today" | "last7" | "month" | "custom";

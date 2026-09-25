@@ -14,6 +14,9 @@ import {
 import { getFinancialHistory, getFinancialInsights, getFinancialSummary } from "./api/financial";
 import { listVehicles } from "./api/vehicles";
 import "./App.css";
+import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
+import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
+import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
 import { CsvImportSection } from "./features/imports/CsvImportSection";
 import { ResultSection } from "./features/result/ResultSection";
 import {
@@ -69,6 +72,7 @@ import {
 } from "./utils/money";
 
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
+const RESET_PASSWORD_PATH = "/reset-password";
 
 type WorkSessionForm = {
   work_date: string;
@@ -162,6 +166,14 @@ type QuickDailyEntryResult = {
   vehicle: Vehicle;
   workDate: string;
 };
+
+function getResetPasswordTokenFromUrl(): string {
+  if (window.location.pathname !== RESET_PASSWORD_PATH) {
+    return "";
+  }
+
+  return new URLSearchParams(window.location.search).get("token") ?? "";
+}
 
 const ownershipOptions: Array<{ label: string; value: OwnershipType }> = [
   { label: "Proprio", value: "owned" },
@@ -368,6 +380,10 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY));
+  const [isResetPasswordRoute, setIsResetPasswordRoute] = useState(
+    () => window.location.pathname === RESET_PASSWORD_PATH,
+  );
+  const [resetPasswordToken, setResetPasswordToken] = useState(getResetPasswordTokenFromUrl);
   const [user, setUser] = useState<User | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
@@ -410,6 +426,7 @@ function App() {
   const [pendingQuickDailyEntry, setPendingQuickDailyEntry] = useState(false);
   const [dailyExpenseForm, setDailyExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [dailyExpenseVisible, setDailyExpenseVisible] = useState(false);
+  const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [pendingQuickStartAction, setPendingQuickStartAction] = useState<
     "register" | "configure" | null
   >(null);
@@ -490,6 +507,7 @@ function App() {
     setPendingQuickDailyEntry(false);
     setDailyExpenseForm(emptyExpenseForm);
     setDailyExpenseVisible(false);
+    setIsChangePasswordVisible(false);
     setPendingQuickStartAction(null);
     setMode("login");
     setPassword("");
@@ -821,6 +839,11 @@ function App() {
   }
 
   useEffect(() => {
+    if (isResetPasswordRoute) {
+      setUser(null);
+      return;
+    }
+
     if (!token) {
       setUser(null);
       setVehicles([]);
@@ -863,7 +886,7 @@ function App() {
     }
 
     void loadSession();
-  }, [token]);
+  }, [token, isResetPasswordRoute]);
 
   useEffect(() => {
     if (!token || !user) {
@@ -888,6 +911,38 @@ function App() {
     setPassword("");
     setMessage("");
     setSuccessMessage("");
+  }
+
+  function handleBackToLogin(nextSuccessMessage = "") {
+    window.history.replaceState(null, "", "/");
+    setIsResetPasswordRoute(false);
+    setResetPasswordToken("");
+    setMode("login");
+    setName("");
+    setPassword("");
+    setMessage("");
+    setSuccessMessage(nextSuccessMessage);
+  }
+
+  function handleRequestNewResetLink() {
+    window.history.replaceState(null, "", "/");
+    setIsResetPasswordRoute(false);
+    setResetPasswordToken("");
+    setMode("forgot-password");
+    setMessage("");
+    setSuccessMessage("");
+  }
+
+  function handleResetComplete() {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    setToken(null);
+    setUser(null);
+    window.history.replaceState(null, "", RESET_PASSWORD_PATH);
+    setResetPasswordToken("");
+  }
+
+  function handlePasswordChanged(nextMessage: string) {
+    endSession(nextMessage);
   }
 
   async function handleRegister() {
@@ -1897,8 +1952,8 @@ function App() {
                 <p className="eyebrow">GanhoCerto</p>
                 <h2>{workSessions.length === 0 ? "Descubra seu GanhoCerto" : `Ola, ${user.name}.`}</h2>
               </div>
-              <details className="account-menu">
-                <summary>Conta</summary>
+              <details className="account-menu" id="mais">
+                <summary>Mais</summary>
                 <dl className="user-data compact-user-data">
                   <div>
                     <dt>Nome</dt>
@@ -1909,6 +1964,24 @@ function App() {
                     <dd>{user.email}</dd>
                   </div>
                 </dl>
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  onClick={() => {
+                    setIsChangePasswordVisible((current) => !current);
+                    setMessage("");
+                    setSuccessMessage("");
+                  }}
+                >
+                  Alterar senha
+                </button>
+                {isChangePasswordVisible ? (
+                  <ChangePasswordForm
+                    getAuthHeaders={getAuthHeaders}
+                    onCancel={() => setIsChangePasswordVisible(false)}
+                    onPasswordChanged={handlePasswordChanged}
+                  />
+                ) : null}
                 <button className="button button-secondary" type="button" onClick={handleLogout}>
                   Sair
                 </button>
@@ -4166,72 +4239,103 @@ function App() {
           </div>
         ) : (
           <>
-            <div className="tabs" role="tablist" aria-label="Autenticacao">
-              <button
-                className={mode === "login" ? "tab tab-active" : "tab"}
-                type="button"
-                onClick={() => resetForm("login")}
-              >
-                Login
-              </button>
-              <button
-                className={mode === "register" ? "tab tab-active" : "tab"}
-                type="button"
-                onClick={() => resetForm("register")}
-              >
-                Cadastro
-              </button>
-            </div>
+            {isResetPasswordRoute ? (
+              <ResetPasswordForm
+                token={resetPasswordToken}
+                onBackToLogin={handleBackToLogin}
+                onRequestNewLink={handleRequestNewResetLink}
+                onResetComplete={handleResetComplete}
+              />
+            ) : (
+              <>
+                {mode === "forgot-password" ? null : (
+                  <div className="tabs" role="tablist" aria-label="Autenticacao">
+                    <button
+                      className={mode === "login" ? "tab tab-active" : "tab"}
+                      type="button"
+                      onClick={() => resetForm("login")}
+                    >
+                      Login
+                    </button>
+                    <button
+                      className={mode === "register" ? "tab tab-active" : "tab"}
+                      type="button"
+                      onClick={() => resetForm("register")}
+                    >
+                      Cadastro
+                    </button>
+                  </div>
+                )}
 
-            <form className="auth-form" onSubmit={handleSubmit}>
-              <h2>{mode === "login" ? "Entrar" : "Criar conta"}</h2>
+                {mode === "forgot-password" ? (
+                  <ForgotPasswordForm initialEmail={email} onBackToLogin={handleBackToLogin} />
+                ) : (
+                  <form className="auth-form" onSubmit={handleSubmit}>
+                    <h2>{mode === "login" ? "Entrar" : "Criar conta"}</h2>
 
-              {mode === "register" ? (
-                <label>
-                  Nome
-                  <input
-                    autoComplete="name"
-                    name="name"
-                    onChange={(event) => setName(event.target.value)}
-                    required
-                    type="text"
-                    value={name}
-                  />
-                </label>
-              ) : null}
+                    {mode === "register" ? (
+                      <label>
+                        Nome
+                        <input
+                          autoComplete="name"
+                          name="name"
+                          onChange={(event) => setName(event.target.value)}
+                          required
+                          type="text"
+                          value={name}
+                        />
+                      </label>
+                    ) : null}
 
-              <label>
-                Email
-                <input
-                  autoComplete="email"
-                  name="email"
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  type="email"
-                  value={email}
-                />
-              </label>
+                    <label>
+                      Email
+                      <input
+                        autoComplete="email"
+                        name="email"
+                        onChange={(event) => setEmail(event.target.value)}
+                        required
+                        type="email"
+                        value={email}
+                      />
+                    </label>
 
-              <label>
-                Senha
-                <input
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  minLength={mode === "login" ? 1 : 6}
-                  name="password"
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  type="password"
-                  value={password}
-                />
-              </label>
+                    <label>
+                      Senha
+                      <input
+                        autoComplete={mode === "login" ? "current-password" : "new-password"}
+                        minLength={mode === "login" ? 1 : 6}
+                        name="password"
+                        onChange={(event) => setPassword(event.target.value)}
+                        required
+                        type="password"
+                        value={password}
+                      />
+                    </label>
 
-              {message ? <p className="form-message">{message}</p> : null}
-              {successMessage ? <p className="success-message">{successMessage}</p> : null}
+                    {message ? <p className="form-message">{message}</p> : null}
+                    {successMessage ? <p className="success-message">{successMessage}</p> : null}
 
-              <button className="button" disabled={isLoading} type="submit">
-                {isLoading ? "Enviando..." : mode === "login" ? "Entrar" : "Cadastrar"}
-              </button>
-            </form>
+                    <button className="button" disabled={isLoading} type="submit">
+                      {isLoading ? "Enviando..." : mode === "login" ? "Entrar" : "Cadastrar"}
+                    </button>
+                    {mode === "login" ? (
+                      <button
+                        className="text-button inline-action"
+                        type="button"
+                        onClick={() => {
+                          setMode("forgot-password");
+                          setMessage("");
+                          setSuccessMessage("");
+                          setPassword("");
+                        }}
+                      >
+                        Esqueci minha senha
+                      </button>
+                    ) : null}
+                  </form>
+                )}
+              </>
+            )}
           </>
         )}
       </section>
