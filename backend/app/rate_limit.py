@@ -101,6 +101,10 @@ def register_rate_limit_key(request: Request) -> str:
     return f"auth:register:ip:{get_client_ip(request)}"
 
 
+def password_reset_rate_limit_key(request: Request) -> str:
+    return f"auth:password-reset:ip:{get_client_ip(request)}"
+
+
 def reject_rate_limited(retry_after_seconds: int) -> None:
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,

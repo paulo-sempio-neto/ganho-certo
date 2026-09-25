@@ -78,6 +78,29 @@ cd backend
 alembic upgrade head
 ```
 
+## Recuperacao de senha
+
+O fluxo de recuperacao usa tokens de uso unico, armazenados apenas como hash e
+validos por `PASSWORD_RESET_TOKEN_EXPIRE_MINUTES` minutos (padrao: 30). O link
+enviado por email usa `FRONTEND_BASE_URL` no formato
+`/reset-password?token=<token>`.
+
+Em desenvolvimento local, se `SMTP_HOST` e `SMTP_FROM_EMAIL` nao estiverem
+configurados, o email nao e enviado. Em `APP_ENV=production`, a recuperacao
+retorna erro seguro enquanto SMTP nao estiver configurado.
+
+Variaveis SMTP:
+
+```text
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_USE_TLS=true
+FRONTEND_BASE_URL=<URL publica do frontend>
+```
+
 ## Production deployment
 
 Arquitetura planejada:
