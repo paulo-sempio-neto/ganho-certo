@@ -1,257 +1,89 @@
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
 
+import { requestApi } from "./api/client";
+import {
+  createExpense,
+  createRecurringExpense,
+  deleteExpense,
+  deleteRecurringExpense,
+  listExpenses,
+  listRecurringExpenses,
+  updateExpense,
+  updateRecurringExpense,
+} from "./api/expenses";
+import { getFinancialHistory, getFinancialInsights, getFinancialSummary } from "./api/financial";
+import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from "./api/vehicles";
 import "./App.css";
+import type {
+  AuthMode,
+  CsvImportColumnMapping,
+  CsvImportProfile,
+  CsvImportProfileMatchResponse,
+  DashboardPeriod,
+  Expense,
+  ExpenseCategory,
+  ExpenseImportField,
+  ExpenseImportMapping,
+  ExpenseImportPreview,
+  ExpenseImportResult,
+  FuelType,
+  FinancialGoalType,
+  FinancialHistoryGrouping,
+  HistoryChartMetric,
+  HistoryPeriodPreset,
+  MaintenanceCategory,
+  MaintenancePlan,
+  MaintenancePlanStatus,
+  MaintenanceRecord,
+  MaintenanceStatusType,
+  OwnershipType,
+  RecurringExpense,
+  RecurringExpenseFrequency,
+  TokenResponse,
+  User,
+  Vehicle,
+  WorkSession,
+  WorkSessionImportField,
+  WorkSessionImportMapping,
+  WorkSessionImportPreview,
+  WorkSessionImportResult,
+} from "./types/domain";
+import type {
+  FinancialGoal,
+  FinancialGoalProgress,
+  FinancialHistoryMetricComparison,
+  FinancialHistoryPeriod,
+  FinancialHistoryResponse,
+  FinancialHistoryTrendFact,
+  FinancialInsight,
+  FinancialStructuralCosts,
+  FinancialSummary,
+} from "./types/financial";
+import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
+import {
+  formatDate,
+  formatDistance,
+  formatFileSize,
+  formatWorkTime,
+  getImportFieldLabel,
+  getImportProfileTypeLabel,
+  getProgressWidth,
+} from "./utils/formatters";
+import {
+  formatMoney,
+  formatMoneyPerKm,
+  formatOptionalDecimalForInput,
+  formatOptionalMoneyForInput,
+  moneyInputToApi,
+  moneyInputToCents,
+  moneyValueToCents,
+  normalizeDecimalInput,
+  optionalDecimalInputToApi,
+  optionalMoneyInputToApi,
+  parseNonNegativeDecimal,
+} from "./utils/money";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
-
-type AuthMode = "login" | "register";
-type FuelType = "gasoline" | "ethanol" | "flex" | "diesel" | "electric" | "hybrid" | "other";
-type OwnershipType = "owned" | "financed" | "rented";
-type DashboardPeriod = "today" | "last7" | "month" | "custom";
-type HistoryPeriodPreset = "last7" | "last30" | "last90" | "month" | "custom";
-type FinancialHistoryGrouping = "daily" | "weekly" | "monthly";
-type FinancialHistoryTrendDirection = "increased" | "decreased" | "unchanged";
-type HistoryChartMetric =
-  | "estimated_result"
-  | "estimated_result_per_hour"
-  | "estimated_result_per_km";
-type RecurringExpenseFrequency = "weekly" | "monthly" | "yearly";
-type FinancialGoalType = "net" | "projected";
-type FinancialInsightType = "info" | "positive" | "attention";
-type MaintenanceCategory =
-  | "oil"
-  | "tires"
-  | "brakes"
-  | "filters"
-  | "alignment"
-  | "battery"
-  | "inspection"
-  | "transmission"
-  | "cooling"
-  | "other";
-type MaintenanceStatusType = "ok" | "due_soon" | "due";
-type WorkSessionImportField =
-  | "date"
-  | "gross_revenue"
-  | "distance_km"
-  | "worked_minutes"
-  | "trip_count";
-type ExpenseImportField = "expense_date" | "amount" | "category" | "description";
-type CsvImportType = "work_sessions" | "expenses";
-type CsvImportColumnMapping = Partial<
-  Record<WorkSessionImportField | ExpenseImportField, string>
->;
-
-type User = {
-  id: number;
-  name: string;
-  email: string;
-  created_at: string;
-};
-
-type TokenResponse = {
-  access_token: string;
-  token_type: string;
-};
-
-type Vehicle = {
-  id: number;
-  name: string;
-  brand: string;
-  model: string;
-  year: number;
-  fuel_type: FuelType;
-  created_at: string;
-};
-
-type WorkSession = {
-  id: number;
-  vehicle_id: number;
-  work_date: string;
-  gross_revenue: string;
-  distance_km: string;
-  worked_minutes: number;
-  trip_count: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type WorkSessionImportRow = {
-  row: number;
-  date: string;
-  gross_revenue: string;
-  distance_km: string;
-  worked_minutes: number;
-  trip_count: number;
-};
-
-type WorkSessionImportError = {
-  row: number;
-  field: string;
-  message: string;
-};
-
-type WorkSessionImportPreview = {
-  total_rows: number;
-  valid_rows: number;
-  invalid_rows: number;
-  columns_found: string[];
-  suggested_mapping: Partial<Record<WorkSessionImportField, string>>;
-  column_mapping: Partial<Record<WorkSessionImportField, string>>;
-  rows: WorkSessionImportRow[];
-  errors: WorkSessionImportError[];
-};
-
-type WorkSessionImportMapping = Record<WorkSessionImportField, string>;
-
-type WorkSessionImportResult = {
-  imported: number;
-  duplicates_skipped: number;
-  failed: number;
-  errors: WorkSessionImportError[];
-};
-
-type ExpenseImportRow = {
-  row: number;
-  expense_date: string;
-  amount: string;
-  category: ExpenseCategory;
-  description: string | null;
-};
-
-type ExpenseImportPreview = {
-  total_rows: number;
-  valid_rows: number;
-  invalid_rows: number;
-  columns_found: string[];
-  suggested_mapping: Partial<Record<ExpenseImportField, string>>;
-  column_mapping: Partial<Record<ExpenseImportField, string>>;
-  rows: ExpenseImportRow[];
-  errors: WorkSessionImportError[];
-};
-
-type ExpenseImportMapping = Record<ExpenseImportField, string>;
-
-type ExpenseImportResult = {
-  imported: number;
-  duplicates_skipped: number;
-  failed: number;
-  errors: WorkSessionImportError[];
-};
-
-type CsvImportProfile = {
-  id: number;
-  name: string;
-  import_type: CsvImportType;
-  header_signature: string;
-  column_mapping: CsvImportColumnMapping;
-  vehicle_id: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type CsvImportProfileMatchResponse = {
-  profile: CsvImportProfile | null;
-  column_mapping: CsvImportColumnMapping | null;
-  vehicle_id: number | null;
-};
-
-type ExpenseCategory =
-  | "fuel"
-  | "charging"
-  | "maintenance"
-  | "parking"
-  | "toll"
-  | "insurance"
-  | "rental"
-  | "financing"
-  | "washing"
-  | "other";
-
-type Expense = {
-  id: number;
-  vehicle_id: number | null;
-  expense_date: string;
-  category: ExpenseCategory;
-  amount: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-type RecurringExpense = {
-  id: number;
-  vehicle_id: number | null;
-  category: ExpenseCategory;
-  amount: string;
-  frequency: RecurringExpenseFrequency;
-  start_date: string;
-  end_date: string | null;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type FinancialGoal = {
-  id: number;
-  vehicle_id: number | null;
-  goal_type: FinancialGoalType;
-  target_amount: string;
-  start_date: string;
-  end_date: string;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type FinancialGoalProgress = {
-  target_amount: string;
-  current_amount: string;
-  remaining_amount: string;
-  progress_percentage: string;
-  days_total: number;
-  days_elapsed: number;
-  days_remaining: number;
-  required_daily_amount: string;
-  projected_completion_amount: string;
-  on_track: boolean;
-  average_net_per_hour: string | null;
-  average_projected_per_hour: string | null;
-  estimated_hours_remaining: string | null;
-};
-
-type MaintenancePlan = {
-  id: number;
-  vehicle_id: number;
-  name: string;
-  category: MaintenanceCategory;
-  interval_km: string | null;
-  interval_days: number | null;
-  estimated_cost: string | null;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type MaintenanceRecord = {
-  id: number;
-  maintenance_plan_id: number;
-  service_date: string;
-  notes: string | null;
-  created_at: string;
-};
-
-type MaintenancePlanStatus = {
-  status: MaintenanceStatusType;
-  km_since_last_service: string | null;
-  km_remaining: string | null;
-  days_since_last_service: number | null;
-  days_remaining: number | null;
-  estimated_cost: string | null;
-  recommended_reserve_per_km: string | null;
-};
 
 type VehicleForm = {
   name: string;
@@ -384,124 +216,6 @@ type QuickDailyEntryResult = {
   tripCount: number;
   vehicle: Vehicle;
   workDate: string;
-};
-
-type FinancialDailySummary = {
-  date: string;
-  gross_revenue: string;
-  expenses: string;
-  estimated_net_profit: string;
-};
-
-type FinancialStructuralCosts = {
-  ownership: string;
-  insurance: string;
-  ipva: string;
-  other_fixed: string;
-  maintenance: string;
-  tires: string;
-  oil: string;
-  depreciation: string;
-};
-
-type FinancialRecurringExpenseBreakdown = {
-  category: ExpenseCategory;
-  amount: string;
-};
-
-type FinancialSummary = {
-  gross_revenue: string;
-  total_expenses: string;
-  estimated_net_profit: string;
-  estimated_structural_costs: string;
-  estimated_economic_costs: string;
-  estimated_economic_result: string;
-  recurring_expenses_total: string;
-  recurring_expenses_breakdown: FinancialRecurringExpenseBreakdown[];
-  projected_economic_costs: string;
-  projected_economic_result: string;
-  structural_costs: FinancialStructuralCosts;
-  total_distance_km: string;
-  total_worked_minutes: number;
-  total_trip_count: number;
-  gross_per_hour: string | null;
-  net_per_hour: string | null;
-  gross_per_km: string | null;
-  net_per_km: string | null;
-  expense_per_km: string | null;
-  average_ticket: string | null;
-  daily: FinancialDailySummary[];
-};
-
-type FinancialInsight = {
-  code: string;
-  type: FinancialInsightType;
-  title: string;
-  message: string;
-};
-
-type FinancialInsightsResponse = {
-  insights: FinancialInsight[];
-};
-
-type FinancialHistoryPeriod = {
-  period_start: string;
-  period_end: string;
-  gross_revenue: string;
-  registered_expenses: string;
-  estimated_structural_costs: string;
-  recurring_projected_expenses: string;
-  cash_remaining: string;
-  estimated_result: string;
-  projected_result: string;
-  worked_minutes: number;
-  distance_km: string;
-  trip_count: number;
-  revenue_per_hour: string | null;
-  estimated_result_per_hour: string | null;
-  revenue_per_km: string | null;
-  estimated_result_per_km: string | null;
-};
-
-type FinancialHistoryMetricComparison = {
-  current: string | null;
-  previous: string | null;
-  absolute_delta: string | null;
-  percentage_delta: string | null;
-};
-
-type FinancialHistoryComparison = {
-  current_period_start: string;
-  current_period_end: string;
-  previous_period_start: string;
-  previous_period_end: string;
-  gross_revenue: FinancialHistoryMetricComparison;
-  registered_expenses: FinancialHistoryMetricComparison;
-  estimated_result: FinancialHistoryMetricComparison;
-  projected_result: FinancialHistoryMetricComparison;
-  worked_minutes: FinancialHistoryMetricComparison;
-  distance_km: FinancialHistoryMetricComparison;
-  estimated_result_per_hour: FinancialHistoryMetricComparison;
-  estimated_result_per_km: FinancialHistoryMetricComparison;
-};
-
-type FinancialHistoryTrendFact = {
-  metric: string;
-  direction: FinancialHistoryTrendDirection;
-  current: string;
-  previous: string;
-  absolute_delta: string;
-  percentage_delta: string | null;
-};
-
-type FinancialHistoryResponse = {
-  start_date: string;
-  end_date: string;
-  vehicle_id: number | null;
-  grouping: FinancialHistoryGrouping;
-  periods: FinancialHistoryPeriod[];
-  comparison: FinancialHistoryComparison;
-  trend_facts: FinancialHistoryTrendFact[];
 };
 
 const fuelOptions: Array<{ label: string; value: FuelType }> = [
@@ -723,95 +437,6 @@ const emptyQuickDailyEntryForm: QuickDailyEntryForm = {
   work_date: toDateInputValue(new Date()),
 };
 
-function toDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(date: Date, days: number): Date {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + days);
-  return nextDate;
-}
-
-function parseDateInput(value: string): Date {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function getInclusiveDateCount(startDate: string, endDate: string): number {
-  const start = parseDateInput(startDate);
-  const end = parseDateInput(endDate);
-  const millisecondsPerDay = 24 * 60 * 60 * 1000;
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / millisecondsPerDay) + 1);
-}
-
-function getPeriodDates(period: DashboardPeriod, customStartDate: string, customEndDate: string) {
-  const today = new Date();
-
-  if (period === "today") {
-    const todayValue = toDateInputValue(today);
-    return { startDate: todayValue, endDate: todayValue };
-  }
-
-  if (period === "last7") {
-    const start = new Date(today);
-    start.setDate(today.getDate() - 6);
-    return { startDate: toDateInputValue(start), endDate: toDateInputValue(today) };
-  }
-
-  if (period === "month") {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    return { startDate: toDateInputValue(start), endDate: toDateInputValue(today) };
-  }
-
-  return { startDate: customStartDate, endDate: customEndDate };
-}
-
-function getHistoryPeriodDates(
-  period: HistoryPeriodPreset,
-  customStartDate: string,
-  customEndDate: string,
-) {
-  const today = new Date();
-
-  if (period === "last7") {
-    return { startDate: toDateInputValue(addDays(today, -6)), endDate: toDateInputValue(today) };
-  }
-
-  if (period === "last30") {
-    return { startDate: toDateInputValue(addDays(today, -29)), endDate: toDateInputValue(today) };
-  }
-
-  if (period === "last90") {
-    return { startDate: toDateInputValue(addDays(today, -89)), endDate: toDateInputValue(today) };
-  }
-
-  if (period === "month") {
-    return {
-      startDate: toDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)),
-      endDate: toDateInputValue(today),
-    };
-  }
-
-  return { startDate: customStartDate, endDate: customEndDate };
-}
-
-function getDefaultHistoryGrouping(startDate: string, endDate: string): FinancialHistoryGrouping {
-  const days = getInclusiveDateCount(startDate, endDate);
-  if (days <= 14) {
-    return "daily";
-  }
-
-  if (days <= 60) {
-    return "weekly";
-  }
-
-  return "monthly";
-}
-
 function getFuelLabel(value: FuelType): string {
   return fuelOptions.find((option) => option.value === value)?.label ?? value;
 }
@@ -856,180 +481,6 @@ function getMaintenanceStatusClass(value: MaintenanceStatusType): string {
   return "status-pill status-active";
 }
 
-function getDefaultErrorMessage(status: number): string {
-  if (status === 401) {
-    return "Sessao expirada ou invalida. Entre novamente.";
-  }
-
-  if (status === 409) {
-    return "Conflito ao concluir a solicitacao.";
-  }
-
-  if (status === 422) {
-    return "Verifique os campos informados.";
-  }
-
-  if (status === 404) {
-    return "Registro nao encontrado.";
-  }
-
-  return "Nao foi possivel concluir a solicitacao.";
-}
-
-async function getErrorMessage(response: Response): Promise<string> {
-  if (response.status !== 409) {
-    return getDefaultErrorMessage(response.status);
-  }
-
-  try {
-    const payload: unknown = await response.json();
-    if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "detail" in payload &&
-      typeof payload.detail === "string"
-    ) {
-      return payload.detail === "Email already registered."
-        ? "Este email ja esta cadastrado."
-        : payload.detail;
-    }
-  } catch {
-    // Fall back to a generic message when the API does not return JSON.
-  }
-
-  return getDefaultErrorMessage(response.status);
-}
-
-function normalizeDecimalInput(value: string): string {
-  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
-  if (!/^\d+(\.\d+)?$/.test(normalized)) {
-    throw new Error("Verifique os campos numericos informados.");
-  }
-
-  return normalized;
-}
-
-function moneyInputToApi(value: string): string {
-  const cleaned = value.trim().replace(/R\$/gi, "").replace(/\s/g, "");
-  const lastComma = cleaned.lastIndexOf(",");
-  const lastDot = cleaned.lastIndexOf(".");
-  const decimalIndex = Math.max(lastComma, lastDot);
-  let normalized = cleaned;
-
-  if (decimalIndex >= 0) {
-    const integerPart = cleaned.slice(0, decimalIndex).replace(/[.,]/g, "");
-    const decimalPart = cleaned.slice(decimalIndex + 1);
-    if (!integerPart || !decimalPart) {
-      throw new Error("Informe um valor em reais, por exemplo 250,50.");
-    }
-
-    if (decimalPart.length <= 2) {
-      normalized = `${integerPart}.${decimalPart}`;
-    } else if (
-      decimalPart.length === 3 &&
-      (lastComma < 0 || lastDot < 0) &&
-      /^[\d.]+$/.test(cleaned)
-    ) {
-      normalized = `${cleaned.replace(/[.,]/g, "")}.00`;
-    }
-  }
-
-  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
-    throw new Error("Informe um valor em reais, por exemplo 250,50.");
-  }
-
-  const [reais, cents = ""] = normalized.split(".");
-  const safeReais = reais.replace(/^0+(?=\d)/, "") || "0";
-  const safeCents = `${cents}00`.slice(0, 2);
-  return `${safeReais}.${safeCents}`;
-}
-
-function optionalMoneyInputToApi(value: string): string | null {
-  if (!value.trim()) {
-    return null;
-  }
-
-  return moneyInputToApi(value);
-}
-
-function optionalDecimalInputToApi(value: string): string | null {
-  if (!value.trim()) {
-    return null;
-  }
-
-  return normalizeDecimalInput(value);
-}
-
-function formatMoney(value: string): string {
-  const [reais, cents = "00"] = value.split(".");
-  const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `R$ ${groupedReais},${`${cents}00`.slice(0, 2)}`;
-}
-
-function formatMoneyPerKm(value: string): string {
-  const [reais, fraction = ""] = value.split(".");
-  const groupedReais = reais.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const safeFraction = fraction ? `,${fraction}` : "";
-  return `R$ ${groupedReais}${safeFraction}/km`;
-}
-
-function formatOptionalMoneyForInput(value: string | null): string {
-  return value ? formatMoney(value).replace("R$ ", "") : "";
-}
-
-function formatOptionalDecimalForInput(value: string | null): string {
-  return value ? value.replace(".", ",") : "";
-}
-
-function formatDistance(value: string): string {
-  return value.replace(".", ",");
-}
-
-function formatWorkTime(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}h ${minutes.toString().padStart(2, "0")}min`;
-}
-
-function formatFileSize(size: number): string {
-  if (size < 1024) {
-    return `${size} bytes`;
-  }
-
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1).replace(".", ",")} KB`;
-  }
-
-  return `${(size / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
-}
-
-function getImportFieldLabel(field: string): string {
-  const labels: Record<string, string> = {
-    date: "Data",
-    gross_revenue: "Faturamento",
-    distance_km: "Km rodados",
-    worked_minutes: "Minutos trabalhados",
-    trip_count: "Corridas",
-    expense_date: "Data",
-    amount: "Valor",
-    category: "Categoria",
-    description: "Descricao",
-    header: "Cabeçalho",
-    file: "Arquivo",
-  };
-
-  return labels[field] ?? field;
-}
-
-function getImportProfileTypeLabel(importType: CsvImportType): string {
-  return importType === "expenses" ? "Despesas" : "Jornadas";
-}
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
-}
-
 function formatPercent(value: string | null): string {
   if (value === null) {
     return "—";
@@ -1039,50 +490,12 @@ function formatPercent(value: string | null): string {
   return normalized.endsWith(",00") ? `${normalized.slice(0, -3)}%` : `${normalized}%`;
 }
 
-function getProgressWidth(value: string | null): string {
-  if (value === null) {
-    return "0%";
-  }
-
-  const percentage = Number(value);
-  if (!Number.isFinite(percentage)) {
-    return "0%";
-  }
-
-  return `${Math.min(100, Math.max(0, percentage))}%`;
-}
-
 function formatHours(value: string | null): string {
   if (value === null) {
     return "—";
   }
 
   return `${value.replace(".", ",")} h`;
-}
-
-function moneyInputToCents(value: string): bigint {
-  return BigInt(moneyInputToApi(value).replace(".", ""));
-}
-
-function moneyValueToCents(value: string): bigint {
-  const isNegative = value.startsWith("-");
-  const safeValue = isNegative ? value.slice(1) : value;
-  const [reais, cents = "00"] = safeValue.split(".");
-  const amount = BigInt(`${reais}${`${cents}00`.slice(0, 2)}`);
-  return isNegative ? -amount : amount;
-}
-
-function parseNonNegativeDecimal(value: string, fieldName: string) {
-  const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
-  if (!/^\d+(\.\d+)?$/.test(normalized)) {
-    throw new Error(`Informe ${fieldName} corretamente.`);
-  }
-
-  const [whole, fraction = ""] = normalized.split(".");
-  return {
-    units: BigInt(`${whole}${fraction}`),
-    scale: fraction.length,
-  };
 }
 
 function divideAndRound(numerator: bigint, denominator: bigint): bigint {
@@ -1105,36 +518,6 @@ function formatCents(value: bigint): string {
   const reais = (absolute / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const cents = (absolute % 100n).toString().padStart(2, "0");
   return `${isNegative ? "-" : ""}R$ ${reais},${cents}`;
-}
-
-async function requestApi<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!API_BASE_URL) {
-    throw new Error("Configure VITE_API_BASE_URL para conectar ao backend.");
-  }
-
-  let response: Response;
-
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-  } catch {
-    throw new Error("Backend indisponivel. Tente novamente em instantes.");
-  }
-
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response));
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
 }
 
 function App() {
@@ -1430,51 +813,6 @@ function App() {
     return summary.recurring_expenses_breakdown.filter((item) => isPositiveMoney(item.amount));
   }
 
-  function buildDashboardPath(endpoint: string) {
-    const params = new URLSearchParams();
-    const { startDate, endDate } = getPeriodDates(
-      dashboardPeriod,
-      customStartDate,
-      customEndDate,
-    );
-
-    if (startDate) {
-      params.set("start_date", startDate);
-    }
-
-    if (endDate) {
-      params.set("end_date", endDate);
-    }
-
-    if (dashboardVehicleId) {
-      params.set("vehicle_id", dashboardVehicleId);
-    }
-
-    const query = params.toString();
-    return `${endpoint}${query ? `?${query}` : ""}`;
-  }
-
-  function buildFinancialSummaryPath() {
-    return buildDashboardPath("/financial-summary");
-  }
-
-  function buildFinancialInsightsPath() {
-    return buildDashboardPath("/financial-insights");
-  }
-
-  function buildFinancialHistoryPath() {
-    const params = new URLSearchParams();
-    params.set("start_date", historyStartDate);
-    params.set("end_date", historyEndDate);
-    params.set("grouping", historyGrouping);
-
-    if (historyVehicleId) {
-      params.set("vehicle_id", historyVehicleId);
-    }
-
-    return `/financial-history?${params.toString()}`;
-  }
-
   function handleHistoryPeriodChange(nextPeriod: HistoryPeriodPreset) {
     const { startDate, endDate } = getHistoryPeriodDates(
       nextPeriod,
@@ -1642,9 +980,7 @@ function App() {
 
     setIsVehiclesLoading(true);
     try {
-      const nextVehicles = await requestApi<Vehicle[]>("/vehicles", {
-        headers: getAuthHeaders(currentToken),
-      });
+      const nextVehicles = await listVehicles(getAuthHeaders(currentToken));
       setVehicles(nextVehicles);
       setWorkSessionForm((currentForm) => ({
         ...currentForm,
@@ -1737,9 +1073,7 @@ function App() {
 
     setIsExpensesLoading(true);
     try {
-      const nextExpenses = await requestApi<Expense[]>("/expenses", {
-        headers: getAuthHeaders(currentToken),
-      });
+      const nextExpenses = await listExpenses(getAuthHeaders(currentToken));
       setExpenses(nextExpenses);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1759,9 +1093,7 @@ function App() {
 
     setIsRecurringExpensesLoading(true);
     try {
-      const nextRecurringExpenses = await requestApi<RecurringExpense[]>("/recurring-expenses", {
-        headers: getAuthHeaders(currentToken),
-      });
+      const nextRecurringExpenses = await listRecurringExpenses(getAuthHeaders(currentToken));
       setRecurringExpenses(nextRecurringExpenses);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1890,8 +1222,11 @@ function App() {
     setIsDashboardLoading(true);
     setDashboardError("");
     try {
-      const summary = await requestApi<FinancialSummary>(buildFinancialSummaryPath(), {
-        headers: getAuthHeaders(currentToken),
+      const summary = await getFinancialSummary(getAuthHeaders(currentToken), {
+        period: dashboardPeriod,
+        customStartDate,
+        customEndDate,
+        vehicleId: dashboardVehicleId,
       });
       setFinancialSummary(summary);
     } catch (error) {
@@ -1915,8 +1250,11 @@ function App() {
     setIsFinancialInsightsLoading(true);
     setFinancialInsightsError("");
     try {
-      const response = await requestApi<FinancialInsightsResponse>(buildFinancialInsightsPath(), {
-        headers: getAuthHeaders(currentToken),
+      const response = await getFinancialInsights(getAuthHeaders(currentToken), {
+        period: dashboardPeriod,
+        customStartDate,
+        customEndDate,
+        vehicleId: dashboardVehicleId,
       });
       setFinancialInsights(response.insights);
     } catch (error) {
@@ -1939,8 +1277,11 @@ function App() {
     setIsFinancialHistoryLoading(true);
     setFinancialHistoryError("");
     try {
-      const history = await requestApi<FinancialHistoryResponse>(buildFinancialHistoryPath(), {
-        headers: getAuthHeaders(currentToken),
+      const history = await getFinancialHistory(getAuthHeaders(currentToken), {
+        startDate: historyStartDate,
+        endDate: historyEndDate,
+        grouping: historyGrouping,
+        vehicleId: historyVehicleId,
       });
       setFinancialHistory(history);
     } catch (error) {
@@ -2510,18 +1851,10 @@ function App() {
     try {
       let savedVehicle: Vehicle | null = null;
       if (editingVehicleId) {
-        await requestApi<Vehicle>(`/vehicles/${editingVehicleId}`, {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        await updateVehicle(getAuthHeaders(), editingVehicleId, payload);
         setSuccessMessage("Veiculo atualizado com sucesso.");
       } else {
-        savedVehicle = await requestApi<Vehicle>("/vehicles", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        savedVehicle = await createVehicle(getAuthHeaders(), payload);
         setSuccessMessage("Veiculo cadastrado com sucesso.");
       }
 
@@ -2557,10 +1890,7 @@ function App() {
     setSuccessMessage("");
 
     try {
-      await requestApi<void>(`/vehicles/${vehicle.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
+      await deleteVehicle(getAuthHeaders(), vehicle.id);
       setSuccessMessage("Veiculo excluido com sucesso.");
       if (costProfileVehicleId === vehicle.id) {
         closeCostProfileForm();
@@ -3469,18 +2799,10 @@ function App() {
       };
 
       if (editingExpenseId) {
-        await requestApi<Expense>(`/expenses/${editingExpenseId}`, {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        await updateExpense(getAuthHeaders(), editingExpenseId, payload);
         setSuccessMessage("Despesa atualizada com sucesso.");
       } else {
-        await requestApi<Expense>("/expenses", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        await createExpense(getAuthHeaders(), payload);
         setSuccessMessage("Despesa cadastrada com sucesso.");
       }
 
@@ -3508,10 +2830,7 @@ function App() {
     setSuccessMessage("");
 
     try {
-      await requestApi<void>(`/expenses/${expense.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
+      await deleteExpense(getAuthHeaders(), expense.id);
       setSuccessMessage("Despesa excluida com sucesso.");
       await loadExpenses();
       await refreshDashboardData();
@@ -3568,18 +2887,10 @@ function App() {
       const payload = buildRecurringExpensePayload(recurringExpenseForm);
 
       if (editingRecurringExpenseId) {
-        await requestApi<RecurringExpense>(`/recurring-expenses/${editingRecurringExpenseId}`, {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        await updateRecurringExpense(getAuthHeaders(), editingRecurringExpenseId, payload);
         setSuccessMessage("Despesa recorrente atualizada com sucesso.");
       } else {
-        await requestApi<RecurringExpense>("/recurring-expenses", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
+        await createRecurringExpense(getAuthHeaders(), payload);
         setSuccessMessage("Despesa recorrente cadastrada com sucesso.");
       }
 
@@ -3603,19 +2914,15 @@ function App() {
     setSuccessMessage("");
 
     try {
-      await requestApi<RecurringExpense>(`/recurring-expenses/${recurringExpense.id}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          category: recurringExpense.category,
-          amount: recurringExpense.amount,
-          frequency: recurringExpense.frequency,
-          start_date: recurringExpense.start_date,
-          end_date: recurringExpense.end_date,
-          description: recurringExpense.description,
-          active: !recurringExpense.active,
-          ...(recurringExpense.vehicle_id ? { vehicle_id: recurringExpense.vehicle_id } : {}),
-        }),
+      await updateRecurringExpense(getAuthHeaders(), recurringExpense.id, {
+        category: recurringExpense.category,
+        amount: recurringExpense.amount,
+        frequency: recurringExpense.frequency,
+        start_date: recurringExpense.start_date,
+        end_date: recurringExpense.end_date,
+        description: recurringExpense.description,
+        active: !recurringExpense.active,
+        ...(recurringExpense.vehicle_id ? { vehicle_id: recurringExpense.vehicle_id } : {}),
       });
       setSuccessMessage(
         recurringExpense.active
@@ -3646,10 +2953,7 @@ function App() {
     setSuccessMessage("");
 
     try {
-      await requestApi<void>(`/recurring-expenses/${recurringExpense.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
+      await deleteRecurringExpense(getAuthHeaders(), recurringExpense.id);
       setSuccessMessage("Despesa recorrente excluida com sucesso.");
       await loadRecurringExpenses();
     } catch (error) {
