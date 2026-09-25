@@ -15,6 +15,7 @@ from app.observability import configure_logging, request_logging_middleware
 from app.recurring_expenses import router as recurring_expenses_router
 from app.vehicle_cost_profiles import router as vehicle_cost_profiles_router
 from app.vehicles import router as vehicles_router
+from app.work_patterns import router as work_patterns_router
 from app.work_session_imports import router as work_session_imports_router
 from app.work_sessions import router as work_sessions_router
 
@@ -56,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(financial_history_router)
     application.include_router(financial_insights_router)
     application.include_router(financial_summary_router)
+    application.include_router(work_patterns_router)
 
     @application.get("/health")
     def health() -> dict[str, str]:

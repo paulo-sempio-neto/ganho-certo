@@ -20,6 +20,14 @@ FinancialInsightType = Literal["info", "positive", "attention"]
 CsvImportType = Literal["work_sessions", "expenses"]
 FinancialHistoryGrouping = Literal["daily", "weekly", "monthly"]
 FinancialHistoryTrendDirection = Literal["increased", "decreased", "unchanged"]
+WorkPatternSampleClassification = Literal["insufficient", "limited", "usable"]
+WorkPatternObservationType = Literal[
+    "highest_estimated_result_per_hour_weekday",
+    "highest_estimated_result_per_km_weekday",
+    "highest_average_estimated_result_per_active_day",
+    "highest_expense_burden_weekday",
+    "most_frequently_worked_weekday",
+]
 MaintenanceCategory = Literal[
     "oil",
     "tires",
@@ -827,3 +835,94 @@ class FinancialHistoryResponse(BaseModel):
     periods: list[FinancialHistoryPeriod]
     comparison: FinancialHistoryComparison
     trend_facts: list[FinancialHistoryTrendFact]
+
+
+class WorkPatternOverallSummary(BaseModel):
+    active_days: int
+    total_worked_minutes: int
+    total_distance_km: Decimal
+    total_trip_count: int
+    gross_revenue: Decimal
+    registered_expenses: Decimal
+    estimated_result: Decimal
+    estimated_result_per_hour: Decimal | None
+    estimated_result_per_km: Decimal | None
+
+    @field_serializer(
+        "total_distance_km",
+        "gross_revenue",
+        "registered_expenses",
+        "estimated_result",
+        "estimated_result_per_hour",
+        "estimated_result_per_km",
+    )
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+
+class WorkPatternWeekdayPerformance(BaseModel):
+    weekday: str
+    active_days: int
+    sample_classification: WorkPatternSampleClassification
+    total_worked_minutes: int
+    total_distance_km: Decimal
+    total_trip_count: int
+    gross_revenue: Decimal
+    registered_expenses: Decimal
+    estimated_result: Decimal
+    average_gross_revenue_per_active_day: Decimal | None
+    average_estimated_result_per_active_day: Decimal | None
+    gross_revenue_per_hour: Decimal | None
+    estimated_result_per_hour: Decimal | None
+    gross_revenue_per_km: Decimal | None
+    estimated_result_per_km: Decimal | None
+    expense_ratio: Decimal | None
+
+    @field_serializer(
+        "total_distance_km",
+        "gross_revenue",
+        "registered_expenses",
+        "estimated_result",
+        "average_gross_revenue_per_active_day",
+        "average_estimated_result_per_active_day",
+        "gross_revenue_per_hour",
+        "estimated_result_per_hour",
+        "gross_revenue_per_km",
+        "estimated_result_per_km",
+    )
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.2f}"
+
+    @field_serializer("expense_ratio")
+    def serialize_ratio(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+
+        return f"{value:.4f}"
+
+
+class WorkPatternObservation(BaseModel):
+    type: WorkPatternObservationType
+    metric: str
+    weekday: str
+    value: Decimal
+    message: str
+
+    @field_serializer("value")
+    def serialize_value(self, value: Decimal) -> str:
+        return f"{value:.2f}"
+
+
+class WorkPatternsResponse(BaseModel):
+    start_date: date
+    end_date: date
+    vehicle_id: int | None
+    overall: WorkPatternOverallSummary
+    weekdays: list[WorkPatternWeekdayPerformance]
+    observations: list[WorkPatternObservation]
