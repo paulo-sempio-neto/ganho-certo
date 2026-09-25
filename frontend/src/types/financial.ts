@@ -151,3 +151,60 @@ export type FinancialHistoryResponse = {
   comparison: FinancialHistoryComparison;
   trend_facts: FinancialHistoryTrendFact[];
 };
+
+export type WorkPatternSampleClassification = "insufficient" | "limited" | "usable";
+
+export type WorkPatternObservationType =
+  | "highest_estimated_result_per_hour_weekday"
+  | "highest_estimated_result_per_km_weekday"
+  | "highest_average_estimated_result_per_active_day"
+  | "highest_expense_burden_weekday"
+  | "most_frequently_worked_weekday";
+
+export type WorkPatternOverallSummary = {
+  active_days: number;
+  total_worked_minutes: number;
+  total_distance_km: string;
+  total_trip_count: number;
+  gross_revenue: string;
+  registered_expenses: string;
+  estimated_result: string;
+  estimated_result_per_hour: string | null;
+  estimated_result_per_km: string | null;
+};
+
+export type WorkPatternWeekdayPerformance = {
+  weekday: string;
+  active_days: number;
+  sample_classification: WorkPatternSampleClassification;
+  total_worked_minutes: number;
+  total_distance_km: string;
+  total_trip_count: number;
+  gross_revenue: string;
+  registered_expenses: string;
+  estimated_result: string;
+  average_gross_revenue_per_active_day: string | null;
+  average_estimated_result_per_active_day: string | null;
+  gross_revenue_per_hour: string | null;
+  estimated_result_per_hour: string | null;
+  gross_revenue_per_km: string | null;
+  estimated_result_per_km: string | null;
+  expense_ratio: string | null;
+};
+
+export type WorkPatternObservation = {
+  type: WorkPatternObservationType;
+  metric: string;
+  weekday: string;
+  value: string;
+  message: string;
+};
+
+export type WorkPatternsResponse = {
+  start_date: string;
+  end_date: string;
+  vehicle_id: number | null;
+  overall: WorkPatternOverallSummary;
+  weekdays: WorkPatternWeekdayPerformance[];
+  observations: WorkPatternObservation[];
+};

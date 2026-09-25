@@ -13,6 +13,7 @@ import type {
 import { FinancialSummaryPanel } from "./FinancialSummaryPanel";
 import { HistoricalPerformanceSection } from "./HistoricalPerformanceSection";
 import { InsightsPanel } from "./InsightsPanel";
+import { WorkPatternsSection } from "./WorkPatternsSection";
 
 type DashboardFilters = {
   period: DashboardPeriod;
@@ -51,6 +52,8 @@ type ResultSectionProps = {
   insightsError: string;
   historyError: string;
   onHistoryRetry: () => void;
+  getAuthHeaders: () => Record<string, string>;
+  endSession: (message: string) => void;
   getVehicleLabel: (vehicleId: number) => string;
   getExpenseCategoryLabel: (category: ExpenseCategory) => string;
 };
@@ -69,6 +72,8 @@ export function ResultSection({
   insightsError,
   historyError,
   onHistoryRetry,
+  getAuthHeaders,
+  endSession,
   getVehicleLabel,
   getExpenseCategoryLabel,
 }: ResultSectionProps) {
@@ -87,6 +92,7 @@ export function ResultSection({
         <a href="#metas">Metas</a>
         <a href="#insights">Insights</a>
         <a href="#evolucao">EvoluÃ§Ã£o</a>
+        <a href="#padroes">Padrões</a>
       </div>
 
       <div className="dashboard-filters">
@@ -173,6 +179,13 @@ export function ResultSection({
             onGroupingChange={historyFilters.onGroupingChange}
             onVehicleChange={historyFilters.onVehicleChange}
             onRetry={onHistoryRetry}
+            getVehicleLabel={getVehicleLabel}
+          />
+
+          <WorkPatternsSection
+            vehicles={vehicles}
+            getAuthHeaders={getAuthHeaders}
+            endSession={endSession}
             getVehicleLabel={getVehicleLabel}
           />
         </>

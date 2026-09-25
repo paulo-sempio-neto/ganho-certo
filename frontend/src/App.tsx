@@ -3000,6 +3000,8 @@ function App() {
                 insightsError={financialInsightsError}
                 historyError={financialHistoryError}
                 onHistoryRetry={() => void loadFinancialHistory()}
+                getAuthHeaders={getAuthHeaders}
+                endSession={endSession}
                 getVehicleLabel={getVehicleLabel}
                 getExpenseCategoryLabel={getExpenseCategoryLabel}
               />

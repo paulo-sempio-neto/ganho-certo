@@ -4,6 +4,7 @@ import type {
   FinancialHistoryResponse,
   FinancialInsightsResponse,
   FinancialSummary,
+  WorkPatternsResponse,
 } from "../types/financial";
 import { getPeriodDates } from "../utils/dates";
 
@@ -20,6 +21,12 @@ export type FinancialHistoryQueryParams = {
   startDate: string;
   endDate: string;
   grouping: FinancialHistoryGrouping;
+  vehicleId: string;
+};
+
+export type WorkPatternsQueryParams = {
+  startDate: string;
+  endDate: string;
   vehicleId: string;
 };
 
@@ -50,6 +57,18 @@ export function buildFinancialHistoryPath(params: FinancialHistoryQueryParams) {
   return `/financial-history?${searchParams.toString()}`;
 }
 
+export function buildWorkPatternsPath(params: WorkPatternsQueryParams) {
+  const searchParams = new URLSearchParams({
+    start_date: params.startDate,
+    end_date: params.endDate,
+  });
+  if (params.vehicleId) {
+    searchParams.set("vehicle_id", params.vehicleId);
+  }
+
+  return `/work-patterns?${searchParams.toString()}`;
+}
+
 export function getFinancialSummary(headers: AuthHeaders, params: DashboardQueryParams) {
   return requestApi<FinancialSummary>(buildDashboardPath("/financial-summary", params), {
     headers,
@@ -64,6 +83,12 @@ export function getFinancialInsights(headers: AuthHeaders, params: DashboardQuer
 
 export function getFinancialHistory(headers: AuthHeaders, params: FinancialHistoryQueryParams) {
   return requestApi<FinancialHistoryResponse>(buildFinancialHistoryPath(params), {
+    headers,
+  });
+}
+
+export function getWorkPatterns(headers: AuthHeaders, params: WorkPatternsQueryParams) {
+  return requestApi<WorkPatternsResponse>(buildWorkPatternsPath(params), {
     headers,
   });
 }
