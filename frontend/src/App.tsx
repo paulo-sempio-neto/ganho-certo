@@ -14,6 +14,7 @@ import {
 import { getFinancialHistory, getFinancialInsights, getFinancialSummary } from "./api/financial";
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from "./api/vehicles";
 import "./App.css";
+import { ResultSection } from "./features/result/ResultSection";
 import type {
   AuthMode,
   CsvImportColumnMapping,
@@ -29,7 +30,6 @@ import type {
   FuelType,
   FinancialGoalType,
   FinancialHistoryGrouping,
-  HistoryChartMetric,
   HistoryPeriodPreset,
   MaintenanceCategory,
   MaintenancePlan,
@@ -51,12 +51,8 @@ import type {
 import type {
   FinancialGoal,
   FinancialGoalProgress,
-  FinancialHistoryMetricComparison,
-  FinancialHistoryPeriod,
   FinancialHistoryResponse,
-  FinancialHistoryTrendFact,
   FinancialInsight,
-  FinancialStructuralCosts,
   FinancialSummary,
 } from "./types/financial";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
@@ -234,17 +230,6 @@ const ownershipOptions: Array<{ label: string; value: OwnershipType }> = [
   { label: "Alugado", value: "rented" },
 ];
 
-const structuralCostLabels: Array<{ key: keyof FinancialStructuralCosts; label: string }> = [
-  { key: "ownership", label: "Aluguel/financiamento" },
-  { key: "insurance", label: "Seguro" },
-  { key: "ipva", label: "IPVA" },
-  { key: "other_fixed", label: "Outros custos fixos" },
-  { key: "maintenance", label: "Manutencao" },
-  { key: "tires", label: "Pneus" },
-  { key: "oil", label: "Oleo" },
-  { key: "depreciation", label: "Depreciacao" },
-];
-
 const expenseCategoryOptions: Array<{ label: string; value: ExpenseCategory }> = [
   { label: "Combustível", value: "fuel" },
   { label: "Recarga elétrica", value: "charging" },
@@ -267,26 +252,6 @@ const recurringFrequencyOptions: Array<{ label: string; value: RecurringExpenseF
 const financialGoalTypeOptions: Array<{ label: string; value: FinancialGoalType }> = [
   { label: "Meta de sobra apos despesas", value: "net" },
   { label: "Meta de resultado projetado", value: "projected" },
-];
-
-const historyPeriodOptions: Array<{ label: string; value: HistoryPeriodPreset }> = [
-  { label: "7 dias", value: "last7" },
-  { label: "30 dias", value: "last30" },
-  { label: "90 dias", value: "last90" },
-  { label: "Este mês", value: "month" },
-  { label: "Personalizado", value: "custom" },
-];
-
-const historyGroupingOptions: Array<{ label: string; value: FinancialHistoryGrouping }> = [
-  { label: "Dia", value: "daily" },
-  { label: "Semana", value: "weekly" },
-  { label: "Mês", value: "monthly" },
-];
-
-const historyChartMetricOptions: Array<{ label: string; value: HistoryChartMetric }> = [
-  { label: "Resultado estimado", value: "estimated_result" },
-  { label: "R$/hora", value: "estimated_result_per_hour" },
-  { label: "R$/km", value: "estimated_result_per_km" },
 ];
 
 const maintenanceCategoryOptions: Array<{ label: string; value: MaintenanceCategory }> = [
@@ -625,8 +590,6 @@ function App() {
     getDefaultHistoryGrouping(initialHistoryRange.startDate, initialHistoryRange.endDate),
   );
   const [historyVehicleId, setHistoryVehicleId] = useState("");
-  const [historyChartMetric, setHistoryChartMetric] =
-    useState<HistoryChartMetric>("estimated_result");
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dashboardError, setDashboardError] = useState("");
@@ -769,48 +732,8 @@ function App() {
     };
   }
 
-  function getMetricValue(value: string | null, formatter: (metric: string) => string): string {
-    return value === null ? "—" : formatter(value);
-  }
-
-  function getChartValue(value: string): number {
-    return Math.max(0, Number(value));
-  }
-
-  function getChartMax(summary: FinancialSummary): number {
-    const values = summary.daily.flatMap((dailyItem) => [
-      getChartValue(dailyItem.gross_revenue),
-      getChartValue(dailyItem.expenses),
-      getChartValue(dailyItem.estimated_net_profit),
-    ]);
-    return Math.max(...values, 1);
-  }
-
   function isPositiveMoney(value: string): boolean {
     return Number(value) > 0;
-  }
-
-  function isNegativeMoney(value: string): boolean {
-    return Number(value) < 0;
-  }
-
-  function getStructuralCostItems(summary: FinancialSummary) {
-    const totalStructuralCosts = Number(summary.estimated_structural_costs);
-
-    return structuralCostLabels
-      .map((item) => ({
-        ...item,
-        value: summary.structural_costs[item.key],
-        percentage:
-          totalStructuralCosts > 0
-            ? Math.round((Number(summary.structural_costs[item.key]) / totalStructuralCosts) * 100)
-            : null,
-      }))
-      .filter((item) => isPositiveMoney(item.value));
-  }
-
-  function getRecurringProjectionItems(summary: FinancialSummary) {
-    return summary.recurring_expenses_breakdown.filter((item) => isPositiveMoney(item.amount));
   }
 
   function handleHistoryPeriodChange(nextPeriod: HistoryPeriodPreset) {
@@ -832,145 +755,6 @@ function App() {
     setHistoryStartDate(nextStartDate);
     setHistoryEndDate(nextEndDate);
     setHistoryGrouping(getDefaultHistoryGrouping(nextStartDate, nextEndDate));
-  }
-
-  function getHistoryMetricLabel(metric: string): string {
-    const labels: Record<string, string> = {
-      gross_revenue: "Faturamento",
-      registered_expenses: "Gastos",
-      estimated_result: "Resultado estimado",
-      projected_result: "Resultado projetado",
-      worked_minutes: "Tempo trabalhado",
-      distance_km: "Km rodados",
-      estimated_result_per_hour: "Resultado por hora",
-      estimated_result_per_km: "Resultado por km",
-    };
-
-    return labels[metric] ?? metric;
-  }
-
-  function formatHistoryMoneyPerHour(value: string): string {
-    return `${formatMoney(value)}/h`;
-  }
-
-  function formatHistoryMetricValue(metric: string, value: string | null): string {
-    if (value === null) {
-      return "—";
-    }
-
-    if (metric === "worked_minutes") {
-      return formatWorkTime(Math.round(Number(value)));
-    }
-
-    if (metric === "distance_km") {
-      return `${formatDistance(value)} km`;
-    }
-
-    if (metric.endsWith("_per_km")) {
-      return formatMoneyPerKm(value);
-    }
-
-    if (metric.endsWith("_per_hour")) {
-      return formatHistoryMoneyPerHour(value);
-    }
-
-    return formatMoney(value);
-  }
-
-  function getHistoryChartMetricLabel(metric: HistoryChartMetric): string {
-    return historyChartMetricOptions.find((option) => option.value === metric)?.label ?? metric;
-  }
-
-  function getHistoryChartValue(period: FinancialHistoryPeriod): number {
-    const rawValue = period[historyChartMetric];
-    if (rawValue === null) {
-      return 0;
-    }
-
-    const parsedValue = Number(rawValue);
-    return Number.isFinite(parsedValue) ? parsedValue : 0;
-  }
-
-  function formatHistoryChartValue(value: string | null): string {
-    if (historyChartMetric === "estimated_result_per_hour") {
-      return getMetricValue(value, formatHistoryMoneyPerHour);
-    }
-
-    if (historyChartMetric === "estimated_result_per_km") {
-      return getMetricValue(value, formatMoneyPerKm);
-    }
-
-    return getMetricValue(value, formatMoney);
-  }
-
-  function hasHistoryData(history: FinancialHistoryResponse): boolean {
-    return history.periods.some(
-      (period) =>
-        Number(period.gross_revenue) !== 0 ||
-        Number(period.registered_expenses) !== 0 ||
-        Number(period.estimated_structural_costs) !== 0 ||
-        Number(period.recurring_projected_expenses) !== 0 ||
-        period.worked_minutes > 0 ||
-        Number(period.distance_km) > 0 ||
-        period.trip_count > 0,
-    );
-  }
-
-  function hasPreviousComparisonData(history: FinancialHistoryResponse): boolean {
-    return [
-      history.comparison.gross_revenue.previous,
-      history.comparison.registered_expenses.previous,
-      history.comparison.estimated_result.previous,
-      history.comparison.projected_result.previous,
-      history.comparison.worked_minutes.previous,
-      history.comparison.distance_km.previous,
-    ].some((value) => value !== null && Number(value) !== 0);
-  }
-
-  function getComparisonDirectionLabel(comparison: FinancialHistoryMetricComparison): string {
-    if (comparison.absolute_delta === null || Number(comparison.absolute_delta) === 0) {
-      return "sem mudança";
-    }
-
-    return Number(comparison.absolute_delta) > 0 ? "aumentou" : "diminuiu";
-  }
-
-  function getComparisonSummary(metric: string, comparison: FinancialHistoryMetricComparison) {
-    if (comparison.current === null || comparison.previous === null) {
-      return "Comparação indisponível para esta métrica.";
-    }
-
-    const direction = getComparisonDirectionLabel(comparison);
-    const percent =
-      comparison.percentage_delta === null ? "" : ` ${formatPercent(comparison.percentage_delta)}`;
-    return `${getHistoryMetricLabel(metric)} ${direction}${percent}.`;
-  }
-
-  function getHistoryTrendMessage(fact: FinancialHistoryTrendFact): string {
-    const direction = fact.direction === "increased" ? "aumentou" : "diminuiu";
-    const metric = getHistoryMetricLabel(fact.metric).toLowerCase();
-
-    if (fact.direction === "unchanged") {
-      return `${getHistoryMetricLabel(fact.metric)} ficou estável.`;
-    }
-
-    if (fact.metric === "registered_expenses") {
-      return `Seus gastos ${fact.direction === "increased" ? "ficaram maiores" : "ficaram menores"} que no período anterior.`;
-    }
-
-    if (fact.metric === "worked_minutes") {
-      return `Você trabalhou ${fact.direction === "increased" ? "mais" : "menos"} horas neste período.`;
-    }
-
-    return `Seu ${metric} ${direction}.`;
-  }
-
-  function getHistoryPeriodLabel(period: FinancialHistoryPeriod): string {
-    if (period.period_start === period.period_end) {
-      return formatDate(period.period_start);
-    }
-
-    return `${formatDate(period.period_start)}–${formatDate(period.period_end)}`;
   }
 
   async function loadVehicles(currentToken = token) {
@@ -3263,52 +3047,6 @@ function App() {
 
   const selectedCostProfileVehicle = getCostProfileVehicle();
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
-  const visibleFinancialInsights = financialInsights.slice(0, 5);
-  const historyComparisonItems: Array<{
-    metric: string;
-    comparison: FinancialHistoryMetricComparison;
-  }> = financialHistory
-    ? [
-        { metric: "estimated_result", comparison: financialHistory.comparison.estimated_result },
-        {
-          metric: "estimated_result_per_hour",
-          comparison: financialHistory.comparison.estimated_result_per_hour,
-        },
-        {
-          metric: "estimated_result_per_km",
-          comparison: financialHistory.comparison.estimated_result_per_km,
-        },
-        {
-          metric: "registered_expenses",
-          comparison: financialHistory.comparison.registered_expenses,
-        },
-      ]
-    : [];
-  const historyChartPeriods = financialHistory?.periods ?? [];
-  const historyChartValues = historyChartPeriods.map(getHistoryChartValue);
-  const historyChartMin = Math.min(0, ...historyChartValues);
-  const historyChartMax = Math.max(0, ...historyChartValues);
-  const historyChartRange =
-    historyChartMax === historyChartMin ? 1 : historyChartMax - historyChartMin;
-  const historyChartWidth = 320;
-  const historyChartHeight = 150;
-  const historyChartTop = 16;
-  const historyChartBottom = 118;
-  const historyChartInnerHeight = historyChartBottom - historyChartTop;
-  const historyChartXStep =
-    historyChartPeriods.length <= 1 ? 0 : 260 / (historyChartPeriods.length - 1);
-  const historyChartPoints = historyChartValues
-    .map((value, index) => {
-      const x = 30 + index * historyChartXStep;
-      const y =
-        historyChartTop +
-        ((historyChartMax - value) / historyChartRange) * historyChartInnerHeight;
-      return `${x},${y}`;
-    })
-    .join(" ");
-  const historyChartZeroY =
-    historyChartTop +
-    ((historyChartMax - 0) / historyChartRange) * historyChartInnerHeight;
   const quickDailyExpenseTotalCents = quickDailyEntryResult
     ? getQuickDailyExpenseTotalCents(quickDailyEntryResult)
     : 0n;
@@ -4408,683 +4146,43 @@ function App() {
             </section>
 
             {workSessions.length > 0 ? (
-              <section className="manager-section dashboard-section" id="resultado">
-              <div className="section-title">
-                <p className="eyebrow">Resultado</p>
-                <h3>Resumo financeiro</h3>
-                <p className="subtle-note">
-                  Veja quanto entrou, quanto saiu e como os custos do veículo afetam sua estimativa.
-                </p>
-              </div>
-
-              <div className="result-context-nav" aria-label="Áreas de resultado">
-                <a href="#resultado">Visão geral</a>
-                <a href="#metas">Metas</a>
-                <a href="#insights">Insights</a>
-                <a href="#evolucao">EvoluÃ§Ã£o</a>
-              </div>
-
-              <div className="dashboard-filters">
-                <label>
-                  Período
-                  <select
-                    onChange={(event) => setDashboardPeriod(event.target.value as DashboardPeriod)}
-                    value={dashboardPeriod}
-                  >
-                    <option value="today">Hoje</option>
-                    <option value="last7">Últimos 7 dias</option>
-                    <option value="month">Este mês</option>
-                    <option value="custom">Personalizado</option>
-                  </select>
-                </label>
-
-                {dashboardPeriod === "custom" ? (
-                  <>
-                    <label>
-                      Início
-                      <input
-                        onChange={(event) => setCustomStartDate(event.target.value)}
-                        type="date"
-                        value={customStartDate}
-                      />
-                    </label>
-                    <label>
-                      Fim
-                      <input
-                        onChange={(event) => setCustomEndDate(event.target.value)}
-                        type="date"
-                        value={customEndDate}
-                      />
-                    </label>
-                  </>
-                ) : null}
-
-                <label>
-                  Veículo
-                  <select
-                    onChange={(event) => setDashboardVehicleId(event.target.value)}
-                    value={dashboardVehicleId}
-                  >
-                    <option value="">Todos</option>
-                    {vehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.name} - {vehicle.brand} {vehicle.model}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {isDashboardLoading ? <p className="empty-state">Carregando dashboard...</p> : null}
-              {dashboardError ? <p className="form-message">{dashboardError}</p> : null}
-
-              {!isDashboardLoading && financialSummary ? (
-                <>
-                  <div className="economic-panel">
-                    <div className="section-title">
-                      <p className="eyebrow">Resultado</p>
-                      <h3>Quanto realmente esta sobrando?</h3>
-                      <p className="subtle-note">
-                        Primeiro veja a sobra do caixa e o impacto estimado do veículo. Os detalhes
-                        continuam disponíveis abaixo.
-                      </p>
-                    </div>
-
-                    <div className="metric-grid result-summary-grid">
-                      <article className="metric-card metric-profit">
-                        <span>Sobrou no caixa</span>
-                        <strong>{formatMoney(financialSummary.estimated_net_profit)}</strong>
-                        <small>Faturamento menos despesas registradas.</small>
-                      </article>
-                      <article className="metric-card metric-expense">
-                        <span>Custos estimados do veículo</span>
-                        <strong>{formatMoney(financialSummary.estimated_structural_costs)}</strong>
-                        <small>Custos configurados que nem sempre aparecem como gasto do dia.</small>
-                      </article>
-                      <article
-                        className={
-                          isNegativeMoney(financialSummary.estimated_economic_result)
-                            ? "metric-card metric-negative"
-                            : "metric-card metric-profit"
-                        }
-                      >
-                        <span>Resultado estimado</span>
-                        <strong>{formatMoney(financialSummary.estimated_economic_result)}</strong>
-                        <small>Depois de considerar os custos estimados do veículo.</small>
-                      </article>
-                    </div>
-
-                    <details className="calculation-details">
-                      <summary>Ver detalhes do cálculo</summary>
-
-                    <article
-                      className={
-                        isNegativeMoney(financialSummary.projected_economic_result)
-                          ? "metric-card projected-result-card metric-negative"
-                          : "metric-card projected-result-card metric-profit"
-                      }
-                    >
-                      <span>Resultado projetado</span>
-                      <strong>{formatMoney(financialSummary.projected_economic_result)}</strong>
-                      <small>
-                        Considera despesas registradas, custos estruturais configurados e despesas
-                        recorrentes previstas para o periodo.
-                      </small>
-                      {isNegativeMoney(financialSummary.projected_economic_result) ? (
-                        <small>
-                          Neste periodo, seus custos projetados estao acima do faturamento
-                          registrado.
-                        </small>
-                      ) : null}
-                    </article>
-
-                    <div className="dashboard-layers">
-                      <article className="dashboard-layer">
-                        <p className="eyebrow">Realizado</p>
-                        <dl>
-                          <div>
-                            <dt>Faturamento</dt>
-                            <dd>{formatMoney(financialSummary.gross_revenue)}</dd>
-                          </div>
-                          <div>
-                            <dt>Despesas registradas</dt>
-                            <dd>{formatMoney(financialSummary.total_expenses)}</dd>
-                          </div>
-                          <div>
-                            <dt>Sobra apos despesas</dt>
-                            <dd>{formatMoney(financialSummary.estimated_net_profit)}</dd>
-                          </div>
-                        </dl>
-                      </article>
-
-                      <article className="dashboard-layer">
-                        <p className="eyebrow">Estimado</p>
-                        <dl>
-                          <div>
-                            <dt>Custos estruturais estimados</dt>
-                            <dd>{formatMoney(financialSummary.estimated_structural_costs)}</dd>
-                          </div>
-                          <div>
-                            <dt>Resultado economico estimado</dt>
-                            <dd>{formatMoney(financialSummary.estimated_economic_result)}</dd>
-                          </div>
-                        </dl>
-                      </article>
-
-                      <article className="dashboard-layer dashboard-layer-projected">
-                        <p className="eyebrow">Projetado</p>
-                        <dl>
-                          <div>
-                            <dt>Despesas recorrentes previstas</dt>
-                            <dd>{formatMoney(financialSummary.recurring_expenses_total)}</dd>
-                          </div>
-                          <div>
-                            <dt>Custos projetados totais</dt>
-                            <dd>{formatMoney(financialSummary.projected_economic_costs)}</dd>
-                          </div>
-                          <div>
-                            <dt>Resultado projetado apos recorrencias</dt>
-                            <dd>{formatMoney(financialSummary.projected_economic_result)}</dd>
-                          </div>
-                        </dl>
-                      </article>
-                    </div>
-
-                    {!isPositiveMoney(financialSummary.estimated_structural_costs) ? (
-                      <p className="empty-state">
-                        Configure os custos do veiculo para obter uma estimativa economica mais
-                        completa. <a href="#veiculos">Ir para Veiculos</a>
-                      </p>
-                    ) : null}
-                    </details>
-                  </div>
-
-                  <div className="financial-insights" id="insights">
-                    <div className="list-header">
-                      <h3>Insights do seu periodo</h3>
-                    </div>
-
-                    {isFinancialInsightsLoading ? (
-                      <p className="empty-state compact-empty-state">Carregando insights...</p>
-                    ) : null}
-                    {financialInsightsError ? (
-                      <p className="form-message compact-message">{financialInsightsError}</p>
-                    ) : null}
-
-                    {!isFinancialInsightsLoading && !financialInsightsError ? (
-                      visibleFinancialInsights.length > 0 ? (
-                        <div className="financial-insights-list">
-                          {visibleFinancialInsights.map((insight) => (
-                            <article
-                              className={`financial-insight financial-insight-${insight.type}`}
-                              key={insight.code}
-                            >
-                              <strong>{insight.title}</strong>
-                              <p>{insight.message}</p>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="empty-state compact-empty-state">
-                          Ainda não há dados suficientes para gerar insights deste período.
-                        </p>
-                      )
-                    ) : null}
-                  </div>
-
-                  <div className="financial-history" id="evolucao">
-                    <div className="section-title">
-                      <p className="eyebrow">EvoluÃ§Ã£o</p>
-                      <h3>Como seu resultado esta mudando?</h3>
-                      <p className="subtle-note">
-                        Veja como seus ganhos e sua eficiÃªncia estÃ£o mudando com o tempo.
-                      </p>
-                    </div>
-
-                    <div className="dashboard-filters history-filters">
-                      <label>
-                        PerÃ­odo
-                        <select
-                          onChange={(event) =>
-                            handleHistoryPeriodChange(event.target.value as HistoryPeriodPreset)
-                          }
-                          value={historyPeriod}
-                        >
-                          {historyPeriodOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      {historyPeriod === "custom" ? (
-                        <>
-                          <label>
-                            InÃ­cio
-                            <input
-                              onChange={(event) => handleHistoryDateChange("start", event.target.value)}
-                              type="date"
-                              value={historyStartDate}
-                            />
-                          </label>
-                          <label>
-                            Fim
-                            <input
-                              onChange={(event) => handleHistoryDateChange("end", event.target.value)}
-                              type="date"
-                              value={historyEndDate}
-                            />
-                          </label>
-                        </>
-                      ) : null}
-
-                      {vehicles.length > 1 ? (
-                        <label>
-                          VeÃ­culo
-                          <select
-                            onChange={(event) => setHistoryVehicleId(event.target.value)}
-                            value={historyVehicleId}
-                          >
-                            <option value="">Todos os veÃ­culos</option>
-                            {vehicles.map((vehicle) => (
-                              <option key={vehicle.id} value={vehicle.id}>
-                                {vehicle.name} - {vehicle.brand} {vehicle.model}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ) : (
-                        <p className="history-single-vehicle">
-                          {vehicles[0] ? getVehicleLabel(vehicles[0].id) : "Todos os veÃ­culos"}
-                        </p>
-                      )}
-
-                      <label>
-                        Agrupar por
-                        <select
-                          onChange={(event) =>
-                            setHistoryGrouping(event.target.value as FinancialHistoryGrouping)
-                          }
-                          value={historyGrouping}
-                        >
-                          {historyGroupingOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    {isFinancialHistoryLoading ? (
-                      <p className="empty-state compact-empty-state">Carregando evoluÃ§Ã£o...</p>
-                    ) : null}
-
-                    {financialHistoryError ? (
-                      <div className="history-error">
-                        <p className="form-message compact-message">{financialHistoryError}</p>
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => void loadFinancialHistory()}
-                        >
-                          Tentar novamente
-                        </button>
-                      </div>
-                    ) : null}
-
-                    {!isFinancialHistoryLoading && !financialHistoryError && financialHistory ? (
-                      hasHistoryData(financialHistory) ? (
-                        <>
-                          <div className="history-comparison">
-                            <div className="list-header">
-                              <div>
-                                <h3>Como vocÃª estÃ¡ em relaÃ§Ã£o ao perÃ­odo anterior?</h3>
-                                {!hasPreviousComparisonData(financialHistory) ? (
-                                  <p className="subtle-note">
-                                    Continue registrando seus dias para comparar sua evoluÃ§Ã£o com
-                                    perÃ­odos anteriores.
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-
-                            <div className="metric-grid history-comparison-grid">
-                              {historyComparisonItems.map(({ metric, comparison }) => (
-                                <article className="metric-card history-comparison-card" key={metric}>
-                                  <span>{getHistoryMetricLabel(metric as string)}</span>
-                                  <strong>
-                                    {formatHistoryMetricValue(
-                                      metric as string,
-                                      comparison.current,
-                                    )}
-                                  </strong>
-                                  <small>
-                                    Anterior:{" "}
-                                    {formatHistoryMetricValue(
-                                      metric as string,
-                                      comparison.previous,
-                                    )}
-                                  </small>
-                                  <small>
-                                    {getComparisonSummary(metric as string, comparison)}
-                                  </small>
-                                </article>
-                              ))}
-                            </div>
-                          </div>
-
-                          {financialHistory.trend_facts.length > 0 ? (
-                            <div className="history-facts">
-                              {financialHistory.trend_facts.map((fact) => (
-                                <article className="financial-insight financial-insight-info" key={fact.metric}>
-                                  <strong>{getHistoryMetricLabel(fact.metric)}</strong>
-                                  <p>{getHistoryTrendMessage(fact)}</p>
-                                </article>
-                              ))}
-                            </div>
-                          ) : null}
-
-                          <div className="history-chart-panel">
-                            <div className="list-header">
-                              <div>
-                                <h3>{getHistoryChartMetricLabel(historyChartMetric)}</h3>
-                                <p className="subtle-note">
-                                  Uma visÃ£o simples da evoluÃ§Ã£o no perÃ­odo selecionado.
-                                </p>
-                                <p className="subtle-note">
-                                  Faixa: {formatHistoryChartValue(historyChartMin.toFixed(2))} a{" "}
-                                  {formatHistoryChartValue(historyChartMax.toFixed(2))}
-                                </p>
-                              </div>
-                              <label>
-                                MÃ©trica
-                                <select
-                                  onChange={(event) =>
-                                    setHistoryChartMetric(event.target.value as HistoryChartMetric)
-                                  }
-                                  value={historyChartMetric}
-                                >
-                                  {historyChartMetricOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                      {option.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            </div>
-
-                            <div className="history-chart" aria-label="GrÃ¡fico de evoluÃ§Ã£o">
-                              <svg
-                                role="img"
-                                viewBox={`0 0 ${historyChartWidth} ${historyChartHeight}`}
-                                preserveAspectRatio="none"
-                              >
-                                <line
-                                  className="history-chart-zero"
-                                  x1="24"
-                                  x2="304"
-                                  y1={historyChartZeroY}
-                                  y2={historyChartZeroY}
-                                />
-                                {historyChartPoints ? (
-                                  <polyline className="history-chart-line" points={historyChartPoints} />
-                                ) : null}
-                                {historyChartValues.map((value, index) => {
-                                  const x = 30 + index * historyChartXStep;
-                                  const y =
-                                    historyChartTop +
-                                    ((historyChartMax - value) / historyChartRange) *
-                                      historyChartInnerHeight;
-                                  return (
-                                    <circle
-                                      className="history-chart-point"
-                                      cx={x}
-                                      cy={y}
-                                      key={`${historyChartPeriods[index]?.period_start}-${index}`}
-                                      r="3.5"
-                                    />
-                                  );
-                                })}
-                              </svg>
-                              <div className="history-chart-labels">
-                                {historyChartPeriods.map((period) => (
-                                  <span key={`${period.period_start}-${period.period_end}`}>
-                                    {getHistoryPeriodLabel(period)}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          <details className="calculation-details history-details">
-                            <summary>Ver detalhes por perÃ­odo</summary>
-                            <div className="history-period-list">
-                              {financialHistory.periods.map((period) => (
-                                <article
-                                  className="dashboard-layer history-period-card"
-                                  key={`${period.period_start}-${period.period_end}`}
-                                >
-                                  <h4>{getHistoryPeriodLabel(period)}</h4>
-                                  <dl>
-                                    <div>
-                                      <dt>Faturamento</dt>
-                                      <dd>{formatMoney(period.gross_revenue)}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Gastos</dt>
-                                      <dd>{formatMoney(period.registered_expenses)}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Resultado estimado</dt>
-                                      <dd>{formatMoney(period.estimated_result)}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Horas trabalhadas</dt>
-                                      <dd>{formatWorkTime(period.worked_minutes)}</dd>
-                                    </div>
-                                    <div>
-                                      <dt>Km rodados</dt>
-                                      <dd>{formatDistance(period.distance_km)} km</dd>
-                                    </div>
-                                    <div>
-                                      <dt>R$/hora</dt>
-                                      <dd>
-                                        {getMetricValue(
-                                          period.estimated_result_per_hour,
-                                          formatHistoryMoneyPerHour,
-                                        )}
-                                      </dd>
-                                    </div>
-                                    <div>
-                                      <dt>R$/km</dt>
-                                      <dd>
-                                        {getMetricValue(period.estimated_result_per_km, formatMoneyPerKm)}
-                                      </dd>
-                                    </div>
-                                  </dl>
-                                </article>
-                              ))}
-                            </div>
-                          </details>
-                        </>
-                      ) : (
-                        <div className="empty-state history-empty-state">
-                          <p>VocÃª ainda nÃ£o tem dados suficientes para acompanhar sua evoluÃ§Ã£o.</p>
-                          <a className="button button-primary" href="#quick-start">
-                            Registrar meu dia
-                          </a>
-                        </div>
-                      )
-                    ) : null}
-                  </div>
-
-                  <div className="recurring-projection">
-                    <div className="list-header">
-                      <h3>Despesas recorrentes previstas</h3>
-                    </div>
-                    <p className="subtle-note">
-                      Despesas recorrentes sao projecoes baseadas nos custos que voce configurou.
-                      Quando uma despesa real equivalente ja esta registrada, o GanhoCerto evita
-                      contar o mesmo custo duas vezes.
-                    </p>
-
-                    {isPositiveMoney(financialSummary.recurring_expenses_total) ? (
-                      <>
-                        <div className="recurring-projection-list">
-                          {getRecurringProjectionItems(financialSummary).map((item) => (
-                            <article className="structural-item" key={item.category}>
-                              <div>
-                                <strong>{getExpenseCategoryLabel(item.category)}</strong>
-                                <span>Previsto no periodo</span>
-                              </div>
-                              <strong>{formatMoney(item.amount)}</strong>
-                            </article>
-                          ))}
-                        </div>
-                        <article className="recurring-projection-total">
-                          <span>Total previsto no periodo</span>
-                          <strong>{formatMoney(financialSummary.recurring_expenses_total)}</strong>
-                        </article>
-                      </>
-                    ) : (
-                      <p className="empty-state compact-empty-state">
-                        Voce ainda nao possui despesas recorrentes previstas neste periodo.{" "}
-                        <a href="#despesas-recorrentes">Configurar despesas recorrentes</a>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="structural-breakdown">
-                    <div className="list-header">
-                      <h3>Para onde seu dinheiro esta indo?</h3>
-                    </div>
-
-                    {getStructuralCostItems(financialSummary).length === 0 ? (
-                      <p className="empty-state">
-                        Nenhum custo estrutural estimado para o periodo selecionado.
-                      </p>
-                    ) : (
-                      <div className="structural-list">
-                        {getStructuralCostItems(financialSummary).map((item) => (
-                          <article className="structural-item" key={item.key}>
-                            <div>
-                              <strong>{item.label}</strong>
-                              <span>
-                                {item.percentage === null
-                                  ? "Participacao indisponivel"
-                                  : `${item.percentage}% dos custos estruturais`}
-                              </span>
-                            </div>
-                            <strong>{formatMoney(item.value)}</strong>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="metric-grid">
-                    <article className="metric-card">
-                      <span>Ganho bruto por hora</span>
-                      <strong>
-                        {getMetricValue(financialSummary.gross_per_hour, formatMoney)}
-                      </strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Ganho líquido por hora</span>
-                      <strong>{getMetricValue(financialSummary.net_per_hour, formatMoney)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Ganho bruto por km</span>
-                      <strong>{getMetricValue(financialSummary.gross_per_km, formatMoney)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Ganho líquido por km</span>
-                      <strong>{getMetricValue(financialSummary.net_per_km, formatMoney)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Custo por km</span>
-                      <strong>
-                        {getMetricValue(financialSummary.expense_per_km, formatMoney)}
-                      </strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Ticket médio</span>
-                      <strong>
-                        {getMetricValue(financialSummary.average_ticket, formatMoney)}
-                      </strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Total de corridas</span>
-                      <strong>{financialSummary.total_trip_count}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Horas trabalhadas</span>
-                      <strong>{formatWorkTime(financialSummary.total_worked_minutes)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Km rodados</span>
-                      <strong>{formatDistance(financialSummary.total_distance_km)} km</strong>
-                    </article>
-                  </div>
-
-                  <div className="daily-breakdown">
-                    <div className="list-header">
-                      <h3>Evolução diária</h3>
-                    </div>
-
-                    {financialSummary.daily.length === 0 ? (
-                      <p className="empty-state">Nenhum dado no período selecionado.</p>
-                    ) : (
-                      financialSummary.daily.map((dailyItem) => {
-                        const chartMax = getChartMax(financialSummary);
-                        return (
-                          <article className="daily-row" key={dailyItem.date}>
-                            <h4>{formatDate(dailyItem.date)}</h4>
-                            <div className="bar-line">
-                              <span>Faturamento</span>
-                              <div>
-                                <i
-                                  style={{
-                                    width: `${(getChartValue(dailyItem.gross_revenue) / chartMax) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                              <strong>{formatMoney(dailyItem.gross_revenue)}</strong>
-                            </div>
-                            <div className="bar-line expense-bar">
-                              <span>Despesas</span>
-                              <div>
-                                <i
-                                  style={{
-                                    width: `${(getChartValue(dailyItem.expenses) / chartMax) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                              <strong>{formatMoney(dailyItem.expenses)}</strong>
-                            </div>
-                            <div className="bar-line profit-bar">
-                              <span>Resultado est.</span>
-                              <div>
-                                <i
-                                  style={{
-                                    width: `${(getChartValue(dailyItem.estimated_net_profit) / chartMax) * 100}%`,
-                                  }}
-                                />
-                              </div>
-                              <strong>{formatMoney(dailyItem.estimated_net_profit)}</strong>
-                            </div>
-                          </article>
-                        );
-                      })
-                    )}
-                  </div>
-                </>
-              ) : null}
-              </section>
+              <ResultSection
+                vehicles={vehicles}
+                dashboardFilters={{
+                  period: dashboardPeriod,
+                  customStartDate,
+                  customEndDate,
+                  vehicleId: dashboardVehicleId,
+                  onPeriodChange: setDashboardPeriod,
+                  onCustomStartDateChange: setCustomStartDate,
+                  onCustomEndDateChange: setCustomEndDate,
+                  onVehicleChange: setDashboardVehicleId,
+                }}
+                historyFilters={{
+                  period: historyPeriod,
+                  startDate: historyStartDate,
+                  endDate: historyEndDate,
+                  grouping: historyGrouping,
+                  vehicleId: historyVehicleId,
+                  onPeriodChange: handleHistoryPeriodChange,
+                  onDateChange: handleHistoryDateChange,
+                  onGroupingChange: setHistoryGrouping,
+                  onVehicleChange: setHistoryVehicleId,
+                }}
+                summary={financialSummary}
+                insights={financialInsights}
+                history={financialHistory}
+                isSummaryLoading={isDashboardLoading}
+                isInsightsLoading={isFinancialInsightsLoading}
+                isHistoryLoading={isFinancialHistoryLoading}
+                summaryError={dashboardError}
+                insightsError={financialInsightsError}
+                historyError={financialHistoryError}
+                onHistoryRetry={() => void loadFinancialHistory()}
+                getVehicleLabel={getVehicleLabel}
+                getExpenseCategoryLabel={getExpenseCategoryLabel}
+              />
             ) : null}
-
             <section className="manager-section" id="mais">
               <div className="section-title">
                 <p className="eyebrow">Jornadas</p>
