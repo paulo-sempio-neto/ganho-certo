@@ -139,6 +139,8 @@ Para executar o deploy passo a passo, use o guia pratico em
 [`docs/PRODUCTION_DEPLOYMENT_GUIDE.md`](docs/PRODUCTION_DEPLOYMENT_GUIDE.md).
 Para a decisao pratica de provedores e custos iniciais, veja
 [`docs/PRODUCTION_STACK_DECISION.md`](docs/PRODUCTION_STACK_DECISION.md).
+Para preparar o primeiro deploy com Vercel, Render e Neon, siga
+[`docs/FIRST_PRODUCTION_DEPLOYMENT.md`](docs/FIRST_PRODUCTION_DEPLOYMENT.md).
 
 ### Backend no Render
 
