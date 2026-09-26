@@ -9,6 +9,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Expense, User, Vehicle, WorkSession
 from app.pagination import PaginationParams, get_pagination_params
+from app.product_events import FIRST_FINANCIAL_ENTRY, record_once_per_user_event
 from app.schemas import QuickStartDayCreate, WorkSessionCreate, WorkSessionPublic, WorkSessionUpdate
 
 router = APIRouter(prefix="/work-sessions", tags=["work-sessions"])
@@ -41,6 +42,14 @@ def get_user_work_session(session_id: int, user_id: int, db: Session) -> WorkSes
     return work_session
 
 
+def has_financial_entry(user_id: int, db: Session) -> bool:
+    return (
+        db.scalar(select(WorkSession.id).where(WorkSession.user_id == user_id).limit(1))
+        is not None
+        or db.scalar(select(Expense.id).where(Expense.user_id == user_id).limit(1)) is not None
+    )
+
+
 @router.post("", response_model=WorkSessionPublic, status_code=status.HTTP_201_CREATED)
 def create_work_session(
     payload: WorkSessionCreate,
@@ -48,6 +57,7 @@ def create_work_session(
     db: Annotated[Session, Depends(get_db)],
 ) -> WorkSession:
     get_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
+    had_financial_entry = has_financial_entry(current_user.id, db)
     work_session = WorkSession(
         user_id=current_user.id,
         vehicle_id=payload.vehicle_id,
@@ -60,6 +70,8 @@ def create_work_session(
     db.add(work_session)
     db.commit()
     db.refresh(work_session)
+    if not had_financial_entry:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_FINANCIAL_ENTRY)
     return work_session
 
 
@@ -70,6 +82,7 @@ def create_quick_start_day(
     db: Annotated[Session, Depends(get_db)],
 ) -> WorkSession:
     get_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
+    had_financial_entry = has_financial_entry(current_user.id, db)
     work_session = WorkSession(
         user_id=current_user.id,
         vehicle_id=payload.vehicle_id,
@@ -102,6 +115,8 @@ def create_quick_start_day(
         ) from exc
 
     db.refresh(work_session)
+    if not had_financial_entry:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_FINANCIAL_ENTRY)
     return work_session
 
 

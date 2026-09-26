@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import BetaFeedback, User
+from app.product_events import FEEDBACK_SENT, record_product_event
 from app.schemas import BetaFeedbackCreate, BetaFeedbackPublic
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -28,4 +29,10 @@ def create_beta_feedback(
     db.add(feedback)
     db.commit()
     db.refresh(feedback)
+    record_product_event(
+        db=db,
+        user=current_user,
+        event_type=FEEDBACK_SENT,
+        dedupe_key=str(feedback.id),
+    )
     return feedback

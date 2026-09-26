@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import Expense, RecurringExpense, User, Vehicle, VehicleCostProfile, WorkSession
+from app.product_events import DASHBOARD_VIEWED, record_daily_product_event
 from app.schemas import (
     FinancialDailySummary,
     FinancialRecurringExpenseBreakdown,
@@ -544,6 +545,7 @@ def get_financial_summary(
 ) -> FinancialSummary:
     validate_date_range(start_date=start_date, end_date=end_date)
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
+    record_daily_product_event(db=db, user=current_user, event_type=DASHBOARD_VIEWED)
 
     work_sessions, expenses, recurring_expenses, cost_profiles = get_financial_summary_records(
         user_id=current_user.id,

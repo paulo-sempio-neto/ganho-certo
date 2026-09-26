@@ -14,6 +14,7 @@ from app.email import EmailDeliveryError, build_password_reset_url, get_password
 from app.entitlements import get_default_plan
 from app.models import PasswordResetToken, User
 from app.observability import log_exception
+from app.product_events import ACCOUNT_CREATED, record_once_per_user_event
 from app.rate_limit import (
     auth_rate_limiter,
     enforce_auth_rate_limit,
@@ -101,6 +102,7 @@ def register_user(
         ) from exc
 
     db.refresh(user)
+    record_once_per_user_event(db=db, user=user, event_type=ACCOUNT_CREATED)
     return user
 
 

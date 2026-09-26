@@ -18,6 +18,15 @@ RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
 BetaFeedbackCategory = Literal["bug", "confusing", "idea", "other"]
+ProductEventType = Literal[
+    "account_created",
+    "first_vehicle_created",
+    "first_financial_entry",
+    "dashboard_viewed",
+    "checkout_started",
+    "subscription_activated",
+    "feedback_sent",
+]
 PlanCode = Literal["free", "pro"]
 CsvImportType = Literal["work_sessions", "expenses"]
 FinancialHistoryGrouping = Literal["daily", "weekly", "monthly"]
@@ -175,6 +184,18 @@ class BetaFeedbackPublic(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BetaLearningSummary(BaseModel):
+    total_users: int
+    active_users_7d: int
+    users_with_first_vehicle: int
+    users_with_first_financial_entry: int
+    users_completed_first_setup: int
+    dashboard_viewed_users: int
+    checkout_started_users: int
+    subscription_activated_users: int
+    feedback_count: int
 
 
 class PasswordChangeRequest(BaseModel):

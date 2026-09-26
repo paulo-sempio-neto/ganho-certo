@@ -30,6 +30,8 @@ Checklist operacional mínimo antes de convidar usuários reais para a beta fech
 - [ ] Migrações Alembic aplicadas com sucesso.
 - [ ] `/health` confirmado no backend publicado.
 - [ ] `/ready` confirmado no backend publicado depois das migrações.
+- [ ] `BETA_ADMIN_TOKEN` forte configurado somente se o resumo interno da beta
+  for usado. Deixe vazio para desabilitar `/internal/beta/summary`.
 - [ ] Build de produção do frontend confirmado.
 - [ ] Limites de autenticação revisados para a beta:
   - `AUTH_LOGIN_RATE_LIMIT`
@@ -77,6 +79,10 @@ Verificação:
 
 - O app coleta feedback autenticado em `/feedback`, gravado em `beta_feedback`
   com usuario, categoria, mensagem, caminho da tela e user agent resumido.
+- O app registra eventos internos em `product_events` sem valores financeiros,
+  senhas, tokens, email ou payload livre. Eventos de marco usam dedupe por usuario.
+- O resumo agregado `/internal/beta/summary` exige `X-Beta-Admin-Token` igual ao
+  `BETA_ADMIN_TOKEN`; sem token configurado, o endpoint fica indisponivel.
 - Revise feedbacks pelo banco durante a beta pequena; ainda nao ha painel interno
   nem integracao externa de suporte.
 - Eventos uteis para acompanhar manualmente nesta fase:

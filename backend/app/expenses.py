@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import Expense, User, Vehicle
+from app.models import Expense, User, Vehicle, WorkSession
 from app.pagination import PaginationParams, get_pagination_params
+from app.product_events import FIRST_FINANCIAL_ENTRY, record_once_per_user_event
 from app.schemas import ExpenseCreate, ExpensePublic, ExpenseUpdate
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
@@ -39,6 +40,14 @@ def get_user_expense(expense_id: int, user_id: int, db: Session) -> Expense:
     return expense
 
 
+def has_financial_entry(user_id: int, db: Session) -> bool:
+    return (
+        db.scalar(select(WorkSession.id).where(WorkSession.user_id == user_id).limit(1))
+        is not None
+        or db.scalar(select(Expense.id).where(Expense.user_id == user_id).limit(1)) is not None
+    )
+
+
 @router.post("", response_model=ExpensePublic, status_code=status.HTTP_201_CREATED)
 def create_expense(
     payload: ExpenseCreate,
@@ -46,6 +55,7 @@ def create_expense(
     db: Annotated[Session, Depends(get_db)],
 ) -> Expense:
     validate_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
+    had_financial_entry = has_financial_entry(current_user.id, db)
     expense = Expense(
         user_id=current_user.id,
         vehicle_id=payload.vehicle_id,
@@ -57,6 +67,8 @@ def create_expense(
     db.add(expense)
     db.commit()
     db.refresh(expense)
+    if not had_financial_entry:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_FINANCIAL_ENTRY)
     return expense
 
 

@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     smtp_password: str | None = Field(default=None, validation_alias="SMTP_PASSWORD")
     smtp_from_email: str | None = Field(default=None, validation_alias="SMTP_FROM_EMAIL")
     smtp_use_tls: bool = Field(default=True, validation_alias="SMTP_USE_TLS")
+    beta_admin_token: str | None = Field(default=None, validation_alias="BETA_ADMIN_TOKEN")
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
     forwarded_allow_ips: str = "127.0.0.1"
     max_request_body_bytes: int = Field(default=1024 * 1024, ge=1024)
@@ -159,6 +160,15 @@ class Settings(BaseSettings):
         if not normalized or len(normalized) != 3 or not normalized.isalpha():
             raise ValueError("BILLING_CURRENCY_ID must be a 3-letter currency code.")
         return normalized
+
+    @field_validator("beta_admin_token")
+    @classmethod
+    def normalize_beta_admin_token(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        return normalized or None
 
     @property
     def environment(self) -> str:
@@ -265,6 +275,8 @@ class Settings(BaseSettings):
                 )
             if bool(self.smtp_username) != bool(self.smtp_password):
                 raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together.")
+            if self.beta_admin_token is not None and len(self.beta_admin_token) < 32:
+                raise ValueError("BETA_ADMIN_TOKEN must have at least 32 characters.")
             if not valid_origin(f"https://{self.smtp_host}", production=True):
                 raise ValueError("SMTP_HOST must be a valid hostname.")
             try:

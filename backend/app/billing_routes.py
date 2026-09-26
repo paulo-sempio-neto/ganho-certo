@@ -25,6 +25,7 @@ from app.config import Settings
 from app.database import get_db
 from app.entitlements import PRO_PLAN_CODE, ensure_default_entitlements
 from app.models import Plan, User
+from app.product_events import CHECKOUT_STARTED, SUBSCRIPTION_ACTIVATED, record_product_event
 from app.providers.mercadopago import MercadoPagoProvider
 from app.schemas import BillingCheckoutRequest, BillingCheckoutResponse, BillingWebhookResponse
 
@@ -98,6 +99,12 @@ def create_billing_checkout(
             detail="Billing provider returned an invalid response.",
         ) from error
 
+    record_product_event(
+        db=db,
+        user=current_user,
+        event_type=CHECKOUT_STARTED,
+        dedupe_key=checkout_session.external_session_id,
+    )
     return BillingCheckoutResponse(
         provider=checkout_session.provider,
         checkout_id=checkout_session.external_session_id,
@@ -165,6 +172,12 @@ async def receive_billing_webhook(
                 current_period_start=provider_subscription.current_period_start,
                 current_period_end=provider_subscription.current_period_end,
                 db=db,
+            )
+            record_product_event(
+                db=db,
+                user=user,
+                event_type=SUBSCRIPTION_ACTIVATED,
+                dedupe_key=provider_subscription.external_subscription_id,
             )
         elif provider_subscription.status in CANCELED_PROVIDER_STATUSES:
             subscription = get_subscription_by_provider_external_id(

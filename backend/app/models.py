@@ -43,6 +43,7 @@ class User(Base):
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
     billing_events: Mapped[list[BillingEvent]] = relationship(back_populates="user")
     beta_feedback: Mapped[list[BetaFeedback]] = relationship(back_populates="user")
+    product_events: Mapped[list[ProductEvent]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
@@ -212,6 +213,32 @@ class BetaFeedback(Base):
         nullable=False,
     )
     user: Mapped[User] = relationship(back_populates="beta_feedback")
+
+
+class ProductEvent(Base):
+    __tablename__ = "product_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "event_type",
+            "dedupe_key",
+            name="uq_product_events_user_type_dedupe",
+        ),
+        Index("ix_product_events_user_occurred_at", "user_id", "occurred_at"),
+        Index("ix_product_events_type_occurred_at", "event_type", "occurred_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    dedupe_key: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+        index=True,
+    )
+    user: Mapped[User] = relationship(back_populates="product_events")
 
 
 class PasswordResetToken(Base):

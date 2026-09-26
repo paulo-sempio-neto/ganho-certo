@@ -24,6 +24,7 @@ from app.models import (
     VehicleCostProfile,
     WorkSession,
 )
+from app.product_events import FIRST_VEHICLE_CREATED, record_once_per_user_event
 from app.schemas import VehicleCreate, VehiclePublic, VehicleUpdate
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
@@ -61,10 +62,11 @@ def create_vehicle(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Vehicle:
+    current_vehicle_count = count_user_vehicles(current_user, db)
     vehicle_limit = check_usage_limit(
         current_user,
         VEHICLE_LIMIT_FEATURE,
-        count_user_vehicles(current_user, db),
+        current_vehicle_count,
         db,
     )
     if not vehicle_limit.allowed:
@@ -83,6 +85,8 @@ def create_vehicle(
     db.add(vehicle)
     db.commit()
     db.refresh(vehicle)
+    if current_vehicle_count == 0:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_VEHICLE_CREATED)
     return vehicle
 
 
