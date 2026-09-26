@@ -17,6 +17,7 @@ OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
+PlanCode = Literal["free", "pro"]
 CsvImportType = Literal["work_sessions", "expenses"]
 FinancialHistoryGrouping = Literal["daily", "weekly", "monthly"]
 FinancialHistoryTrendDirection = Literal["increased", "decreased", "unchanged"]
@@ -97,6 +98,18 @@ class TokenResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class AccountPlanPublic(BaseModel):
+    id: int
+    name: str
+    code: PlanCode
+
+
+class AccountPlanResponse(BaseModel):
+    current_plan: AccountPlanPublic
+    features: dict[str, bool]
+    limits: dict[str, int]
 
 
 class PasswordChangeRequest(BaseModel):

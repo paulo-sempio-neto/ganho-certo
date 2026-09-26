@@ -25,6 +25,11 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    current_plan_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plans.id"),
+        nullable=True,
+        index=True,
+    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -34,6 +39,7 @@ class User(Base):
         default=lambda: datetime.now(UTC),
         nullable=False,
     )
+    current_plan: Mapped[Plan | None] = relationship(back_populates="users")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
@@ -41,6 +47,63 @@ class User(Base):
     recurring_expenses: Mapped[list[RecurringExpense]] = relationship(back_populates="user")
     financial_goals: Mapped[list[FinancialGoal]] = relationship(back_populates="user")
     import_profiles: Mapped[list[CsvImportProfile]] = relationship(back_populates="user")
+
+
+class Plan(Base):
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    users: Mapped[list[User]] = relationship(back_populates="current_plan")
+    plan_features: Mapped[list[PlanFeature]] = relationship(
+        back_populates="plan",
+        cascade="all, delete-orphan",
+    )
+
+
+class Feature(Base):
+    __tablename__ = "features"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    code: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    plan_features: Mapped[list[PlanFeature]] = relationship(
+        back_populates="feature",
+        cascade="all, delete-orphan",
+    )
+
+
+class PlanFeature(Base):
+    __tablename__ = "plan_features"
+    __table_args__ = (
+        UniqueConstraint("plan_id", "feature_id", name="uq_plan_features_plan_feature"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"), nullable=False, index=True)
+    feature_id: Mapped[int] = mapped_column(ForeignKey("features.id"), nullable=False, index=True)
+    enabled: Mapped[bool] = mapped_column(Boolean(), default=True, nullable=False)
+    limit_value: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    plan: Mapped[Plan] = relationship(back_populates="plan_features")
+    feature: Mapped[Feature] = relationship(back_populates="plan_features")
 
 
 class PasswordResetToken(Base):
