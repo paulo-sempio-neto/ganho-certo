@@ -42,6 +42,7 @@ class User(Base):
     current_plan: Mapped[Plan | None] = relationship(back_populates="users")
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
     billing_events: Mapped[list[BillingEvent]] = relationship(back_populates="user")
+    beta_feedback: Mapped[list[BetaFeedback]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
@@ -190,6 +191,27 @@ class BillingEvent(Base):
         nullable=False,
     )
     user: Mapped[User] = relationship(back_populates="billing_events")
+
+
+class BetaFeedback(Base):
+    __tablename__ = "beta_feedback"
+    __table_args__ = (
+        Index("ix_beta_feedback_user_created_at", "user_id", "created_at"),
+        Index("ix_beta_feedback_category_created_at", "category", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    message: Mapped[str] = mapped_column(String(2000), nullable=False)
+    path: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="beta_feedback")
 
 
 class PasswordResetToken(Base):

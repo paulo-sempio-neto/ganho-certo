@@ -17,6 +17,7 @@ OwnershipType = Literal["owned", "financed", "rented"]
 RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
+BetaFeedbackCategory = Literal["bug", "confusing", "idea", "other"]
 PlanCode = Literal["free", "pro"]
 CsvImportType = Literal["work_sessions", "expenses"]
 FinancialHistoryGrouping = Literal["daily", "weekly", "monthly"]
@@ -135,6 +136,45 @@ class BillingCheckoutResponse(BaseModel):
 
 class BillingWebhookResponse(BaseModel):
     status: str
+
+
+class BetaFeedbackCreate(BaseModel):
+    category: BetaFeedbackCategory = "other"
+    message: str = Field(min_length=10, max_length=2000)
+    path: str | None = Field(default=None, max_length=200)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 10:
+            raise ValueError("Feedback message is too short.")
+        return normalized
+
+    @field_validator("path")
+    @classmethod
+    def normalize_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not normalized.startswith("/"):
+            raise ValueError("Feedback path must be relative.")
+        return normalized
+
+
+class BetaFeedbackPublic(BaseModel):
+    id: int
+    category: BetaFeedbackCategory
+    message: str
+    path: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PasswordChangeRequest(BaseModel):

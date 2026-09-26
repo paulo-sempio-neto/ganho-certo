@@ -3,6 +3,7 @@ import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from 
 import { getAccountPlan, type AccountPlanResponse } from "./api/account";
 import { createBillingCheckout } from "./api/billing";
 import { NETWORK_ERROR_MESSAGE, requestApi } from "./api/client";
+import { createBetaFeedback, type BetaFeedbackCategory } from "./api/feedback";
 import {
   createExpense,
   createRecurringExpense,
@@ -175,6 +176,13 @@ type QuickDailyEntryResult = {
   workDate: string;
 };
 
+type BetaNextStep = {
+  title: string;
+  message: string;
+  actionLabel: string;
+  targetId: string;
+};
+
 function getResetPasswordTokenFromUrl(): string {
   if (window.location.pathname !== RESET_PASSWORD_PATH) {
     return "";
@@ -300,6 +308,13 @@ const emptyQuickDailyEntryForm: QuickDailyEntryForm = {
   vehicle_id: "",
   work_date: toDateInputValue(new Date()),
 };
+
+const feedbackCategoryOptions: Array<{ label: string; value: BetaFeedbackCategory }> = [
+  { label: "Algo confuso", value: "confusing" },
+  { label: "Problema", value: "bug" },
+  { label: "Ideia", value: "idea" },
+  { label: "Outro", value: "other" },
+];
 
 function getExpenseCategoryLabel(value: ExpenseCategory): string {
   return expenseCategoryOptions.find((option) => option.value === value)?.label ?? value;
@@ -436,6 +451,10 @@ function App() {
   const [dailyExpenseForm, setDailyExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [dailyExpenseVisible, setDailyExpenseVisible] = useState(false);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
+  const [isFeedbackVisible, setIsFeedbackVisible] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] =
+    useState<BetaFeedbackCategory>("confusing");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [pendingQuickStartAction, setPendingQuickStartAction] = useState<
     "register" | "configure" | null
   >(null);
@@ -483,6 +502,7 @@ function App() {
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
   const [isBillingCheckoutLoading, setIsBillingCheckoutLoading] = useState(false);
+  const [isFeedbackSaving, setIsFeedbackSaving] = useState(false);
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -523,6 +543,9 @@ function App() {
     setDailyExpenseForm(emptyExpenseForm);
     setDailyExpenseVisible(false);
     setIsChangePasswordVisible(false);
+    setIsFeedbackVisible(false);
+    setFeedbackCategory("confusing");
+    setFeedbackMessage("");
     setPendingQuickStartAction(null);
     setMode("login");
     setPassword("");
@@ -675,6 +698,35 @@ function App() {
       }
     } finally {
       setIsBillingCheckoutLoading(false);
+    }
+  }
+
+  async function handleFeedbackSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token) {
+      return;
+    }
+
+    setIsFeedbackSaving(true);
+    setMessage("");
+    setSuccessMessage("");
+    try {
+      await createBetaFeedback(getAuthHeaders(token), {
+        category: feedbackCategory,
+        message: feedbackMessage,
+        path: `${window.location.pathname}${window.location.hash}`,
+      });
+      setFeedbackMessage("");
+      setIsFeedbackVisible(false);
+      setSuccessMessage("Obrigado. Seu feedback foi enviado para a beta.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setMessage(error instanceof Error ? error.message : "Nao foi possivel enviar feedback.");
+      }
+    } finally {
+      setIsFeedbackSaving(false);
     }
   }
 
@@ -2058,6 +2110,45 @@ function App() {
     !isDashboardLoading &&
     financialSummary !== null &&
     !isPositiveMoney(financialSummary.estimated_structural_costs);
+  const betaNextStep: BetaNextStep | null = (() => {
+    if (vehicles.length === 0) {
+      return {
+        title: "Primeiro passo da beta",
+        message: "Cadastre seu veiculo para salvar jornadas e calcular seu resultado real.",
+        actionLabel: "Cadastrar veiculo",
+        targetId: "veiculos",
+      };
+    }
+
+    if (workSessions.length === 0) {
+      return {
+        title: "Agora registre um dia",
+        message: "Um unico registro ja libera o primeiro resumo de faturamento, horas e km.",
+        actionLabel: "Registrar meu dia",
+        targetId: "hoje",
+      };
+    }
+
+    if (expenses.length === 0) {
+      return {
+        title: "Inclua um gasto importante",
+        message: "Combustivel, recarga ou manutencao deixam o resultado bem mais fiel.",
+        actionLabel: "Adicionar gasto",
+        targetId: "hoje",
+      };
+    }
+
+    if (!quickDailyEntryResult && workSessions.length < 3) {
+      return {
+        title: "Continue por mais alguns dias",
+        message: "Com mais registros, o historico e os padroes de trabalho ficam mais uteis.",
+        actionLabel: "Registrar outro dia",
+        targetId: "hoje",
+      };
+    }
+
+    return null;
+  })();
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -2102,6 +2193,7 @@ function App() {
                   type="button"
                   onClick={() => {
                     setIsChangePasswordVisible((current) => !current);
+                    setIsFeedbackVisible(false);
                     setMessage("");
                     setSuccessMessage("");
                   }}
@@ -2114,6 +2206,62 @@ function App() {
                     onCancel={() => setIsChangePasswordVisible(false)}
                     onPasswordChanged={handlePasswordChanged}
                   />
+                ) : null}
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  onClick={() => {
+                    setIsFeedbackVisible((current) => !current);
+                    setIsChangePasswordVisible(false);
+                    setMessage("");
+                    setSuccessMessage("");
+                  }}
+                >
+                  Enviar feedback da beta
+                </button>
+                {isFeedbackVisible ? (
+                  <form className="auth-form feedback-form" onSubmit={handleFeedbackSubmit}>
+                    <h3>Feedback da beta</h3>
+                    <label>
+                      Tipo
+                      <select
+                        value={feedbackCategory}
+                        onChange={(event) =>
+                          setFeedbackCategory(event.target.value as BetaFeedbackCategory)
+                        }
+                      >
+                        {feedbackCategoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      O que aconteceu?
+                      <textarea
+                        maxLength={2000}
+                        minLength={10}
+                        onChange={(event) => setFeedbackMessage(event.target.value)}
+                        placeholder="Conte o que ficou confuso, travou ou faria diferenca para voce."
+                        required
+                        rows={4}
+                        value={feedbackMessage}
+                      />
+                    </label>
+                    <div className="form-actions">
+                      <button className="button" disabled={isFeedbackSaving} type="submit">
+                        {isFeedbackSaving ? "Enviando..." : "Enviar feedback"}
+                      </button>
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={() => setIsFeedbackVisible(false)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
                 ) : null}
                 <button className="button button-secondary" type="button" onClick={handleLogout}>
                   Sair
@@ -2130,6 +2278,26 @@ function App() {
               <a href="#custos">Custos</a>
               <a href="#mais">Mais</a>
             </nav>
+
+            {betaNextStep ? (
+              <div className="action-prompt beta-next-step">
+                <div>
+                  <strong>{betaNextStep.title}</strong>
+                  <p>{betaNextStep.message}</p>
+                </div>
+                <button
+                  className="button button-ghost"
+                  type="button"
+                  onClick={() =>
+                    document.getElementById(betaNextStep.targetId)?.scrollIntoView({
+                      behavior: "smooth",
+                    })
+                  }
+                >
+                  {betaNextStep.actionLabel}
+                </button>
+              </div>
+            ) : null}
 
             <section className="daily-entry" id="hoje">
               <div className="section-title">

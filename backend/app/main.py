@@ -16,6 +16,7 @@ from app.database import get_db
 from app.entitlements import PlanLimitReachedError
 from app.expense_imports import router as expense_imports_router
 from app.expenses import router as expenses_router
+from app.feedback import router as feedback_router
 from app.financial_goals import router as financial_goals_router
 from app.financial_history import router as financial_history_router
 from app.financial_insights import router as financial_insights_router
@@ -89,6 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(expense_imports_router)
     application.include_router(import_profiles_router)
     application.include_router(expenses_router)
+    application.include_router(feedback_router)
     application.include_router(recurring_expenses_router)
     application.include_router(maintenance_router)
     application.include_router(financial_goals_router)

@@ -73,6 +73,23 @@ Verificação:
 - Não crie rota administrativa pública para ativar plano durante a beta. O backend
   deve continuar sendo a fonte da verdade para plano, assinatura e entitlements.
 
+## Aprendizado da beta
+
+- O app coleta feedback autenticado em `/feedback`, gravado em `beta_feedback`
+  com usuario, categoria, mensagem, caminho da tela e user agent resumido.
+- Revise feedbacks pelo banco durante a beta pequena; ainda nao ha painel interno
+  nem integracao externa de suporte.
+- Eventos uteis para acompanhar manualmente nesta fase:
+  - conta criada;
+  - primeiro veiculo cadastrado;
+  - primeiro dia financeiro registrado;
+  - primeiro gasto registrado;
+  - checkout Pro iniciado;
+  - assinatura Pro ativada por webhook;
+  - feedback enviado.
+- Nao instalar analytics externo ate haver necessidade clara e politica de
+  privacidade revisada para a beta.
+
 ## Operacao em producao
 
 - `/health` confirma que o processo responde, sem consultar o banco.
