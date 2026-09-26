@@ -12,7 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Plan, User, WorkSession
+from app.models import Plan, ProductEvent, User, WorkSession
+from app.product_events import FIRST_FINANCIAL_ENTRY, FIRST_WORKDAY_COMPLETED
 from app.work_session_imports import MAX_FILE_SIZE_BYTES, MAX_IMPORT_ERRORS, MAX_ROWS
 
 CSV_HEADER = "date,gross_revenue,distance_km,worked_minutes,trip_count\n"
@@ -262,6 +263,13 @@ def test_import_valid_csv_imports_multiple_rows(client: TestClient, db_session: 
         "errors": [],
     }
     assert count_work_sessions(db_session) == 2
+    user = db_session.scalar(select(User).where(User.email == "import@email.com"))
+    assert user is not None
+    event_types = db_session.scalars(
+        select(ProductEvent.event_type).where(ProductEvent.user_id == user.id)
+    ).all()
+    assert event_types.count(FIRST_FINANCIAL_ENTRY) == 1
+    assert event_types.count(FIRST_WORKDAY_COMPLETED) == 1
 
 
 def test_import_preserves_money_precision(client: TestClient, db_session: Session) -> None:

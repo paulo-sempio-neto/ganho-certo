@@ -18,13 +18,18 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.entitlements import CSV_IMPORT_FEATURE, has_feature_access, raise_plan_limit_reached
 from app.models import User, Vehicle, WorkSession
+from app.product_events import (
+    FIRST_FINANCIAL_ENTRY,
+    FIRST_WORKDAY_COMPLETED,
+    record_once_per_user_event,
+)
 from app.schemas import (
     WorkSessionImportError,
     WorkSessionImportPreview,
     WorkSessionImportResult,
     WorkSessionImportRow,
 )
-from app.work_sessions import money_to_cents
+from app.work_sessions import has_financial_entry, has_work_session, money_to_cents
 
 router = APIRouter(prefix="/imports/work-sessions", tags=["imports"])
 
@@ -585,6 +590,8 @@ async def import_work_sessions(
             )
         )
 
+    had_work_session = has_work_session(current_user.id, db) if work_sessions else True
+    had_financial_entry = has_financial_entry(current_user.id, db) if work_sessions else True
     try:
         db.add_all(work_sessions)
         db.commit()
@@ -594,6 +601,11 @@ async def import_work_sessions(
             status_code=status.HTTP_409_CONFLICT,
             detail="Importação duplicada detectada.",
         ) from exc
+
+    if not had_financial_entry:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_FINANCIAL_ENTRY)
+    if not had_work_session:
+        record_once_per_user_event(db=db, user=current_user, event_type=FIRST_WORKDAY_COMPLETED)
 
     return WorkSessionImportResult(
         imported=len(work_sessions),

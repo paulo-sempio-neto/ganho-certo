@@ -80,11 +80,14 @@ friccoes e coletar feedback sem transformar o teste em suporte tecnico longo.
   - `account_created`
   - `first_vehicle_created`
   - `first_financial_entry`
-  - `dashboard_viewed`
+  - `first_workday_completed` apos a primeira jornada salva
+  - `first_result_viewed` somente apos abrir o resultado com jornada em aba visivel
   - `checkout_started`, se houve checkout
   - `subscription_activated`, se houve webhook aprovado
   - `feedback_sent`
 - [ ] Confirmar que eventos nao armazenam valores financeiros, senha, token ou email.
+- [ ] Confirmar que carregar `/financial-summary` em segundo plano nao cria
+  `first_result_viewed` nem novos eventos `dashboard_viewed`.
 
 ## Quando parar o teste
 

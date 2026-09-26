@@ -41,6 +41,7 @@ function renderResultSection(): string {
       onSummaryRetry: vi.fn(),
       onInsightsRetry: vi.fn(),
       onHistoryRetry: vi.fn(),
+      onFirstResultViewed: vi.fn(),
       getAuthHeaders: () => ({}),
       endSession: vi.fn(),
       getVehicleLabel: () => "Carro",

@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import type { ExpenseCategory } from "../../types/domain";
 import type { FinancialStructuralCosts, FinancialSummary } from "../../types/financial";
 import { formatDistance, formatWorkTime, formatDate } from "../../utils/formatters";
@@ -17,6 +18,7 @@ const structuralCostLabels: Array<{ key: keyof FinancialStructuralCosts; label: 
 type FinancialSummaryPanelProps = {
   summary: FinancialSummary;
   getExpenseCategoryLabel: (category: ExpenseCategory) => string;
+  resultRef?: Ref<HTMLDivElement>;
 };
 
 function getMetricValue(value: string | null, formatter: (metric: string) => string): string {
@@ -66,10 +68,11 @@ function getRecurringProjectionItems(summary: FinancialSummary) {
 export function FinancialSummaryPanel({
   summary,
   getExpenseCategoryLabel,
+  resultRef,
 }: FinancialSummaryPanelProps) {
   return (
     <>
-      <div className="economic-panel">
+      <div className="economic-panel" ref={resultRef}>
         <div className="section-title">
           <p className="eyebrow">Resultado</p>
           <h3>Quanto realmente esta sobrando?</h3>

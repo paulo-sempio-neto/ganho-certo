@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type {
   DashboardPeriod,
   ExpenseCategory,
@@ -13,6 +14,7 @@ import type {
 import { FinancialSummaryPanel } from "./FinancialSummaryPanel";
 import { HistoricalPerformanceSection } from "./HistoricalPerformanceSection";
 import { InsightsPanel } from "./InsightsPanel";
+import { observeFirstResult } from "./observeFirstResult";
 import { WorkPatternsSection } from "./WorkPatternsSection";
 
 type DashboardFilters = {
@@ -54,6 +56,7 @@ type ResultSectionProps = {
   onSummaryRetry: () => void;
   onInsightsRetry: () => void;
   onHistoryRetry: () => void;
+  onFirstResultViewed: () => void;
   getAuthHeaders: () => Record<string, string>;
   endSession: (message: string) => void;
   getVehicleLabel: (vehicleId: number) => string;
@@ -76,11 +79,30 @@ export function ResultSection({
   onSummaryRetry,
   onInsightsRetry,
   onHistoryRetry,
+  onFirstResultViewed,
   getAuthHeaders,
   endSession,
   getVehicleLabel,
   getExpenseCategoryLabel,
 }: ResultSectionProps) {
+  const resultRef = useRef<HTMLDivElement>(null);
+  const hasReportedResult = useRef(false);
+
+  useEffect(() => {
+    if (!summary || isSummaryLoading || summaryError || summary.total_worked_minutes <= 0) {
+      return;
+    }
+    const resultElement = resultRef.current;
+    if (!resultElement || hasReportedResult.current) {
+      return;
+    }
+
+    return observeFirstResult(resultElement, () => {
+      hasReportedResult.current = true;
+      onFirstResultViewed();
+    });
+  }, [summary, isSummaryLoading, summaryError, onFirstResultViewed]);
+
   return (
     <section className="manager-section dashboard-section" id="resultado">
       <div className="section-title">
@@ -172,6 +194,7 @@ export function ResultSection({
           <FinancialSummaryPanel
             summary={summary}
             getExpenseCategoryLabel={getExpenseCategoryLabel}
+            resultRef={resultRef}
           />
 
           <InsightsPanel

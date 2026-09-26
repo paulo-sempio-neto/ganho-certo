@@ -83,6 +83,16 @@ Verificação:
   Valores monetarios explicitos no texto (`R$ ...`) sao removidos antes de salvar.
 - O app registra eventos internos em `product_events` sem valores financeiros,
   senhas, tokens, email ou payload livre. Eventos de marco usam dedupe por usuario.
+- `first_financial_entry` inclui jornada ou despesa; para ativacao, use
+  `first_workday_completed` (primeira jornada salva) e `first_result_viewed`
+  (resultado com jornada exibido em uma aba visivel). O endpoint de visualizacao
+  exige autenticacao, jornada do proprio usuario e corpo vazio.
+- `dashboard_viewed` e legado: leituras automaticas de `/financial-summary`
+  nao geram mais esse evento. Registros antigos permanecem no banco.
+- No resumo interno, `users_with_first_workday` vem das jornadas salvas, inclusive
+  de contas anteriores a esta medicao. Eventos `first_workday_completed` antigos
+  nao sao recriados. `users_with_first_result_viewed` conta eventos observados
+  a partir desta versao; nao ha backfill de visualizacoes.
 - O resumo agregado `/internal/beta/summary` exige `X-Beta-Admin-Token` igual ao
   `BETA_ADMIN_TOKEN`; sem token configurado, o endpoint fica indisponivel.
 - A visao interna `/internal/beta/feedback` mostra total, abertos, contagens por
@@ -93,8 +103,8 @@ Verificação:
 - Eventos uteis para acompanhar manualmente nesta fase:
   - conta criada;
   - primeiro veiculo cadastrado;
-  - primeiro dia financeiro registrado;
-  - primeiro gasto registrado;
+  - primeira jornada salva e primeiro resultado efetivamente exibido;
+  - primeira entrada financeira, que tambem pode ser um gasto;
   - checkout Pro iniciado;
   - assinatura Pro ativada por webhook;
   - feedback enviado.

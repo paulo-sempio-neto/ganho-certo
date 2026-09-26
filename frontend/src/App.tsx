@@ -1078,6 +1078,17 @@ function App() {
     setSuccessMessage("");
   }
 
+  async function recordFirstResultViewed() {
+    try {
+      await requestApi<void>("/product-events/first-result-viewed", {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+    } catch {
+      // The next visit can retry this passive measurement.
+    }
+  }
+
   function handleBackToLogin(nextSuccessMessage = "") {
     window.history.replaceState(null, "", "/");
     setIsResetPasswordRoute(false);
@@ -3366,6 +3377,7 @@ function App() {
                   onSummaryRetry={() => void loadFinancialSummary()}
                   onInsightsRetry={() => void loadFinancialInsights()}
                   onHistoryRetry={() => void loadFinancialHistory()}
+                  onFirstResultViewed={() => void recordFirstResultViewed()}
                   getAuthHeaders={getAuthHeaders}
                   endSession={endSession}
                   getVehicleLabel={getVehicleLabel}

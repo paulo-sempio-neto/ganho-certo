@@ -4,12 +4,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import BetaFeedback, ProductEvent, User
+from app.models import BetaFeedback, ProductEvent, User, WorkSession
 
 ACCOUNT_CREATED = "account_created"
 FIRST_VEHICLE_CREATED = "first_vehicle_created"
 FIRST_FINANCIAL_ENTRY = "first_financial_entry"
 DASHBOARD_VIEWED = "dashboard_viewed"
+FIRST_WORKDAY_COMPLETED = "first_workday_completed"
+FIRST_RESULT_VIEWED = "first_result_viewed"
 CHECKOUT_STARTED = "checkout_started"
 SUBSCRIPTION_ACTIVATED = "subscription_activated"
 FEEDBACK_SENT = "feedback_sent"
@@ -121,20 +123,27 @@ def get_beta_learning_counts(db: Session) -> dict[str, int]:
             .distinct()
         ).all()
     )
+    first_workday_user_ids = set(
+        db.scalars(select(WorkSession.user_id).distinct()).all()
+    )
 
     return {
         "total_users": len(db.scalars(select(User.id)).all()),
         "active_users_7d": len(
             db.scalars(
                 select(ProductEvent.user_id)
-                .where(ProductEvent.occurred_at >= active_since)
+                .where(
+                    ProductEvent.occurred_at >= active_since,
+                    ProductEvent.event_type != DASHBOARD_VIEWED,
+                )
                 .distinct()
             ).all()
         ),
         "users_with_first_vehicle": len(first_vehicle_user_ids),
         "users_with_first_financial_entry": len(first_financial_user_ids),
-        "users_completed_first_setup": len(first_vehicle_user_ids & first_financial_user_ids),
-        "dashboard_viewed_users": count_distinct_event_users(db, DASHBOARD_VIEWED),
+        "users_with_first_workday": len(first_workday_user_ids),
+        "users_completed_first_setup": len(first_vehicle_user_ids & first_workday_user_ids),
+        "users_with_first_result_viewed": count_distinct_event_users(db, FIRST_RESULT_VIEWED),
         "checkout_started_users": count_distinct_event_users(db, CHECKOUT_STARTED),
         "subscription_activated_users": count_distinct_event_users(db, SUBSCRIPTION_ACTIVATED),
         "feedback_count": len(db.scalars(select(BetaFeedback.id)).all()),

@@ -25,6 +25,8 @@ ProductEventType = Literal[
     "first_vehicle_created",
     "first_financial_entry",
     "dashboard_viewed",
+    "first_workday_completed",
+    "first_result_viewed",
     "checkout_started",
     "subscription_activated",
     "feedback_sent",
@@ -228,8 +230,9 @@ class BetaLearningSummary(BaseModel):
     active_users_7d: int
     users_with_first_vehicle: int
     users_with_first_financial_entry: int
+    users_with_first_workday: int
     users_completed_first_setup: int
-    dashboard_viewed_users: int
+    users_with_first_result_viewed: int
     checkout_started_users: int
     subscription_activated_users: int
     feedback_count: int
