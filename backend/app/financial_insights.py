@@ -36,6 +36,16 @@ CATEGORY_LABELS = {
     "other": "Outros",
 }
 
+WEEKDAY_LABELS = {
+    0: "segunda-feira",
+    1: "terca-feira",
+    2: "quarta-feira",
+    3: "quinta-feira",
+    4: "sexta-feira",
+    5: "sabado",
+    6: "domingo",
+}
+
 
 def format_money(value: Decimal) -> str:
     return f"R$ {round_decimal(value):.2f}".replace(".", ",")
@@ -54,11 +64,28 @@ def format_day(value: date) -> str:
     return value.strftime("%d/%m")
 
 
+def format_hours(minutes: int) -> str:
+    hours = Decimal(minutes) / Decimal("60")
+    rounded = hours.quantize(PERCENT, rounding=ROUND_HALF_UP)
+    formatted = f"{rounded:.1f}".replace(".", ",")
+    if formatted.endswith(",0"):
+        formatted = formatted[:-2]
+
+    return f"{formatted}h"
+
+
 def divide_or_none(numerator: Decimal, denominator: Decimal) -> Decimal | None:
     if denominator == ZERO:
         return None
 
     return numerator / denominator
+
+
+def period_days(start_date: date | None, end_date: date | None) -> int | None:
+    if start_date is None or end_date is None:
+        return None
+
+    return (end_date - start_date).days + 1
 
 
 def make_percentage(numerator: Decimal, denominator: Decimal) -> Decimal | None:
@@ -107,6 +134,90 @@ def add_expense_share_insight(insights: list[FinancialInsight], summary: Financi
             message=(
                 "Suas despesas registradas representam "
                 f"{format_percent(expense_share)} do faturamento."
+            ),
+        )
+    )
+
+
+def add_activity_consistency_insight(
+    insights: list[FinancialInsight],
+    summary: FinancialSummary,
+    start_date: date | None,
+    end_date: date | None,
+) -> None:
+    days = period_days(start_date, end_date)
+    if days is None or days <= 0 or not summary.daily:
+        return
+
+    days_with_records = len(summary.daily)
+    consistency = make_percentage(Decimal(days_with_records), Decimal(days))
+    if consistency is None:
+        return
+
+    insights.append(
+        FinancialInsight(
+            code="activity_consistency",
+            type="positive" if consistency >= Decimal("50") else "info",
+            title="Consistencia de registro",
+            message=(
+                f"Voce registrou movimentacao em {days_with_records} de {days} dias "
+                f"do periodo ({format_percent(consistency)})."
+            ),
+        )
+    )
+
+
+def add_weekly_performance_summary(
+    insights: list[FinancialInsight],
+    summary: FinancialSummary,
+    start_date: date | None,
+    end_date: date | None,
+) -> None:
+    days = period_days(start_date, end_date)
+    if days is None or days < 7 or not summary.daily:
+        return
+
+    weekly_result = summary.estimated_net_profit / Decimal(days) * Decimal("7")
+    insights.append(
+        FinancialInsight(
+            code="weekly_performance_summary",
+            type="positive" if weekly_result > ZERO else "attention",
+            title="Resumo semanal",
+            message=(
+                "Neste periodo, sua media proporcional foi de "
+                f"{format_money(weekly_result)} de sobra registrada por semana, "
+                f"com {format_hours(summary.total_worked_minutes)} trabalhadas no total."
+            ),
+        )
+    )
+
+
+def add_best_weekday_insight(insights: list[FinancialInsight], summary: FinancialSummary) -> None:
+    if not summary.daily:
+        return
+
+    totals_by_weekday: defaultdict[int, Decimal] = defaultdict(lambda: ZERO)
+    active_days_by_weekday: defaultdict[int, int] = defaultdict(int)
+    for daily_summary in summary.daily:
+        weekday = daily_summary.date.weekday()
+        totals_by_weekday[weekday] += daily_summary.estimated_net_profit
+        active_days_by_weekday[weekday] += 1
+
+    best_weekday, best_total = max(
+        totals_by_weekday.items(),
+        key=lambda item: (item[1], -item[0]),
+    )
+    active_days = active_days_by_weekday[best_weekday]
+
+    insights.append(
+        FinancialInsight(
+            code="best_weekday",
+            type="positive" if best_total > ZERO else "info",
+            title="Dia da semana em destaque",
+            message=(
+                f"{WEEKDAY_LABELS[best_weekday].capitalize()} concentrou "
+                f"{format_money(best_total)} de sobra registrada em {active_days} "
+                "dia(s) com movimentacao."
             ),
         )
     )
@@ -280,6 +391,9 @@ def get_financial_insights(
     )
     insights: list[FinancialInsight] = []
 
+    add_activity_consistency_insight(insights, summary, start_date, end_date)
+    add_weekly_performance_summary(insights, summary, start_date, end_date)
+    add_best_weekday_insight(insights, summary)
     add_expense_share_insight(insights, summary)
     add_net_per_hour_insight(insights, summary)
     add_net_per_km_insight(insights, summary)

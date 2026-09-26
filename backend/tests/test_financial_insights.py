@@ -176,6 +176,34 @@ def test_financial_insights_return_period_metrics_and_best_day(client: TestClien
         "Seu melhor resultado diário foi em 02/09, com R$ 180,00 após despesas registradas."
     )
 
+def test_financial_insights_return_retention_activity_and_weekly_summary(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "retention-insights@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-09-01", "100.00", "10.00", 60)
+    create_work_session(client, token, vehicle_id, "2026-09-03", "150.00", "10.00", 120)
+    create_expense(client, token, "2026-09-01", "20.00", vehicle_id)
+    create_expense(client, token, "2026-09-03", "30.00", vehicle_id)
+
+    response = client.get(
+        "/financial-insights?start_date=2026-09-01&end_date=2026-09-07",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    insights = insights_by_code(response.json())
+    assert insights["activity_consistency"]["message"] == (
+        "Voce registrou movimentacao em 2 de 7 dias do periodo (28,6%)."
+    )
+    assert insights["weekly_performance_summary"]["message"] == (
+        "Neste periodo, sua media proporcional foi de R$ 200,00 de sobra registrada "
+        "por semana, com 3h trabalhadas no total."
+    )
+    assert insights["best_weekday"]["message"] == (
+        "Quinta-feira concentrou R$ 120,00 de sobra registrada em 1 dia(s) com movimentacao."
+    )
+
 
 def test_financial_insights_compare_with_previous_period_increase(
     client: TestClient,
@@ -245,6 +273,23 @@ def test_financial_insights_empty_period_avoids_division_by_zero(client: TestCli
     assert response.json() == {"insights": []}
 
 
+def test_financial_insights_short_period_skips_weekly_summary(client: TestClient) -> None:
+    token = register_and_login(client, "short-period-insights@email.com")
+    vehicle_id = create_vehicle(client, token)
+    create_work_session(client, token, vehicle_id, "2026-09-01", "100.00", "10.00", 60)
+
+    response = client.get(
+        "/financial-insights?start_date=2026-09-01&end_date=2026-09-02",
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    insights = insights_by_code(response.json())
+    assert "activity_consistency" in insights
+    assert "best_weekday" in insights
+    assert "weekly_performance_summary" not in insights
+
+
 def test_financial_insights_filter_by_vehicle_and_isolate_users(client: TestClient) -> None:
     user_a_email = "filter-a@email.com"
     user_a_token = register_and_login(client, user_a_email)
@@ -272,6 +317,9 @@ def test_financial_insights_filter_by_vehicle_and_isolate_users(client: TestClie
     )
     assert insights["top_expense_category"]["message"] == (
         "Combustível foi sua maior despesa registrada no período, totalizando R$ 30,00."
+    )
+    assert insights["best_weekday"]["message"] == (
+        "Terca-feira concentrou R$ 70,00 de sobra registrada em 1 dia(s) com movimentacao."
     )
 
 

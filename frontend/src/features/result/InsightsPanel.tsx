@@ -8,7 +8,7 @@ type InsightsPanelProps = {
 };
 
 export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsPanelProps) {
-  const visibleInsights = insights.slice(0, 5);
+  const visibleInsights = insights.slice(0, 6);
 
   return (
     <div className="financial-insights" id="insights">
