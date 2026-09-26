@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from threading import Lock
 from time import monotonic
 from typing import Protocol
 
@@ -28,13 +29,16 @@ class InMemoryRateLimiter:
 
     def __init__(self, clock: Clock = monotonic) -> None:
         self._clock = clock
+        self._lock = Lock()
         self._buckets: dict[str, RateLimitBucket] = {}
 
     def reset(self) -> None:
-        self._buckets.clear()
+        with self._lock:
+            self._buckets.clear()
 
     def set_clock(self, clock: Clock) -> None:
-        self._clock = clock
+        with self._lock:
+            self._clock = clock
 
     def hit(
         self,
@@ -47,35 +51,32 @@ class InMemoryRateLimiter:
         if limit <= 0:
             return RateLimitResult(allowed=True, retry_after_seconds=0)
 
-        now = self._clock()
-        self._cleanup(now=now, max_entries=max_entries)
+        with self._lock:
+            now = self._clock()
+            self._cleanup(now=now)
+            bucket = self._buckets.get(key)
+            if bucket is None:
+                # Never evict an active bucket: flooding new identities must not reset limits.
+                if len(self._buckets) >= max_entries:
+                    earliest_reset = min(bucket.reset_at for bucket in self._buckets.values())
+                    return RateLimitResult(False, max(1, int(earliest_reset - now)))
+                self._buckets[key] = RateLimitBucket(count=1, reset_at=now + window_seconds)
+                return RateLimitResult(allowed=True, retry_after_seconds=0)
 
-        bucket = self._buckets.get(key)
-        if bucket is None or bucket.reset_at <= now:
-            self._buckets[key] = RateLimitBucket(count=1, reset_at=now + window_seconds)
+            if bucket.count >= limit:
+                retry_after = max(1, int(bucket.reset_at - now))
+                return RateLimitResult(allowed=False, retry_after_seconds=retry_after)
+
+            bucket.count += 1
             return RateLimitResult(allowed=True, retry_after_seconds=0)
 
-        if bucket.count >= limit:
-            retry_after = max(1, int(bucket.reset_at - now))
-            return RateLimitResult(allowed=False, retry_after_seconds=retry_after)
-
-        bucket.count += 1
-        return RateLimitResult(allowed=True, retry_after_seconds=0)
-
     def clear(self, key: str) -> None:
-        self._buckets.pop(key, None)
-
-    def _cleanup(self, *, now: float, max_entries: int) -> None:
-        expired_keys = [key for key, bucket in self._buckets.items() if bucket.reset_at <= now]
-        for key in expired_keys:
+        with self._lock:
             self._buckets.pop(key, None)
 
-        if len(self._buckets) <= max_entries:
-            return
-
-        keys_by_oldest_reset = sorted(self._buckets, key=lambda key: self._buckets[key].reset_at)
-        keys_to_remove = keys_by_oldest_reset[: len(self._buckets) - max_entries]
-        for key in keys_to_remove:
+    def _cleanup(self, *, now: float) -> None:
+        expired_keys = [key for key, bucket in self._buckets.items() if bucket.reset_at <= now]
+        for key in expired_keys:
             self._buckets.pop(key, None)
 
 

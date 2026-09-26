@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import Settings
 from app.database import Base, get_db
+from app.email import EmailDeliveryError
 from app.main import app, create_app
 from app.models import PasswordResetToken, User
 from app.security import hash_token
@@ -226,6 +227,27 @@ def test_forgot_password_rate_limit(
 
     assert first_response.status_code == 200
     assert limited_response.status_code == 429
+
+
+def test_email_failure_does_not_log_reset_url_or_smtp_details(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FailingSender:
+        def send_password_reset(self, recipient_email: str, reset_url: str) -> None:
+            raise EmailDeliveryError("smtp-private-credential " + reset_url)
+
+    monkeypatch.setattr(
+        "app.auth.get_password_reset_email_sender", lambda settings: FailingSender(),
+    )
+    register_user(client)
+    response = client.post("/auth/forgot-password", json={"email": "paulo@email.com"})
+    assert response.status_code == 200
+    assert response.json()["message"] == PUBLIC_RESET_MESSAGE
+    assert "smtp-private-credential" not in caplog.text + response.text
+    assert "token=" not in caplog.text + response.text
+    assert response.headers["X-Request-ID"] in caplog.text
 
 
 def test_forgot_password_invalidates_previous_unused_token(

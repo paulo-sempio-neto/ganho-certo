@@ -1,4 +1,3 @@
-import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -13,6 +12,7 @@ from app.config import Settings, get_settings
 from app.database import get_db
 from app.email import EmailDeliveryError, build_password_reset_url, get_password_reset_email_sender
 from app.models import PasswordResetToken, User
+from app.observability import log_exception
 from app.rate_limit import (
     auth_rate_limiter,
     enforce_auth_rate_limit,
@@ -42,7 +42,6 @@ from app.security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-logger = logging.getLogger(__name__)
 
 
 def invalid_credentials_exception() -> HTTPException:
@@ -251,9 +250,9 @@ def forgot_password(
             reset_url=build_password_reset_url(settings, raw_token),
         )
         db.commit()
-    except EmailDeliveryError:
+    except EmailDeliveryError as error:
         db.rollback()
-        logger.warning("Password reset email delivery failed.", exc_info=True)
+        log_exception(request, error, event="password_reset_delivery_failed")
 
     return password_reset_public_response()
 

@@ -10,6 +10,8 @@ def main() -> None:
         host=settings.app_host,
         port=settings.app_port,
         proxy_headers=True,
+        forwarded_allow_ips=settings.forwarded_allow_ips,
+        access_log=False,
     )
 
 

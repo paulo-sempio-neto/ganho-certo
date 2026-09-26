@@ -18,7 +18,14 @@ def test_local_app_keeps_api_docs_enabled() -> None:
 
 
 def test_production_app_disables_public_api_docs() -> None:
-    application = create_app(Settings(app_env="production", jwt_secret_key=STRONG_SECRET))
+    application = create_app(Settings(
+        app_env="production", jwt_secret_key=STRONG_SECRET,
+        database_url="postgresql+psycopg://example:example@db.example.com/app",
+        cors_allowed_origins="https://app.example.com",
+        frontend_base_url="https://app.example.com",
+        allowed_hosts="testserver", smtp_host="smtp.example.com",
+        smtp_from_email="support@example.com",
+    ))
 
     with TestClient(application) as client:
         docs_response = client.get("/docs")

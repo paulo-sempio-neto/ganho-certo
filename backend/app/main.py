@@ -1,8 +1,16 @@
-from fastapi import FastAPI
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.auth import router as auth_router
 from app.config import Settings, get_settings
+from app.database import get_db
 from app.expense_imports import router as expense_imports_router
 from app.expenses import router as expenses_router
 from app.financial_goals import router as financial_goals_router
@@ -11,8 +19,14 @@ from app.financial_insights import router as financial_insights_router
 from app.financial_summary import router as financial_summary_router
 from app.import_profiles import router as import_profiles_router
 from app.maintenance import router as maintenance_router
-from app.observability import configure_logging, request_logging_middleware
+from app.observability import (
+    configure_logging,
+    log_exception,
+    request_logging_middleware,
+    safe_errors_middleware,
+)
 from app.recurring_expenses import router as recurring_expenses_router
+from app.request_limits import RequestSizeLimitMiddleware
 from app.vehicle_cost_profiles import router as vehicle_cost_profiles_router
 from app.vehicles import router as vehicles_router
 from app.work_patterns import router as work_patterns_router
@@ -35,14 +49,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json" if enable_docs else None,
     )
     application.state.settings = app_settings
-    application.middleware("http")(request_logging_middleware)
+    application.middleware("http")(safe_errors_middleware)
+    application.add_middleware(
+        RequestSizeLimitMiddleware, max_bytes=app_settings.max_request_body_bytes,
+    )
+    application.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=app_settings.trusted_hosts, www_redirect=False,
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.cors_origins,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
+    application.middleware("http")(request_logging_middleware)
     application.include_router(auth_router)
     application.include_router(vehicles_router)
     application.include_router(vehicle_cost_profiles_router)
@@ -62,6 +84,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/ready")
+    def ready(request: Request, db: Annotated[Session, Depends(get_db)]) -> JSONResponse:
+        try:
+            db.execute(text("SELECT 1"))
+        except SQLAlchemyError as error:
+            log_exception(request, error)
+            return JSONResponse({"status": "unavailable"}, status_code=503)
+        return JSONResponse({"status": "ready"})
 
     return application
 
