@@ -8,6 +8,8 @@ export const TIMEOUT_ERROR_MESSAGE =
   "A conexao demorou demais. Verifique sua internet e tente novamente.";
 export const TEMPORARY_ERROR_MESSAGE =
   "Servidor temporariamente indisponivel. Tente novamente em instantes.";
+export const PLAN_LIMIT_REACHED_MESSAGE = "Voce atingiu o limite do plano gratuito.";
+export const PRO_FEATURE_MESSAGE = "Este recurso esta disponivel no plano Pro.";
 
 export function getDefaultErrorMessage(status: number): string {
   if (status === 401) {
@@ -66,17 +68,34 @@ export function getSafeApiDetail(detail: string): string | null {
   return normalizedDetail;
 }
 
-export async function getErrorMessage(response: Response): Promise<string> {
-  if (response.status !== 400 && response.status !== 409) {
-    return getDefaultErrorMessage(response.status);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function getEntitlementErrorMessage(payload: unknown): string | null {
+  if (!isRecord(payload) || payload.code !== "plan_limit_reached") {
+    return null;
   }
 
+  const detail = typeof payload.detail === "string" ? payload.detail.toLowerCase() : "";
+  if (detail.includes("veiculo") && detail.includes("limite")) {
+    return PLAN_LIMIT_REACHED_MESSAGE;
+  }
+
+  return PRO_FEATURE_MESSAGE;
+}
+
+export async function getErrorMessage(response: Response): Promise<string> {
   try {
     const payload: unknown = await response.json();
+    const entitlementMessage = getEntitlementErrorMessage(payload);
+    if (entitlementMessage) {
+      return entitlementMessage;
+    }
+
     if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "detail" in payload &&
+      (response.status === 400 || response.status === 409) &&
+      isRecord(payload) &&
       typeof payload.detail === "string"
     ) {
       return getSafeApiDetail(payload.detail) ?? getDefaultErrorMessage(response.status);

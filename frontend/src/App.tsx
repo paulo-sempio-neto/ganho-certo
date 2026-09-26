@@ -1,5 +1,6 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
+import { getAccountPlan, type AccountPlanResponse } from "./api/account";
 import { NETWORK_ERROR_MESSAGE, requestApi } from "./api/client";
 import {
   createExpense,
@@ -18,6 +19,7 @@ import { LazyCsvImportSection as CsvImportSection } from "./features/imports/Laz
 import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
 import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
+import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
 import {
   VehiclesSection,
   type VehiclesSectionHandle,
@@ -408,6 +410,7 @@ function App() {
   const [financialSummary, setFinancialSummary] = useState<FinancialSummary | null>(null);
   const [financialInsights, setFinancialInsights] = useState<FinancialInsight[]>([]);
   const [financialHistory, setFinancialHistory] = useState<FinancialHistoryResponse | null>(null);
+  const [accountPlan, setAccountPlan] = useState<AccountPlanResponse | null>(null);
   const [workSessionForm, setWorkSessionForm] =
     useState<WorkSessionForm>(emptyWorkSessionForm);
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
@@ -456,6 +459,7 @@ function App() {
   const [dashboardError, setDashboardError] = useState("");
   const [financialInsightsError, setFinancialInsightsError] = useState("");
   const [financialHistoryError, setFinancialHistoryError] = useState("");
+  const [accountPlanError, setAccountPlanError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
@@ -466,6 +470,7 @@ function App() {
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [isFinancialInsightsLoading, setIsFinancialInsightsLoading] = useState(false);
   const [isFinancialHistoryLoading, setIsFinancialHistoryLoading] = useState(false);
+  const [isAccountPlanLoading, setIsAccountPlanLoading] = useState(false);
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
@@ -491,6 +496,7 @@ function App() {
     setFinancialSummary(null);
     setFinancialInsights([]);
     setFinancialHistory(null);
+    setAccountPlan(null);
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
     setEditingRecurringExpenseId(null);
@@ -520,6 +526,7 @@ function App() {
     setDashboardError("");
     setFinancialInsightsError("");
     setFinancialHistoryError("");
+    setAccountPlanError("");
     setHistoryVehicleId("");
     setMessage(nextMessage);
   }
@@ -613,6 +620,30 @@ function App() {
       }
     } finally {
       setIsVehiclesLoading(false);
+    }
+  }
+
+  async function loadAccountPlan(currentToken = token) {
+    if (!currentToken) {
+      return;
+    }
+
+    setIsAccountPlanLoading(true);
+    setAccountPlanError("");
+    try {
+      const nextAccountPlan = await getAccountPlan(getAuthHeaders(currentToken));
+      setAccountPlan(nextAccountPlan);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setAccountPlan(null);
+        setAccountPlanError(
+          error instanceof Error ? error.message : "Nao foi possivel carregar seu plano.",
+        );
+      }
+    } finally {
+      setIsAccountPlanLoading(false);
     }
   }
 
@@ -808,7 +839,9 @@ function App() {
         endSession(error.message);
       } else {
         setFinancialInsights([]);
-        setFinancialInsightsError("Não foi possível carregar os insights agora.");
+        setFinancialInsightsError(
+          error instanceof Error ? error.message : "Nao foi possivel carregar os insights agora.",
+        );
       }
     } finally {
       setIsFinancialInsightsLoading(false);
@@ -835,7 +868,9 @@ function App() {
         endSession(error.message);
       } else {
         setFinancialHistory(null);
-        setFinancialHistoryError("Não foi possível carregar sua evolução agora.");
+        setFinancialHistoryError(
+          error instanceof Error ? error.message : "Nao foi possivel carregar sua evolucao agora.",
+        );
       }
     } finally {
       setIsFinancialHistoryLoading(false);
@@ -870,7 +905,9 @@ function App() {
       setFinancialSummary(null);
       setFinancialInsights([]);
       setFinancialHistory(null);
+      setAccountPlan(null);
       setFinancialHistoryError("");
+      setAccountPlanError("");
       setMaintenancePlanForm(emptyMaintenancePlanForm);
       setMaintenanceRecordForm(emptyMaintenanceRecordForm);
       setRecordingMaintenancePlanId(null);
@@ -885,7 +922,7 @@ function App() {
         });
         setUser(currentUser);
         setMessage("");
-        await loadVehicles(token);
+        await Promise.all([loadAccountPlan(token), loadVehicles(token)]);
         await Promise.all([
           loadWorkSessions(token),
           loadExpenses(token),
@@ -1987,6 +2024,12 @@ function App() {
                     <dd>{user.email}</dd>
                   </div>
                 </dl>
+                <AccountPlanPanel
+                  accountPlan={accountPlan}
+                  error={accountPlanError}
+                  isLoading={isAccountPlanLoading}
+                  onRetry={() => void loadAccountPlan()}
+                />
                 <button
                   className="button button-ghost"
                   type="button"

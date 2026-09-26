@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   getDefaultErrorMessage,
+  getEntitlementErrorMessage,
   getErrorMessage,
   getRequestTimeoutMs,
   getSafeApiDetail,
   NETWORK_ERROR_MESSAGE,
+  PLAN_LIMIT_REACHED_MESSAGE,
+  PRO_FEATURE_MESSAGE,
   SESSION_EXPIRED_MESSAGE,
   TEMPORARY_ERROR_MESSAGE,
   TIMEOUT_ERROR_MESSAGE,
@@ -35,6 +38,31 @@ describe("api client error handling", () => {
     );
 
     await expect(getErrorMessage(response)).resolves.toBe("Nao foi possivel concluir a solicitacao.");
+  });
+
+  it("maps entitlement errors to friendly plan messages", async () => {
+    expect(
+      getEntitlementErrorMessage({
+        code: "plan_limit_reached",
+        detail: "Seu plano atual atingiu o limite de veiculos cadastrados.",
+      }),
+    ).toBe(PLAN_LIMIT_REACHED_MESSAGE);
+    expect(
+      getEntitlementErrorMessage({
+        code: "plan_limit_reached",
+        detail: "Seu plano atual nao inclui importacao CSV.",
+      }),
+    ).toBe(PRO_FEATURE_MESSAGE);
+
+    const response = new Response(
+      JSON.stringify({
+        code: "plan_limit_reached",
+        detail: "Seu plano atual nao inclui historico avancado.",
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+
+    await expect(getErrorMessage(response)).resolves.toBe(PRO_FEATURE_MESSAGE);
   });
 
   it("allows more time for upload requests", () => {
