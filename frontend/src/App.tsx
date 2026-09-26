@@ -54,6 +54,7 @@ import type {
   FinancialInsight,
   FinancialSummary,
 } from "./types/financial";
+import { getBetaActivationNextStep } from "./utils/activation";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
 import {
   formatDate,
@@ -174,13 +175,6 @@ type QuickDailyEntryResult = {
   tripCount: number;
   vehicle: Vehicle;
   workDate: string;
-};
-
-type BetaNextStep = {
-  title: string;
-  message: string;
-  actionLabel: string;
-  targetId: string;
 };
 
 function getResetPasswordTokenFromUrl(): string {
@@ -1305,7 +1299,7 @@ function App() {
       vehicle_id: String(vehicle.id),
     });
     setQuickDailyEntryShowDate(false);
-    setSuccessMessage("Dia registrado com sucesso.");
+    setSuccessMessage("Dia registrado. Veja a sobra apos gastos abaixo.");
     await loadWorkSessions();
     await refreshDashboardData();
     requestAnimationFrame(() =>
@@ -1323,7 +1317,9 @@ function App() {
       const vehicle = getQuickDailyVehicle();
       if (!vehicle) {
         setPendingQuickDailyEntry(true);
-        setMessage("Cadastre seu veiculo para salvar o dia. Seus dados foram mantidos.");
+        setMessage(
+          "Dados mantidos. Cadastre seu veiculo para salvar este dia e ver quanto sobrou.",
+        );
         document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
         return;
       }
@@ -2110,45 +2106,12 @@ function App() {
     !isDashboardLoading &&
     financialSummary !== null &&
     !isPositiveMoney(financialSummary.estimated_structural_costs);
-  const betaNextStep: BetaNextStep | null = (() => {
-    if (vehicles.length === 0) {
-      return {
-        title: "Primeiro passo da beta",
-        message: "Cadastre seu veiculo para salvar jornadas e calcular seu resultado real.",
-        actionLabel: "Cadastrar veiculo",
-        targetId: "veiculos",
-      };
-    }
-
-    if (workSessions.length === 0) {
-      return {
-        title: "Agora registre um dia",
-        message: "Um unico registro ja libera o primeiro resumo de faturamento, horas e km.",
-        actionLabel: "Registrar meu dia",
-        targetId: "hoje",
-      };
-    }
-
-    if (expenses.length === 0) {
-      return {
-        title: "Inclua um gasto importante",
-        message: "Combustivel, recarga ou manutencao deixam o resultado bem mais fiel.",
-        actionLabel: "Adicionar gasto",
-        targetId: "hoje",
-      };
-    }
-
-    if (!quickDailyEntryResult && workSessions.length < 3) {
-      return {
-        title: "Continue por mais alguns dias",
-        message: "Com mais registros, o historico e os padroes de trabalho ficam mais uteis.",
-        actionLabel: "Registrar outro dia",
-        targetId: "hoje",
-      };
-    }
-
-    return null;
-  })();
+  const betaNextStep = getBetaActivationNextStep({
+    vehicleCount: vehicles.length,
+    workSessionCount: workSessions.length,
+    expenseCount: expenses.length,
+    hasQuickDailyResult: quickDailyEntryResult !== null,
+  });
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -2164,7 +2127,9 @@ function App() {
             <div className="session-header">
               <div>
                 <p className="eyebrow">GanhoCerto</p>
-                <h2>{workSessions.length === 0 ? "Descubra seu GanhoCerto" : `Ola, ${user.name}.`}</h2>
+                <h2>
+                  {workSessions.length === 0 ? "Registre seu primeiro dia" : `Ola, ${user.name}.`}
+                </h2>
               </div>
               <details className="account-menu" id="mais">
                 <summary>Mais</summary>
@@ -2310,26 +2275,40 @@ function App() {
 
               {workSessions.length === 0 ? (
                 <div className="activation-panel">
-                  <h4>Descubra seu GanhoCerto</h4>
+                  <h4>
+                    {vehicles.length === 0
+                      ? "Comece pelo registro do dia"
+                      : "Registre seu primeiro dia"}
+                  </h4>
                   <p>
-                    Comece registrando seu dia. Se quiser testar primeiro, use a simulação sem salvar.
+                    {vehicles.length === 0
+                      ? "Digite faturamento, km e horas agora. Se faltar o veiculo, mantemos os dados e levamos voce ao cadastro."
+                      : "Salve uma jornada real para ver quanto sobrou depois dos gastos registrados."}
                   </p>
                   <div className="quick-action-grid">
                     <a className="button" href="#hoje">
-                      Registrar meu dia
+                      {vehicles.length === 0 ? "Preencher meu dia" : "Registrar meu dia"}
                     </a>
-                    <button
-                      className="button button-ghost"
-                      type="button"
-                      onClick={() => {
-                        setQuickStartVisible(true);
-                        requestAnimationFrame(() =>
-                          document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
-                        );
-                      }}
-                    >
-                      Simular sem salvar
-                    </button>
+                    {vehicles.length === 0 ? (
+                      <a className="button button-ghost" href="#veiculos">
+                        Cadastrar veiculo
+                      </a>
+                    ) : (
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={() => {
+                          setQuickStartVisible(true);
+                          requestAnimationFrame(() =>
+                            document
+                              .getElementById("quick-start")
+                              ?.scrollIntoView({ behavior: "smooth" }),
+                          );
+                        }}
+                      >
+                        Simular sem salvar
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -2494,7 +2473,8 @@ function App() {
 
                 {vehicles.length === 0 ? (
                   <p className="empty-state daily-entry-note">
-                    Cadastre um veiculo para salvar. Os dados digitados ficam nesta tela.
+                    Sem veiculo cadastrado. Voce pode preencher o dia agora; ao salvar, seus dados
+                    ficam guardados e o app abre o cadastro do veiculo.
                   </p>
                 ) : null}
 
@@ -2527,8 +2507,16 @@ function App() {
                   </label>
                 ) : null}
 
-                <button className="button daily-entry-button" disabled={isQuickDailyEntrySaving} type="submit">
-                  {isQuickDailyEntrySaving ? "Salvando..." : "Salvar meu dia"}
+                <button
+                  className="button daily-entry-button"
+                  disabled={isQuickDailyEntrySaving}
+                  type="submit"
+                >
+                  {isQuickDailyEntrySaving
+                    ? "Salvando..."
+                    : vehicles.length === 0
+                      ? "Continuar para cadastrar veiculo"
+                      : "Salvar meu dia"}
                 </button>
               </form>
 
@@ -2536,9 +2524,10 @@ function App() {
                 <div className="daily-entry-result">
                   <div className="section-title">
                     <p className="eyebrow">Resultado parcial de hoje</p>
-                    <h3>O que já dá para ver</h3>
+                    <h3>Quanto sobrou ate agora</h3>
                     <p className="subtle-note">
-                      Este valor considera os gastos de hoje que já foram registrados. Não é lucro final.
+                      Este valor considera os gastos de hoje que ja foram registrados. Adicione
+                      combustivel, recarga ou outros custos para aproximar o resultado real.
                     </p>
                   </div>
 

@@ -207,6 +207,12 @@ export function ResultSection({
           />
         </>
       ) : null}
+
+      {!isSummaryLoading && !summary && !summaryError ? (
+        <p className="empty-state">
+          Ainda nao ha dados para montar o resultado. Registre seu dia em Hoje ou ajuste o periodo.
+        </p>
+      ) : null}
     </section>
   );
 }

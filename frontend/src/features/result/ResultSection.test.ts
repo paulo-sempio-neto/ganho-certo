@@ -1,0 +1,59 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
+
+import { ResultSection } from "./ResultSection";
+
+function renderResultSection(): string {
+  return renderToStaticMarkup(
+    createElement(ResultSection, {
+      vehicles: [],
+      dashboardFilters: {
+        period: "last7",
+        customStartDate: "2026-09-26",
+        customEndDate: "2026-09-26",
+        vehicleId: "",
+        onPeriodChange: vi.fn(),
+        onCustomStartDateChange: vi.fn(),
+        onCustomEndDateChange: vi.fn(),
+        onVehicleChange: vi.fn(),
+      },
+      historyFilters: {
+        period: "last30",
+        startDate: "2026-09-01",
+        endDate: "2026-09-26",
+        grouping: "daily",
+        vehicleId: "",
+        onPeriodChange: vi.fn(),
+        onDateChange: vi.fn(),
+        onGroupingChange: vi.fn(),
+        onVehicleChange: vi.fn(),
+      },
+      summary: null,
+      insights: [],
+      history: null,
+      isSummaryLoading: false,
+      isInsightsLoading: false,
+      isHistoryLoading: false,
+      summaryError: "",
+      insightsError: "",
+      historyError: "",
+      onSummaryRetry: vi.fn(),
+      onInsightsRetry: vi.fn(),
+      onHistoryRetry: vi.fn(),
+      getAuthHeaders: () => ({}),
+      endSession: vi.fn(),
+      getVehicleLabel: () => "Carro",
+      getExpenseCategoryLabel: () => "Combustivel",
+    }),
+  );
+}
+
+describe("ResultSection", () => {
+  it("renders a clear empty state when the dashboard has no summary yet", () => {
+    const html = renderResultSection();
+
+    expect(html).toContain("Ainda nao ha dados para montar o resultado.");
+    expect(html).toContain("Registre seu dia em Hoje");
+  });
+});

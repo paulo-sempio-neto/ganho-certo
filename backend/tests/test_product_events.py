@@ -269,6 +269,7 @@ def test_internal_beta_summary_is_token_protected_and_aggregated(
         },
         headers=auth_headers(first_token),
     )
+    dashboard_response = client.get("/financial-summary", headers=auth_headers(first_token))
     client.post(
         "/feedback",
         json={"category": "idea", "message": "Seria bom comparar por semana."},
@@ -285,6 +286,7 @@ def test_internal_beta_summary_is_token_protected_and_aggregated(
         headers={"X-Beta-Admin-Token": BETA_ADMIN_TOKEN},
     )
 
+    assert dashboard_response.status_code == 200
     assert unauthorized_response.status_code == 403
     assert forbidden_response.status_code == 403
     assert summary_response.status_code == 200
@@ -293,6 +295,7 @@ def test_internal_beta_summary_is_token_protected_and_aggregated(
     assert payload["users_with_first_vehicle"] == 1
     assert payload["users_with_first_financial_entry"] == 1
     assert payload["users_completed_first_setup"] == 1
+    assert payload["dashboard_viewed_users"] == 1
     assert payload["feedback_count"] == 1
     assert "summary-a@email.com" not in summary_response.text
     assert "150.00" not in summary_response.text
