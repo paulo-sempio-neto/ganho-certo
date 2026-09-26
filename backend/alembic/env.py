@@ -6,6 +6,7 @@ from alembic import context
 from app.config import get_settings
 from app.database import Base
 from app.models import (  # noqa: F401
+    BillingEvent,
     Expense,
     Feature,
     FinancialGoal,

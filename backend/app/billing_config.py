@@ -1,0 +1,2 @@
+BILLING_PROVIDER_NONE = "none"
+SUPPORTED_BILLING_PROVIDERS = frozenset({BILLING_PROVIDER_NONE, "stripe", "mercado_pago"})

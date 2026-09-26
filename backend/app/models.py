@@ -41,6 +41,7 @@ class User(Base):
     )
     current_plan: Mapped[Plan | None] = relationship(back_populates="users")
     subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
+    billing_events: Mapped[list[BillingEvent]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
@@ -161,6 +162,33 @@ class Subscription(Base):
     )
     user: Mapped[User] = relationship(back_populates="subscriptions")
     plan: Mapped[Plan] = relationship(back_populates="subscriptions")
+
+
+class BillingEvent(Base):
+    __tablename__ = "billing_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "external_event_id",
+            name="uq_billing_events_provider_external_event",
+        ),
+        Index("ix_billing_events_user_created_at", "user_id", "created_at"),
+        Index("ix_billing_events_provider_event_type", "provider", "event_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    external_event_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    payload_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="billing_events")
 
 
 class PasswordResetToken(Base):

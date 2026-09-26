@@ -6,6 +6,8 @@ from pydantic import AliasChoices, EmailStr, Field, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
+from app.billing_config import BILLING_PROVIDER_NONE, SUPPORTED_BILLING_PROVIDERS
+
 
 def valid_origin(value: str, *, production: bool) -> bool:
     try:
@@ -77,6 +79,11 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         validation_alias="FRONTEND_BASE_URL",
     )
+    billing_provider: str = Field(
+        default=BILLING_PROVIDER_NONE,
+        validation_alias="BILLING_PROVIDER",
+    )
+    billing_secret_key: str | None = Field(default=None, validation_alias="BILLING_SECRET_KEY")
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
     smtp_port: int = Field(default=587, ge=1, le=65535, validation_alias="SMTP_PORT")
     smtp_username: str | None = Field(default=None, validation_alias="SMTP_USERNAME")
@@ -117,6 +124,14 @@ class Settings(BaseSettings):
                     "FORWARDED_ALLOW_IPS must contain explicit IPs or CIDRs."
                 ) from None
         return value
+
+    @field_validator("billing_provider")
+    @classmethod
+    def validate_billing_provider(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SUPPORTED_BILLING_PROVIDERS:
+            raise ValueError("BILLING_PROVIDER is invalid.")
+        return normalized
 
     @property
     def environment(self) -> str:
@@ -164,6 +179,15 @@ class Settings(BaseSettings):
 
         if is_production and "*" in self.cors_origins:
             raise ValueError("CORS_ALLOWED_ORIGINS cannot contain '*' in production.")
+
+        if (
+            is_production
+            and self.billing_provider != BILLING_PROVIDER_NONE
+            and not self.billing_secret_key
+        ):
+            raise ValueError(
+                "BILLING_SECRET_KEY must be configured when billing is enabled in production."
+            )
 
         if not self.cors_origins or any(
             not valid_origin(origin, production=is_production) for origin in self.cors_origins
