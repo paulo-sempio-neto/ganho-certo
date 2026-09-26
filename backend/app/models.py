@@ -204,9 +204,12 @@ class BetaFeedback(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     category: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    priority: Mapped[str] = mapped_column(String(20), default="normal", nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", nullable=False, index=True)
     message: Mapped[str] = mapped_column(String(2000), nullable=False)
     path: Mapped[str | None] = mapped_column(String(200), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

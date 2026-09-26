@@ -79,10 +79,15 @@ Verificação:
 
 - O app coleta feedback autenticado em `/feedback`, gravado em `beta_feedback`
   com usuario, categoria, mensagem, caminho da tela e user agent resumido.
+- Feedbacks possuem `priority`, `status` e `resolved_at` para triagem simples.
+  Valores monetarios explicitos no texto (`R$ ...`) sao removidos antes de salvar.
 - O app registra eventos internos em `product_events` sem valores financeiros,
   senhas, tokens, email ou payload livre. Eventos de marco usam dedupe por usuario.
 - O resumo agregado `/internal/beta/summary` exige `X-Beta-Admin-Token` igual ao
   `BETA_ADMIN_TOKEN`; sem token configurado, o endpoint fica indisponivel.
+- A visao interna `/internal/beta/feedback` mostra total, abertos, contagens por
+  categoria/status/prioridade e feedbacks recentes. Use `PATCH
+  /internal/beta/feedback/{id}` para alterar categoria, prioridade ou status.
 - Revise feedbacks pelo banco durante a beta pequena; ainda nao ha painel interno
   nem integracao externa de suporte.
 - Eventos uteis para acompanhar manualmente nesta fase:

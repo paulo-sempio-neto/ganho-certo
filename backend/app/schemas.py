@@ -18,6 +18,8 @@ RecurringExpenseFrequency = Literal["weekly", "monthly", "yearly"]
 FinancialGoalType = Literal["net", "projected"]
 FinancialInsightType = Literal["info", "positive", "attention"]
 BetaFeedbackCategory = Literal["bug", "confusing", "idea", "other"]
+BetaFeedbackPriority = Literal["low", "normal", "high", "urgent"]
+BetaFeedbackStatus = Literal["open", "reviewing", "resolved", "closed"]
 ProductEventType = Literal[
     "account_created",
     "first_vehicle_created",
@@ -179,11 +181,46 @@ class BetaFeedbackCreate(BaseModel):
 class BetaFeedbackPublic(BaseModel):
     id: int
     category: BetaFeedbackCategory
+    priority: BetaFeedbackPriority
+    status: BetaFeedbackStatus
     message: str
     path: str | None
+    resolved_at: datetime | None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class BetaFeedbackAdminPublic(BaseModel):
+    id: int
+    user_id: int
+    category: BetaFeedbackCategory
+    priority: BetaFeedbackPriority
+    status: BetaFeedbackStatus
+    message: str
+    path: str | None
+    user_agent: str | None
+    resolved_at: datetime | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BetaFeedbackUpdate(BaseModel):
+    category: BetaFeedbackCategory | None = None
+    priority: BetaFeedbackPriority | None = None
+    status: BetaFeedbackStatus | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class BetaFeedbackAdminSummary(BaseModel):
+    total_feedback: int
+    open_feedback: int
+    by_category: dict[str, int]
+    by_status: dict[str, int]
+    by_priority: dict[str, int]
+    recent_feedback: list[BetaFeedbackAdminPublic]
 
 
 class BetaLearningSummary(BaseModel):

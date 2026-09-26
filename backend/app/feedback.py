@@ -1,3 +1,4 @@
+import re
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
@@ -10,6 +11,11 @@ from app.product_events import FEEDBACK_SENT, record_product_event
 from app.schemas import BetaFeedbackCreate, BetaFeedbackPublic
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
+MONEY_PATTERN = re.compile(r"\bR\$\s*\d{1,3}(?:[.\s]\d{3})*(?:,\d{2})?\b", re.IGNORECASE)
+
+
+def sanitize_feedback_message(message: str) -> str:
+    return MONEY_PATTERN.sub("[valor removido]", message)
 
 
 @router.post("", response_model=BetaFeedbackPublic, status_code=status.HTTP_201_CREATED)
@@ -22,7 +28,7 @@ def create_beta_feedback(
     feedback = BetaFeedback(
         user_id=current_user.id,
         category=payload.category,
-        message=payload.message,
+        message=sanitize_feedback_message(payload.message),
         path=payload.path,
         user_agent=(request.headers.get("user-agent") or "")[:255] or None,
     )

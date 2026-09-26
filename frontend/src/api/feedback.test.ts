@@ -19,8 +19,11 @@ describe("feedback api", () => {
     const response = {
       id: 1,
       category: "confusing",
+      priority: "normal",
+      status: "open",
       message: "Nao entendi o resumo.",
       path: "/#resultado",
+      resolved_at: null,
       created_at: "2026-09-26T12:00:00Z",
     };
     requestApiMock.mockResolvedValue(response);

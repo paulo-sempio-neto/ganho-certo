@@ -49,6 +49,8 @@ def test_create_feedback_stores_current_user_feedback(
     )
     assert response.status_code == 201
     assert response.json()["category"] == "confusing"
+    assert response.json()["priority"] == "normal"
+    assert response.json()["status"] == "open"
     assert response.json()["path"] == "/#resultado"
     assert "user_id" not in response.json()
     assert stored_feedback is not None
