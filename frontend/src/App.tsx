@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { requestApi } from "./api/client";
 import {
@@ -14,11 +14,10 @@ import {
 import { getFinancialHistory, getFinancialInsights, getFinancialSummary } from "./api/financial";
 import { listVehicles } from "./api/vehicles";
 import "./App.css";
+import { LazyCsvImportSection as CsvImportSection } from "./features/imports/LazyCsvImportSection";
 import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
 import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
-import { CsvImportSection } from "./features/imports/CsvImportSection";
-import { ResultSection } from "./features/result/ResultSection";
 import {
   VehiclesSection,
   type VehiclesSectionHandle,
@@ -73,6 +72,12 @@ import {
 
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 const RESET_PASSWORD_PATH = "/reset-password";
+
+const ResultSection = lazy(() =>
+  import("./features/result/ResultSection").then((module) => ({
+    default: module.ResultSection,
+  })),
+);
 
 type WorkSessionForm = {
   work_date: string;
@@ -523,8 +528,13 @@ function App() {
     return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
   }
 
+  const vehiclesById = useMemo(
+    () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle])),
+    [vehicles],
+  );
+
   function getVehicleLabel(vehicleId: number): string {
-    const vehicle = vehicles.find((item) => item.id === vehicleId);
+    const vehicle = vehiclesById.get(vehicleId);
     return vehicle ? `${vehicle.name} · ${vehicle.brand} ${vehicle.model}` : "Veiculo removido";
   }
 
@@ -833,9 +843,11 @@ function App() {
   }
 
   async function refreshDashboardData(currentToken = token) {
-    await loadFinancialSummary(currentToken);
-    await loadFinancialInsights(currentToken);
-    await loadFinancialHistory(currentToken);
+    await Promise.all([
+      loadFinancialSummary(currentToken),
+      loadFinancialInsights(currentToken),
+      loadFinancialHistory(currentToken),
+    ]);
   }
 
   useEffect(() => {
@@ -874,12 +886,14 @@ function App() {
         setUser(currentUser);
         setMessage("");
         await loadVehicles(token);
-        await loadWorkSessions(token);
-        await loadExpenses(token);
-        await loadRecurringExpenses(token);
-        await loadFinancialGoals(token);
-        await loadMaintenancePlans(token);
-        await refreshDashboardData(token);
+        await Promise.all([
+          loadWorkSessions(token),
+          loadExpenses(token),
+          loadRecurringExpenses(token),
+          loadFinancialGoals(token),
+          loadMaintenancePlans(token),
+          refreshDashboardData(token),
+        ]);
       } catch {
         endSession("Sessao expirada ou invalida. Entre novamente.");
       }
@@ -893,7 +907,7 @@ function App() {
       return;
     }
 
-    void refreshDashboardData(token);
+    void Promise.all([loadFinancialSummary(token), loadFinancialInsights(token)]);
   }, [dashboardPeriod, dashboardVehicleId, customStartDate, customEndDate]);
 
   useEffect(() => {
@@ -1895,21 +1909,28 @@ function App() {
     }
   }
 
-  function getMaintenancePlansByStatus(statusValue: MaintenanceStatusType) {
-    return maintenancePlans.filter(
-      (plan) => maintenanceStatusesById[plan.id]?.status === statusValue,
-    );
-  }
+  const maintenancePlansByStatus = useMemo(() => {
+    const groups: Record<MaintenanceStatusType, MaintenancePlan[]> = {
+      due: [],
+      due_soon: [],
+      ok: [],
+    };
+    for (const plan of maintenancePlans) {
+      const status = maintenanceStatusesById[plan.id]?.status;
+      if (status) groups[status].push(plan);
+    }
+    return groups;
+  }, [maintenancePlans, maintenanceStatusesById]);
 
-  function getQuickDailyExpenseTotalCents(result: QuickDailyEntryResult): bigint {
-    return expenses
-      .filter(
-        (expense) =>
-          expense.expense_date === result.workDate &&
-          expense.vehicle_id === result.vehicle.id,
-      )
-      .reduce((total, expense) => total + moneyValueToCents(expense.amount), 0n);
-  }
+  const quickDailyExpenseTotalCents = useMemo(() => {
+    if (!quickDailyEntryResult) return 0n;
+    return expenses.reduce((total, expense) => {
+      return expense.expense_date === quickDailyEntryResult.workDate &&
+        expense.vehicle_id === quickDailyEntryResult.vehicle.id
+        ? total + moneyValueToCents(expense.amount)
+        : total;
+    }, 0n);
+  }, [expenses, quickDailyEntryResult]);
 
   function getPrimaryMaintenanceAlert(): { plan: MaintenancePlan; status: MaintenancePlanStatus } | null {
     for (const plan of maintenancePlans) {
@@ -1923,9 +1944,6 @@ function App() {
   }
 
   const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
-  const quickDailyExpenseTotalCents = quickDailyEntryResult
-    ? getQuickDailyExpenseTotalCents(quickDailyEntryResult)
-    : 0n;
   const quickDailyRemainingCents = quickDailyEntryResult
     ? quickDailyEntryResult.grossRevenueCents - quickDailyExpenseTotalCents
     : 0n;
@@ -3040,60 +3058,64 @@ function App() {
             </section>
 
             {workSessions.length > 0 ? (
-              <ResultSection
-                vehicles={vehicles}
-                dashboardFilters={{
-                  period: dashboardPeriod,
-                  customStartDate,
-                  customEndDate,
-                  vehicleId: dashboardVehicleId,
-                  onPeriodChange: setDashboardPeriod,
-                  onCustomStartDateChange: setCustomStartDate,
-                  onCustomEndDateChange: setCustomEndDate,
-                  onVehicleChange: setDashboardVehicleId,
-                }}
-                historyFilters={{
-                  period: historyPeriod,
-                  startDate: historyStartDate,
-                  endDate: historyEndDate,
-                  grouping: historyGrouping,
-                  vehicleId: historyVehicleId,
-                  onPeriodChange: handleHistoryPeriodChange,
-                  onDateChange: handleHistoryDateChange,
-                  onGroupingChange: setHistoryGrouping,
-                  onVehicleChange: setHistoryVehicleId,
-                }}
-                summary={financialSummary}
-                insights={financialInsights}
-                history={financialHistory}
-                isSummaryLoading={isDashboardLoading}
-                isInsightsLoading={isFinancialInsightsLoading}
-                isHistoryLoading={isFinancialHistoryLoading}
-                summaryError={dashboardError}
-                insightsError={financialInsightsError}
-                historyError={financialHistoryError}
-                onHistoryRetry={() => void loadFinancialHistory()}
-                getAuthHeaders={getAuthHeaders}
-                endSession={endSession}
-                getVehicleLabel={getVehicleLabel}
-                getExpenseCategoryLabel={getExpenseCategoryLabel}
-              />
+              <Suspense fallback={<p className="empty-state">Carregando resultado...</p>}>
+                <ResultSection
+                  vehicles={vehicles}
+                  dashboardFilters={{
+                    period: dashboardPeriod,
+                    customStartDate,
+                    customEndDate,
+                    vehicleId: dashboardVehicleId,
+                    onPeriodChange: setDashboardPeriod,
+                    onCustomStartDateChange: setCustomStartDate,
+                    onCustomEndDateChange: setCustomEndDate,
+                    onVehicleChange: setDashboardVehicleId,
+                  }}
+                  historyFilters={{
+                    period: historyPeriod,
+                    startDate: historyStartDate,
+                    endDate: historyEndDate,
+                    grouping: historyGrouping,
+                    vehicleId: historyVehicleId,
+                    onPeriodChange: handleHistoryPeriodChange,
+                    onDateChange: handleHistoryDateChange,
+                    onGroupingChange: setHistoryGrouping,
+                    onVehicleChange: setHistoryVehicleId,
+                  }}
+                  summary={financialSummary}
+                  insights={financialInsights}
+                  history={financialHistory}
+                  isSummaryLoading={isDashboardLoading}
+                  isInsightsLoading={isFinancialInsightsLoading}
+                  isHistoryLoading={isFinancialHistoryLoading}
+                  summaryError={dashboardError}
+                  insightsError={financialInsightsError}
+                  historyError={financialHistoryError}
+                  onHistoryRetry={() => void loadFinancialHistory()}
+                  getAuthHeaders={getAuthHeaders}
+                  endSession={endSession}
+                  getVehicleLabel={getVehicleLabel}
+                  getExpenseCategoryLabel={getExpenseCategoryLabel}
+                />
+              </Suspense>
             ) : null}
             <section className="manager-section" id="mais">
-              <CsvImportSection
-                type="work_sessions"
-                token={token}
-                vehicles={vehicles}
-                getAuthHeaders={getAuthHeaders}
-                getVehicleLabel={getVehicleLabel}
-                getExpenseCategoryLabel={getExpenseCategoryLabel}
-                endSession={endSession}
-                setMessage={setMessage}
-                setSuccessMessage={setSuccessMessage}
-                loadWorkSessions={loadWorkSessions}
-                loadExpenses={loadExpenses}
-                refreshDashboardData={refreshDashboardData}
-              />
+              <Suspense fallback={<p className="empty-state">Carregando importacao...</p>}>
+                <CsvImportSection
+                  type="work_sessions"
+                  token={token}
+                  vehicles={vehicles}
+                  getAuthHeaders={getAuthHeaders}
+                  getVehicleLabel={getVehicleLabel}
+                  getExpenseCategoryLabel={getExpenseCategoryLabel}
+                  endSession={endSession}
+                  setMessage={setMessage}
+                  setSuccessMessage={setSuccessMessage}
+                  loadWorkSessions={loadWorkSessions}
+                  loadExpenses={loadExpenses}
+                  refreshDashboardData={refreshDashboardData}
+                />
+              </Suspense>
               <div className="vehicles-layout">
                 <form className="auth-form vehicle-form" onSubmit={handleWorkSessionSubmit}>
                   <h3>{editingWorkSessionId ? "Editar jornada" : "Cadastrar jornada"}</h3>
@@ -3330,20 +3352,22 @@ function App() {
             </section>
 
             <section className="manager-section" id="custos">
-              <CsvImportSection
-                type="expenses"
-                token={token}
-                vehicles={vehicles}
-                getAuthHeaders={getAuthHeaders}
-                getVehicleLabel={getVehicleLabel}
-                getExpenseCategoryLabel={getExpenseCategoryLabel}
-                endSession={endSession}
-                setMessage={setMessage}
-                setSuccessMessage={setSuccessMessage}
-                loadWorkSessions={loadWorkSessions}
-                loadExpenses={loadExpenses}
-                refreshDashboardData={refreshDashboardData}
-              />
+              <Suspense fallback={<p className="empty-state">Carregando importacao...</p>}>
+                <CsvImportSection
+                  type="expenses"
+                  token={token}
+                  vehicles={vehicles}
+                  getAuthHeaders={getAuthHeaders}
+                  getVehicleLabel={getVehicleLabel}
+                  getExpenseCategoryLabel={getExpenseCategoryLabel}
+                  endSession={endSession}
+                  setMessage={setMessage}
+                  setSuccessMessage={setSuccessMessage}
+                  loadWorkSessions={loadWorkSessions}
+                  loadExpenses={loadExpenses}
+                  refreshDashboardData={refreshDashboardData}
+                />
+              </Suspense>
               <div className="vehicles-layout">
                 <form className="auth-form vehicle-form" onSubmit={handleExpenseSubmit}>
                   <h3>{editingExpenseId ? "Editar despesa" : "Cadastrar despesa"}</h3>
@@ -4026,7 +4050,7 @@ function App() {
                   ) : null}
 
                   {(["due", "due_soon", "ok"] as MaintenanceStatusType[]).map((statusValue) => {
-                    const plans = getMaintenancePlansByStatus(statusValue);
+                    const plans = maintenancePlansByStatus[statusValue];
                     if (plans.length === 0) {
                       return null;
                     }

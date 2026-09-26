@@ -1518,6 +1518,19 @@ select:focus {
   font-size: 1rem;
 }
 
+/* Keep every record searchable while skipping layout/paint for offscreen cards. */
+.vehicles-list > .session-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
+}
+
+@media print {
+  .vehicles-list > .session-card {
+    content-visibility: visible;
+    contain-intrinsic-size: none;
+  }
+}
+
 .vehicle-card p {
   margin: 6px 0 10px;
   color: #465048;

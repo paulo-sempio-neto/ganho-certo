@@ -73,7 +73,7 @@ const expenseImportMappingFields: Array<{
   { field: "description", label: "Descricao", optional: true },
 ];
 
-type CsvImportSectionProps = {
+export type CsvImportSectionProps = {
   type: "work_sessions" | "expenses";
   token: string | null;
   vehicles: Vehicle[];
@@ -158,6 +158,7 @@ function downloadCsvTemplate(csvTemplate: string, filename: string) {
 }
 
 export function CsvImportSection({
+  isVisible,
   type,
   token,
   vehicles,
@@ -170,7 +171,7 @@ export function CsvImportSection({
   loadWorkSessions,
   loadExpenses,
   refreshDashboardData,
-}: CsvImportSectionProps) {
+}: CsvImportSectionProps & { isVisible: boolean }) {
   const [importProfiles, setImportProfiles] = useState<CsvImportProfile[]>([]);
   const [isImportProfilesLoading, setIsImportProfilesLoading] = useState(false);
   const [isImportProfileSaving, setIsImportProfileSaving] = useState(false);
@@ -188,7 +189,7 @@ export function CsvImportSection({
   const [workSessionImportProfileName, setWorkSessionImportProfileName] = useState("");
   const [matchedWorkSessionImportProfile, setMatchedWorkSessionImportProfile] =
     useState<CsvImportProfile | null>(null);
-  const [isWorkSessionImportVisible, setIsWorkSessionImportVisible] = useState(false);
+  const isWorkSessionImportVisible = type === "work_sessions" && isVisible;
   const [isWorkSessionImportMappingVisible, setIsWorkSessionImportMappingVisible] = useState(false);
   const [isWorkSessionImportDragging, setIsWorkSessionImportDragging] = useState(false);
   const [isWorkSessionImportPreviewLoading, setIsWorkSessionImportPreviewLoading] =
@@ -208,7 +209,7 @@ export function CsvImportSection({
   const [expenseImportProfileName, setExpenseImportProfileName] = useState("");
   const [matchedExpenseImportProfile, setMatchedExpenseImportProfile] =
     useState<CsvImportProfile | null>(null);
-  const [isExpenseImportVisible, setIsExpenseImportVisible] = useState(false);
+  const isExpenseImportVisible = type === "expenses" && isVisible;
   const [isExpenseImportMappingVisible, setIsExpenseImportMappingVisible] = useState(false);
   const [isExpenseImportDragging, setIsExpenseImportDragging] = useState(false);
   const [isExpenseImportPreviewLoading, setIsExpenseImportPreviewLoading] = useState(false);
@@ -805,18 +806,6 @@ export function CsvImportSection({
   if (type === "work_sessions") {
     return (
       <>
-        <div className="section-title">
-          <p className="eyebrow">Jornadas</p>
-          <h3>Registro diario de trabalho</h3>
-          <button
-            className="button button-ghost inline-action"
-            type="button"
-            onClick={() => setIsWorkSessionImportVisible((current) => !current)}
-          >
-            Importar jornadas
-          </button>
-        </div>
-
         {isWorkSessionImportVisible ? (
           <div
             className="import-panel"
@@ -1203,18 +1192,6 @@ export function CsvImportSection({
 
   return (
     <>
-      <div className="section-title">
-        <p className="eyebrow">Despesas</p>
-        <h3>Custos da operação</h3>
-        <button
-          className="button button-ghost inline-action"
-          type="button"
-          onClick={() => setIsExpenseImportVisible((current) => !current)}
-        >
-          Importar despesas
-        </button>
-      </div>
-
       {isExpenseImportVisible ? (
         <div
           className="import-panel"
