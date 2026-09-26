@@ -37,12 +37,13 @@ function renderPanel(
   accountPlan: AccountPlanResponse | null,
   error = "",
   billingError = "",
+  billingMessage = "",
 ): string {
   return renderToStaticMarkup(
     createElement(AccountPlanPanel, {
       accountPlan,
       billingError,
-      billingMessage: "",
+      billingMessage,
       error,
       isCheckoutLoading: false,
       isLoading: false,
@@ -62,8 +63,11 @@ describe("AccountPlanPanel", () => {
     expect(html).toContain("Cadastro de 1 veiculo");
     expect(html).toContain("Importacao CSV");
     expect(html).toContain("Historico avancado");
-    expect(html).toContain("Inteligencia financeira");
-    expect(html).toContain("Assinar Pro");
+    expect(html).toContain("Insights financeiros");
+    expect(html).toContain("Cadastro de veiculos sem limite");
+    expect(html).toContain("Continuar para pagamento");
+    expect(html).toContain("O acesso Pro so e ativado depois");
+    expect(html).not.toContain("Desbloqueie inteligencia financeira");
   });
 
   it("renders the PRO plan without locked features", () => {
@@ -71,11 +75,11 @@ describe("AccountPlanPanel", () => {
 
     expect(html).toContain("PRO");
     expect(html).toContain("Plano Pro ativo");
-    expect(html).toContain("Cadastro de veiculos");
+    expect(html).toContain("Cadastro de veiculos sem limite");
     expect(html).toContain("Importacao CSV");
     expect(html).toContain("Historico avancado");
     expect(html).toContain("Todos os recursos Pro estao liberados neste plano.");
-    expect(html).not.toContain("Assinar Pro");
+    expect(html).not.toContain("Continuar para pagamento");
   });
 
   it("renders subscription status from backend information", () => {
@@ -101,7 +105,9 @@ describe("AccountPlanPanel", () => {
     };
 
     expect(renderPanel(pendingPlan)).toContain("Pagamento em processamento");
+    expect(renderPanel(pendingPlan)).toContain("sera liberado somente apos a confirmacao");
     expect(renderPanel(canceledPlan)).toContain("Assinatura cancelada");
+    expect(renderPanel(canceledPlan)).toContain("A assinatura nao esta ativa");
   });
 
   it("renders loading and error states", () => {
@@ -126,5 +132,17 @@ describe("AccountPlanPanel", () => {
     const html = renderPanel(freePlan, "", "Nao foi possivel iniciar a assinatura.");
 
     expect(html).toContain("Nao foi possivel iniciar a assinatura.");
+  });
+
+  it("explains that checkout confirmation controls Pro access", () => {
+    const html = renderPanel(
+      freePlan,
+      "",
+      "",
+      "Pagamento enviado. O acesso Pro sera liberado apos a confirmacao do pagamento.",
+    );
+
+    expect(html).toContain("Pagamento enviado");
+    expect(html).toContain("apos a confirmacao do pagamento");
   });
 });

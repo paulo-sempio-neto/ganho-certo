@@ -14,7 +14,7 @@ type AccountPlanPanelProps = {
 const featureLabels: Record<string, string> = {
   advanced_history: "Historico avancado",
   csv_import: "Importacao CSV",
-  financial_insights: "Inteligencia financeira",
+  financial_insights: "Insights financeiros",
 };
 
 function getFeatureLabel(featureCode: string): string {
@@ -28,7 +28,7 @@ function getAvailableFeatures(accountPlan: AccountPlanResponse): string[] {
   if (vehicleLimit) {
     features.push(`Cadastro de ${vehicleLimit} veiculo${vehicleLimit > 1 ? "s" : ""}`);
   } else {
-    features.push("Cadastro de veiculos");
+    features.push("Cadastro de veiculos sem limite");
   }
 
   for (const [featureCode, enabled] of Object.entries(accountPlan.features)) {
@@ -41,9 +41,33 @@ function getAvailableFeatures(accountPlan: AccountPlanResponse): string[] {
 }
 
 function getLockedFeatures(accountPlan: AccountPlanResponse): string[] {
-  return Object.entries(accountPlan.features)
+  const lockedFeatures = Object.entries(accountPlan.features)
     .filter(([, enabled]) => !enabled)
     .map(([featureCode]) => getFeatureLabel(featureCode));
+
+  if (accountPlan.limits.vehicle_limit) {
+    lockedFeatures.unshift("Cadastro de veiculos sem limite");
+  }
+
+  return lockedFeatures;
+}
+
+function getSubscriptionStatusMessage(accountPlan: AccountPlanResponse): string | null {
+  const subscriptionStatus = accountPlan.subscription?.status.toLowerCase();
+
+  if (subscriptionStatus === "pending") {
+    return "O pagamento ainda esta sendo confirmado. O acesso Pro sera liberado somente apos a confirmacao.";
+  }
+
+  if (subscriptionStatus === "canceled" || subscriptionStatus === "cancelled") {
+    return "A assinatura nao esta ativa e seus recursos permanecem no plano gratuito. Voce pode tentar novamente.";
+  }
+
+  if (subscriptionStatus === "active" || subscriptionStatus === "trialing") {
+    return "Pagamento confirmado. Os recursos Pro estao liberados enquanto a assinatura estiver ativa.";
+  }
+
+  return null;
 }
 
 function getSubscriptionStatusLabel(accountPlan: AccountPlanResponse): string {
@@ -84,6 +108,9 @@ export function AccountPlanPanel({
   onRetry,
 }: AccountPlanPanelProps) {
   const lockedFeatures = accountPlan ? getLockedFeatures(accountPlan) : [];
+  const subscriptionStatusMessage = accountPlan
+    ? getSubscriptionStatusMessage(accountPlan)
+    : null;
 
   return (
     <section className="account-plan-panel" aria-live="polite">
@@ -120,6 +147,7 @@ export function AccountPlanPanel({
                 {new Date(accountPlan.subscription.period_end).toLocaleDateString("pt-BR")}
               </span>
             ) : null}
+            {subscriptionStatusMessage ? <span>{subscriptionStatusMessage}</span> : null}
           </div>
 
           <div className="plan-feature-group">
@@ -135,7 +163,7 @@ export function AccountPlanPanel({
           </div>
 
           <div className="plan-feature-group">
-            <h4>Beneficios Pro</h4>
+            <h4>{lockedFeatures.length > 0 ? "Disponivel no Pro" : "Recursos Pro"}</h4>
             {lockedFeatures.length > 0 ? (
               <ul className="plan-feature-list">
                 {lockedFeatures.map((feature) => (
@@ -153,7 +181,12 @@ export function AccountPlanPanel({
           {shouldShowUpgradeButton(accountPlan) ? (
             <div className="plan-upgrade-panel">
               <p>
-                Desbloqueie importacao CSV, historico avancado e inteligencia financeira.
+                Seu plano gratuito continua disponivel. No Pro, voce libera {lockedFeatures.join(
+                  ", ",
+                )}.
+              </p>
+              <p className="subtle-note">
+                O acesso Pro so e ativado depois que o pagamento for confirmado.
               </p>
               <button
                 className="button"
@@ -161,7 +194,7 @@ export function AccountPlanPanel({
                 type="button"
                 onClick={onCheckoutPro}
               >
-                {isCheckoutLoading ? "Redirecionando..." : "Assinar Pro"}
+                {isCheckoutLoading ? "Abrindo pagamento..." : "Continuar para pagamento"}
               </button>
             </div>
           ) : null}

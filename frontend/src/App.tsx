@@ -1036,7 +1036,7 @@ function App() {
 
     if (billingStatus === "success") {
       setBillingCheckoutMessage(
-        "Sua assinatura sera atualizada apos confirmacao do pagamento.",
+        "Pagamento enviado. O acesso Pro sera liberado apos a confirmacao do pagamento.",
       );
       setBillingCheckoutError("");
     } else if (billingStatus === "cancel") {
