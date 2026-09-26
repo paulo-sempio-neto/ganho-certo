@@ -133,6 +133,8 @@ Antes de convidar usuários reais para a beta fechada, siga o checklist em
 [`docs/BETA_CHECKLIST.md`](docs/BETA_CHECKLIST.md).
 Para validar a primeira sessao com testers, use tambem
 [`docs/BETA_TEST_CHECKLIST.md`](docs/BETA_TEST_CHECKLIST.md).
+Para preparar o primeiro deploy real, siga o runbook em
+[`docs/PRODUCTION_DEPLOYMENT.md`](docs/PRODUCTION_DEPLOYMENT.md).
 
 ### Backend no Render
 
