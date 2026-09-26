@@ -182,6 +182,7 @@ class BillingEvent(Base):
     event_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     external_event_id: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     payload_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    raw_payload: Mapped[dict[str, object] | None] = mapped_column(JSON(), nullable=True)
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

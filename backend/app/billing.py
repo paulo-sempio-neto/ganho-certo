@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Protocol
+from decimal import Decimal
+from typing import Any, Protocol
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.models import BillingEvent, Plan, Subscription, User
 
 ACTIVE_SUBSCRIPTION_STATUS = "active"
 CANCELED_SUBSCRIPTION_STATUS = "canceled"
+GANHOCERTO_EXTERNAL_REFERENCE_PREFIX = "gc"
 
 
 class BillingError(Exception):
@@ -18,6 +20,18 @@ class BillingError(Exception):
 
 
 class DuplicateBillingEventError(BillingError):
+    pass
+
+
+class BillingEventVerificationError(BillingError):
+    pass
+
+
+class BillingProviderConfigurationError(BillingError):
+    pass
+
+
+class BillingProviderResponseError(BillingError):
     pass
 
 
@@ -38,6 +52,9 @@ class CheckoutSessionRequest:
     plan_code: str
     success_url: str
     cancel_url: str
+    payer_email: str
+    amount: Decimal
+    currency_id: str
 
 
 @dataclass(frozen=True)
@@ -52,19 +69,63 @@ class VerifiedBillingEvent:
     provider: str
     event_type: str
     external_event_id: str
+    resource_id: str
     payload_hash: str
+    raw_payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ProviderSubscription:
+    provider: str
+    external_subscription_id: str
+    external_reference: str
+    status: str
+    current_period_start: datetime | None = None
+    current_period_end: datetime | None = None
 
 
 class BillingProvider(Protocol):
     provider: str
 
     def create_checkout_session(self, request: CheckoutSessionRequest) -> CheckoutSession:
-        """Create a checkout session in a future provider implementation."""
+        """Create a provider checkout session without changing local entitlements."""
         raise NotImplementedError
 
-    def verify_payment_event(self, payload: bytes, signature: str | None) -> VerifiedBillingEvent:
-        """Verify a future provider webhook without leaking provider details to app code."""
+    def verify_payment_event(
+        self,
+        payload: bytes,
+        headers: dict[str, str],
+        query_params: dict[str, str],
+    ) -> VerifiedBillingEvent:
+        """Verify and normalize a provider webhook event."""
         raise NotImplementedError
+
+    def fetch_subscription(self, external_subscription_id: str) -> ProviderSubscription:
+        """Fetch the authoritative subscription state from the provider."""
+        raise NotImplementedError
+
+
+def build_billing_external_reference(user_id: int, plan_code: str) -> str:
+    return f"{GANHOCERTO_EXTERNAL_REFERENCE_PREFIX}:user:{user_id}:plan:{plan_code}"
+
+
+def parse_billing_external_reference(external_reference: str) -> tuple[int, str]:
+    parts = external_reference.split(":")
+    if len(parts) != 5 or parts[:2] != [GANHOCERTO_EXTERNAL_REFERENCE_PREFIX, "user"]:
+        raise InvalidBillingOperationError("Billing external reference is invalid.")
+    if parts[3] != "plan":
+        raise InvalidBillingOperationError("Billing external reference is invalid.")
+
+    try:
+        user_id = int(parts[2])
+    except ValueError:
+        raise InvalidBillingOperationError("Billing external reference user is invalid.") from None
+
+    plan_code = parts[4]
+    if not plan_code:
+        raise InvalidBillingOperationError("Billing external reference plan is invalid.")
+
+    return user_id, plan_code
 
 
 def store_billing_event(
@@ -75,6 +136,7 @@ def store_billing_event(
     external_event_id: str,
     payload_hash: str,
     db: Session,
+    raw_payload: dict[str, Any] | None = None,
     processed_at: datetime | None = None,
 ) -> BillingEvent:
     existing_event = db.scalar(
@@ -92,6 +154,7 @@ def store_billing_event(
         event_type=event_type,
         external_event_id=external_event_id,
         payload_hash=payload_hash,
+        raw_payload=raw_payload,
         processed_at=processed_at,
     )
     db.add(event)
@@ -204,6 +267,19 @@ def update_subscription_period(
     db.commit()
     db.refresh(subscription)
     return subscription
+
+
+def get_subscription_by_provider_external_id(
+    *,
+    provider: str,
+    external_subscription_id: str,
+    db: Session,
+) -> Subscription | None:
+    return _find_provider_subscription(
+        provider=provider,
+        external_subscription_id=external_subscription_id,
+        db=db,
+    )
 
 
 def _find_provider_subscription(

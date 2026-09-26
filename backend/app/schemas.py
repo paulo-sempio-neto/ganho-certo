@@ -121,6 +121,22 @@ class AccountPlanResponse(BaseModel):
     subscription: AccountSubscriptionPublic | None = None
 
 
+class BillingCheckoutRequest(BaseModel):
+    plan_code: PlanCode = "pro"
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class BillingCheckoutResponse(BaseModel):
+    provider: str
+    checkout_id: str
+    checkout_url: str
+
+
+class BillingWebhookResponse(BaseModel):
+    status: str
+
+
 class PasswordChangeRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=6, max_length=128)

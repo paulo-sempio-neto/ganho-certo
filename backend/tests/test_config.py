@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -89,3 +91,40 @@ def test_production_requires_billing_secret_only_when_provider_enabled() -> None
 def test_unknown_billing_provider_is_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(app_env="local", jwt_secret_key=STRONG_SECRET, billing_provider="unknown")
+
+
+def test_production_requires_mercadopago_credentials_when_enabled() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="production",
+            jwt_secret_key=STRONG_SECRET,
+            database_url="postgresql+psycopg://example:example@db.example.com/app",
+            cors_allowed_origins="https://app.example.com",
+            frontend_base_url="https://app.example.com",
+            allowed_hosts="testserver",
+            smtp_host="smtp.example.com",
+            smtp_from_email="support@example.com",
+            billing_provider="mercado_pago",
+            mercadopago_webhook_secret="webhook_secret",
+            billing_pro_monthly_amount=Decimal("29.90"),
+        )
+
+
+def test_production_accepts_mercadopago_specific_secret() -> None:
+    settings = Settings(
+        app_env="production",
+        jwt_secret_key=STRONG_SECRET,
+        database_url="postgresql+psycopg://example:example@db.example.com/app",
+        cors_allowed_origins="https://app.example.com",
+        frontend_base_url="https://app.example.com",
+        allowed_hosts="testserver",
+        smtp_host="smtp.example.com",
+        smtp_from_email="support@example.com",
+        billing_provider="mercado_pago",
+        mercadopago_access_token="APP_USR-test-token",
+        mercadopago_webhook_secret="webhook_secret",
+        billing_pro_monthly_amount=Decimal("29.90"),
+    )
+
+    assert settings.billing_provider == "mercado_pago"
+    assert settings.mercadopago_public_key is None

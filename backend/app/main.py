@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.account import router as account_router
 from app.auth import router as auth_router
+from app.billing_routes import router as billing_router
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.entitlements import PlanLimitReachedError
@@ -80,6 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application.include_router(auth_router)
     application.include_router(account_router)
+    application.include_router(billing_router)
     application.include_router(vehicles_router)
     application.include_router(vehicle_cost_profiles_router)
     application.include_router(work_sessions_router)

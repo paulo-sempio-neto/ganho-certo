@@ -1,3 +1,4 @@
+from decimal import Decimal
 from functools import lru_cache
 from ipaddress import ip_network
 from urllib.parse import urlsplit
@@ -83,7 +84,25 @@ class Settings(BaseSettings):
         default=BILLING_PROVIDER_NONE,
         validation_alias="BILLING_PROVIDER",
     )
+    billing_pro_monthly_amount: Decimal | None = Field(
+        default=None,
+        gt=Decimal("0"),
+        validation_alias="BILLING_PRO_MONTHLY_AMOUNT",
+    )
+    billing_currency_id: str = Field(default="BRL", validation_alias="BILLING_CURRENCY_ID")
     billing_secret_key: str | None = Field(default=None, validation_alias="BILLING_SECRET_KEY")
+    mercadopago_access_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MERCADOPAGO_ACCESS_TOKEN", "MP_ACCESS_TOKEN"),
+    )
+    mercadopago_public_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MERCADOPAGO_PUBLIC_KEY", "MP_PUBLIC_KEY"),
+    )
+    mercadopago_webhook_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("MERCADOPAGO_WEBHOOK_SECRET", "MP_WEBHOOK_SECRET"),
+    )
     smtp_host: str | None = Field(default=None, validation_alias="SMTP_HOST")
     smtp_port: int = Field(default=587, ge=1, le=65535, validation_alias="SMTP_PORT")
     smtp_username: str | None = Field(default=None, validation_alias="SMTP_USERNAME")
@@ -131,6 +150,14 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in SUPPORTED_BILLING_PROVIDERS:
             raise ValueError("BILLING_PROVIDER is invalid.")
+        return normalized
+
+    @field_validator("billing_currency_id")
+    @classmethod
+    def validate_billing_currency_id(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized or len(normalized) != 3 or not normalized.isalpha():
+            raise ValueError("BILLING_CURRENCY_ID must be a 3-letter currency code.")
         return normalized
 
     @property
@@ -183,11 +210,25 @@ class Settings(BaseSettings):
         if (
             is_production
             and self.billing_provider != BILLING_PROVIDER_NONE
-            and not self.billing_secret_key
+            and not (self.billing_secret_key or self.mercadopago_webhook_secret)
         ):
             raise ValueError(
                 "BILLING_SECRET_KEY must be configured when billing is enabled in production."
             )
+
+        if is_production and self.billing_provider == "mercado_pago":
+            if not self.mercadopago_access_token:
+                raise ValueError(
+                    "MERCADOPAGO_ACCESS_TOKEN must be configured when Mercado Pago is enabled."
+                )
+            if not (self.mercadopago_webhook_secret or self.billing_secret_key):
+                raise ValueError(
+                    "MERCADOPAGO_WEBHOOK_SECRET must be configured when Mercado Pago is enabled."
+                )
+            if self.billing_pro_monthly_amount is None:
+                raise ValueError(
+                    "BILLING_PRO_MONTHLY_AMOUNT must be configured when Mercado Pago is enabled."
+                )
 
         if not self.cors_origins or any(
             not valid_origin(origin, production=is_production) for origin in self.cors_origins
