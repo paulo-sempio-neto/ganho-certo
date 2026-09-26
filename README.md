@@ -135,6 +135,8 @@ Para validar a primeira sessao com testers, use tambem
 [`docs/BETA_TEST_CHECKLIST.md`](docs/BETA_TEST_CHECKLIST.md).
 Para preparar o primeiro deploy real, siga o runbook em
 [`docs/PRODUCTION_DEPLOYMENT.md`](docs/PRODUCTION_DEPLOYMENT.md).
+Para executar o deploy passo a passo, use o guia pratico em
+[`docs/PRODUCTION_DEPLOYMENT_GUIDE.md`](docs/PRODUCTION_DEPLOYMENT_GUIDE.md).
 
 ### Backend no Render
 
