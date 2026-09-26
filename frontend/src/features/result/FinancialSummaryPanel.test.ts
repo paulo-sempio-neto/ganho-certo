@@ -50,4 +50,43 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("Quanto realmente esta sobrando?");
     expect(html).toContain("Nenhum dado no período selecionado.");
   });
+
+  it("presents realized, estimated, and projected results in that order", () => {
+    const html = renderToStaticMarkup(
+      createElement(FinancialSummaryPanel, {
+        summary: {
+          ...emptySummary,
+          estimated_net_profit: "120.00",
+          estimated_structural_costs: "40.00",
+          estimated_economic_result: "80.00",
+          recurring_expenses_total: "10.00",
+          projected_economic_costs: "50.00",
+          projected_economic_result: "70.00",
+        },
+        getExpenseCategoryLabel: () => "Combustivel",
+      }),
+    );
+
+    expect(html).toContain("Realizado");
+    expect(html).toContain("Estimado");
+    expect(html).toContain("Projetado");
+    expect(html).toContain("Sobra no caixa: faturamento menos despesas registradas.");
+    expect(html).toContain("Resultado apos custos estruturais estimados do veiculo.");
+    expect(html).toContain("Estimado mais despesas recorrentes previstas para o periodo.");
+    expect(html.indexOf("Realizado")).toBeLessThan(html.indexOf("Estimado"));
+    expect(html.indexOf("Estimado")).toBeLessThan(html.indexOf("Projetado"));
+  });
+
+  it("explains which missing inputs limit estimated and projected results", () => {
+    const html = renderToStaticMarkup(
+      createElement(FinancialSummaryPanel, {
+        summary: emptySummary,
+        getExpenseCategoryLabel: () => "Combustivel",
+      }),
+    );
+
+    expect(html).toContain("Dados insuficientes para o resultado estimado");
+    expect(html).toContain("Dados insuficientes para o projetado");
+    expect(html).toContain("nenhum custo estrutural foi configurado");
+  });
 });

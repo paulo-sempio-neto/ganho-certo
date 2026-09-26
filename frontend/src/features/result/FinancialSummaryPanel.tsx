@@ -46,6 +46,10 @@ function isNegativeMoney(value: string): boolean {
   return Number(value) < 0;
 }
 
+function getResultCardClass(value: string): string {
+  return isNegativeMoney(value) ? "metric-card metric-negative" : "metric-card metric-profit";
+}
+
 function getStructuralCostItems(summary: FinancialSummary) {
   const totalStructuralCosts = Number(summary.estimated_structural_costs);
 
@@ -77,57 +81,34 @@ export function FinancialSummaryPanel({
           <p className="eyebrow">Resultado</p>
           <h3>Quanto realmente esta sobrando?</h3>
           <p className="subtle-note">
-            Primeiro veja a sobra do caixa e o impacto estimado do veículo. Os detalhes continuam
-            disponíveis abaixo.
+            Comece pelo que aconteceu de fato. Depois, veja o impacto dos custos do veiculo e das
+            despesas futuras configuradas.
           </p>
         </div>
 
         <div className="metric-grid result-summary-grid">
-          <article className="metric-card metric-profit">
-            <span>Sobrou no caixa</span>
+          <article className={getResultCardClass(summary.estimated_net_profit)}>
+            <span>Realizado</span>
             <strong>{formatMoney(summary.estimated_net_profit)}</strong>
-            <small>Faturamento menos despesas registradas.</small>
+            <small>Sobra no caixa: faturamento menos despesas registradas.</small>
           </article>
-          <article className="metric-card metric-expense">
-            <span>Custos estimados do veículo</span>
-            <strong>{formatMoney(summary.estimated_structural_costs)}</strong>
-            <small>Custos configurados que nem sempre aparecem como gasto do dia.</small>
-          </article>
-          <article
-            className={
-              isNegativeMoney(summary.estimated_economic_result)
-                ? "metric-card metric-negative"
-                : "metric-card metric-profit"
-            }
-          >
-            <span>Resultado estimado</span>
+          <article className={getResultCardClass(summary.estimated_economic_result)}>
+            <span>Estimado</span>
             <strong>{formatMoney(summary.estimated_economic_result)}</strong>
-            <small>Depois de considerar os custos estimados do veículo.</small>
+            <small>Resultado apos custos estruturais estimados do veiculo.</small>
+          </article>
+          <article className={getResultCardClass(summary.projected_economic_result)}>
+            <span>Projetado</span>
+            <strong>{formatMoney(summary.projected_economic_result)}</strong>
+            <small>Estimado mais despesas recorrentes previstas para o periodo.</small>
+            {isNegativeMoney(summary.projected_economic_result) ? (
+              <small>Os custos projetados estao acima do faturamento registrado.</small>
+            ) : null}
           </article>
         </div>
 
         <details className="calculation-details">
-          <summary>Ver detalhes do cálculo</summary>
-
-          <article
-            className={
-              isNegativeMoney(summary.projected_economic_result)
-                ? "metric-card projected-result-card metric-negative"
-                : "metric-card projected-result-card metric-profit"
-            }
-          >
-            <span>Resultado projetado</span>
-            <strong>{formatMoney(summary.projected_economic_result)}</strong>
-            <small>
-              Considera despesas registradas, custos estruturais configurados e despesas recorrentes
-              previstas para o periodo.
-            </small>
-            {isNegativeMoney(summary.projected_economic_result) ? (
-              <small>
-                Neste periodo, seus custos projetados estao acima do faturamento registrado.
-              </small>
-            ) : null}
-          </article>
+          <summary>Ver como cada resultado e formado</summary>
 
           <div className="dashboard-layers">
             <article className="dashboard-layer">
@@ -159,6 +140,10 @@ export function FinancialSummaryPanel({
                   <dt>Resultado economico estimado</dt>
                   <dd>{formatMoney(summary.estimated_economic_result)}</dd>
                 </div>
+                <div>
+                  <dt>O que entra aqui</dt>
+                  <dd>Custos do veiculo configurados</dd>
+                </div>
               </dl>
             </article>
 
@@ -177,13 +162,18 @@ export function FinancialSummaryPanel({
                   <dt>Resultado projetado apos recorrencias</dt>
                   <dd>{formatMoney(summary.projected_economic_result)}</dd>
                 </div>
+                <div>
+                  <dt>O que entra aqui</dt>
+                  <dd>Despesas recorrentes previstas</dd>
+                </div>
               </dl>
             </article>
           </div>
 
           {!isPositiveMoney(summary.estimated_structural_costs) ? (
             <p className="empty-state">
-              Configure os custos do veiculo para obter uma estimativa economica mais completa.{" "}
+              Dados insuficientes para o resultado estimado: configure os custos do veiculo para
+              uma leitura economica mais completa.{" "}
               <a href="#veiculos">Ir para Veiculos</a>
             </p>
           ) : null}
@@ -195,9 +185,8 @@ export function FinancialSummaryPanel({
           <h3>Despesas recorrentes previstas</h3>
         </div>
         <p className="subtle-note">
-          Despesas recorrentes sao projecoes baseadas nos custos que voce configurou. Quando uma
-          despesa real equivalente ja esta registrada, o GanhoCerto evita contar o mesmo custo duas
-          vezes.
+          Projetado usa despesas recorrentes configuradas. Quando uma despesa real equivalente ja
+          esta registrada, o GanhoCerto evita contar o mesmo custo duas vezes.
         </p>
 
         {isPositiveMoney(summary.recurring_expenses_total) ? (
@@ -220,7 +209,8 @@ export function FinancialSummaryPanel({
           </>
         ) : (
           <p className="empty-state compact-empty-state">
-            Voce ainda nao possui despesas recorrentes previstas neste periodo.{" "}
+            Dados insuficientes para o projetado: nenhuma despesa recorrente foi configurada neste
+            periodo.{" "}
             <a href="#despesas-recorrentes">Configurar despesas recorrentes</a>
           </p>
         )}
@@ -232,7 +222,9 @@ export function FinancialSummaryPanel({
         </div>
 
         {getStructuralCostItems(summary).length === 0 ? (
-          <p className="empty-state">Nenhum custo estrutural estimado para o periodo selecionado.</p>
+          <p className="empty-state">
+            Dados insuficientes: nenhum custo estrutural foi configurado para este periodo.
+          </p>
         ) : (
           <div className="structural-list">
             {getStructuralCostItems(summary).map((item) => (
