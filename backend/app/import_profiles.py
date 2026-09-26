@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.entitlements import CSV_IMPORT_FEATURE, has_feature_access, raise_plan_limit_reached
 from app.expense_imports import validate_column_mapping as validate_expense_column_mapping
 from app.models import CsvImportProfile, User, Vehicle
 from app.pagination import PaginationParams, get_pagination_params
@@ -125,12 +126,18 @@ def get_user_profile(profile_id: int, user_id: int, db: Session) -> CsvImportPro
     return profile
 
 
+def enforce_csv_import_access(user: User, db: Session) -> None:
+    if not has_feature_access(user, CSV_IMPORT_FEATURE, db):
+        raise_plan_limit_reached("Seu plano atual nao inclui importacao CSV.")
+
+
 @router.post("", response_model=CsvImportProfilePublic, status_code=status.HTTP_201_CREATED)
 def create_import_profile(
     payload: CsvImportProfileCreate,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CsvImportProfilePublic:
+    enforce_csv_import_access(current_user, db)
     get_user_vehicle(vehicle_id=payload.vehicle_id, user_id=current_user.id, db=db)
     headers = normalize_headers(payload.headers)
     column_mapping = normalize_column_mapping(payload.column_mapping)
@@ -205,6 +212,7 @@ def match_import_profile(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CsvImportProfileMatchResponse:
+    enforce_csv_import_access(current_user, db)
     header_signature = build_header_signature(normalize_headers(payload.headers))
     profile = db.scalar(
         select(CsvImportProfile)
@@ -237,6 +245,7 @@ def update_import_profile(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> CsvImportProfilePublic:
+    enforce_csv_import_access(current_user, db)
     profile = get_user_profile(profile_id=profile_id, user_id=current_user.id, db=db)
 
     update_data = payload.model_dump(exclude_unset=True)

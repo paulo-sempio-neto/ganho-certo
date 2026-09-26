@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from fastapi import status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -7,6 +8,10 @@ from app.models import Feature, Plan, PlanFeature, User
 
 FREE_PLAN_CODE = "free"
 PRO_PLAN_CODE = "pro"
+VEHICLE_LIMIT_FEATURE = "vehicle_limit"
+ADVANCED_HISTORY_FEATURE = "advanced_history"
+CSV_IMPORT_FEATURE = "csv_import"
+PLAN_LIMIT_REACHED_CODE = "plan_limit_reached"
 
 DEFAULT_PLANS: tuple[dict[str, str], ...] = (
     {"code": FREE_PLAN_CODE, "name": "Free"},
@@ -41,6 +46,18 @@ class UsageLimitResult:
     allowed: bool
     limit: int | None
     current_usage: int
+
+
+class PlanLimitReachedError(Exception):
+    def __init__(self, detail: str) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.status_code = status.HTTP_403_FORBIDDEN
+        self.code = PLAN_LIMIT_REACHED_CODE
+
+
+def raise_plan_limit_reached(detail: str) -> None:
+    raise PlanLimitReachedError(detail=detail)
 
 
 def ensure_default_entitlements(db: Session) -> None:

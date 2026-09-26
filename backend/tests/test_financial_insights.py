@@ -2,12 +2,13 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.models import Plan, User
 
 
 @pytest.fixture
@@ -56,6 +57,17 @@ def register_and_login(client: TestClient, email: str) -> str:
     )
     assert login_response.status_code == 200
     return str(login_response.json()["access_token"])
+
+
+def set_user_plan(email: str, plan_code: str) -> None:
+    override_get_db = app.dependency_overrides[get_db]
+    db_session = next(override_get_db())
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
 
 
 def create_vehicle(client: TestClient, token: str, name: str = "Carro") -> int:
@@ -234,8 +246,10 @@ def test_financial_insights_empty_period_avoids_division_by_zero(client: TestCli
 
 
 def test_financial_insights_filter_by_vehicle_and_isolate_users(client: TestClient) -> None:
-    user_a_token = register_and_login(client, "filter-a@email.com")
+    user_a_email = "filter-a@email.com"
+    user_a_token = register_and_login(client, user_a_email)
     user_b_token = register_and_login(client, "filter-b@email.com")
+    set_user_plan(user_a_email, "pro")
     vehicle_a = create_vehicle(client, user_a_token, "Carro A")
     vehicle_b = create_vehicle(client, user_a_token, "Carro B")
     user_b_vehicle = create_vehicle(client, user_b_token, "Carro B")

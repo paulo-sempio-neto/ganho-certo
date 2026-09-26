@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import WorkSession
+from app.models import Plan, User, WorkSession
 from app.work_session_imports import MAX_FILE_SIZE_BYTES, MAX_IMPORT_ERRORS, MAX_ROWS
 
 CSV_HEADER = "date,gross_revenue,distance_km,worked_minutes,trip_count\n"
@@ -55,7 +55,18 @@ def csv_headers(token: str) -> dict[str, str]:
     return {**auth_headers(token), "Content-Type": "text/csv"}
 
 
-def register_and_login(client: TestClient, email: str) -> str:
+def set_user_plan(email: str, plan_code: str) -> None:
+    override_get_db = app.dependency_overrides[get_db]
+    db_session = next(override_get_db())
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
+
+
+def register_and_login(client: TestClient, email: str, plan_code: str = "pro") -> str:
     register_response = client.post(
         "/auth/register",
         json={"name": "Paulo", "email": email, "password": "senha123"},
@@ -67,6 +78,7 @@ def register_and_login(client: TestClient, email: str) -> str:
         json={"email": email, "password": "senha123"},
     )
     assert login_response.status_code == 200
+    set_user_plan(email=email, plan_code=plan_code)
     return str(login_response.json()["access_token"])
 
 
@@ -195,6 +207,25 @@ def test_preview_valid_csv_normalizes_rows_without_persisting(
         ],
         "errors": [],
     }
+    assert count_work_sessions(db_session) == 0
+
+
+def test_free_plan_cannot_preview_or_import_work_session_csv(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, "free-work-session-import@email.com", plan_code="free")
+    vehicle_id = create_vehicle(client, token)
+
+    preview_response = post_preview(client, token, vehicle_id, valid_csv())
+    import_response = post_import(client, token, vehicle_id, valid_csv())
+
+    assert preview_response.status_code == 403
+    assert preview_response.json() == {
+        "code": "plan_limit_reached",
+        "detail": "Seu plano atual nao inclui importacao CSV.",
+    }
+    assert import_response.status_code == 403
     assert count_work_sessions(db_session) == 0
 
 

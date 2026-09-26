@@ -7,6 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.entitlements import (
+    VEHICLE_LIMIT_FEATURE,
+    check_usage_limit,
+    count_user_vehicles,
+    raise_plan_limit_reached,
+)
 from app.models import (
     CsvImportProfile,
     Expense,
@@ -55,6 +61,17 @@ def create_vehicle(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Vehicle:
+    vehicle_limit = check_usage_limit(
+        current_user,
+        VEHICLE_LIMIT_FEATURE,
+        count_user_vehicles(current_user, db),
+        db,
+    )
+    if not vehicle_limit.allowed:
+        raise_plan_limit_reached(
+            "Seu plano atual atingiu o limite de veiculos cadastrados."
+        )
+
     vehicle = Vehicle(
         user_id=current_user.id,
         name=payload.name,

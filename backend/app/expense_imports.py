@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.entitlements import CSV_IMPORT_FEATURE, has_feature_access, raise_plan_limit_reached
 from app.expenses import money_to_cents, validate_user_vehicle
 from app.models import Expense, User
 from app.schemas import (
@@ -85,6 +86,11 @@ class ParsedExpenseImportRow:
     category: str
     description: str | None
     fingerprint: str
+
+
+def enforce_csv_import_access(user: User, db: Session) -> None:
+    if not has_feature_access(user, CSV_IMPORT_FEATURE, db):
+        raise_plan_limit_reached("Seu plano atual nao inclui importacao CSV.")
 
 
 def normalize_header(value: str) -> str:
@@ -420,6 +426,7 @@ async def preview_expense_import(
     vehicle_id: Annotated[int | None, Query(gt=0)] = None,
     column_mapping: Annotated[str | None, Query()] = None,
 ) -> ExpenseImportPreview:
+    enforce_csv_import_access(current_user, db)
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
     csv_content = await read_limited_csv_body(request)
     preview, _ = parse_csv_content(
@@ -439,6 +446,7 @@ async def import_expenses(
     vehicle_id: Annotated[int | None, Query(gt=0)] = None,
     column_mapping: Annotated[str | None, Query()] = None,
 ) -> ExpenseImportResult:
+    enforce_csv_import_access(current_user, db)
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
     csv_content = await read_limited_csv_body(request)
     preview, parsed_rows = parse_csv_content(

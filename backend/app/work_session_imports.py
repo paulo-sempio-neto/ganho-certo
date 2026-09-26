@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.entitlements import CSV_IMPORT_FEATURE, has_feature_access, raise_plan_limit_reached
 from app.models import User, Vehicle, WorkSession
 from app.schemas import (
     WorkSessionImportError,
@@ -66,6 +67,11 @@ def get_user_vehicle(vehicle_id: int, user_id: int, db: Session) -> Vehicle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found.")
 
     return vehicle
+
+
+def enforce_csv_import_access(user: User, db: Session) -> None:
+    if not has_feature_access(user, CSV_IMPORT_FEATURE, db):
+        raise_plan_limit_reached("Seu plano atual nao inclui importacao CSV.")
 
 
 async def read_limited_csv_body(request: Request) -> bytes:
@@ -508,6 +514,7 @@ async def preview_work_session_import(
     vehicle_id: Annotated[int, Query(gt=0)],
     column_mapping: Annotated[str | None, Query()] = None,
 ) -> WorkSessionImportPreview:
+    enforce_csv_import_access(current_user, db)
     get_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
     csv_content = await read_limited_csv_body(request)
     preview, _ = parse_csv_content(
@@ -526,6 +533,7 @@ async def import_work_sessions(
     vehicle_id: Annotated[int, Query(gt=0)],
     column_mapping: Annotated[str | None, Query()] = None,
 ) -> WorkSessionImportResult:
+    enforce_csv_import_access(current_user, db)
     get_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
     csv_content = await read_limited_csv_body(request)
     preview, parsed_rows = parse_csv_content(

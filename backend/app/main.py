@@ -12,6 +12,7 @@ from app.account import router as account_router
 from app.auth import router as auth_router
 from app.config import Settings, get_settings
 from app.database import get_db
+from app.entitlements import PlanLimitReachedError
 from app.expense_imports import router as expense_imports_router
 from app.expenses import router as expenses_router
 from app.financial_goals import router as financial_goals_router
@@ -66,6 +67,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         expose_headers=["X-Request-ID"],
     )
     application.middleware("http")(request_logging_middleware)
+
+    @application.exception_handler(PlanLimitReachedError)
+    def plan_limit_reached_handler(
+        _request: Request,
+        exc: PlanLimitReachedError,
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"code": exc.code, "detail": exc.detail},
+        )
+
     application.include_router(auth_router)
     application.include_router(account_router)
     application.include_router(vehicles_router)

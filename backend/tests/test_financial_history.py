@@ -5,13 +5,13 @@ from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import WorkSession
+from app.models import Plan, User, WorkSession
 
 
 @pytest.fixture
@@ -47,7 +47,18 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def register_and_login(client: TestClient, email: str) -> str:
+def set_user_plan(email: str, plan_code: str) -> None:
+    override_get_db = app.dependency_overrides[get_db]
+    db_session = next(override_get_db())
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
+
+
+def register_and_login(client: TestClient, email: str, plan_code: str = "pro") -> str:
     register_response = client.post(
         "/auth/register",
         json={"name": "Paulo", "email": email, "password": "senha123"},
@@ -58,6 +69,7 @@ def register_and_login(client: TestClient, email: str) -> str:
         json={"email": email, "password": "senha123"},
     )
     assert login_response.status_code == 200
+    set_user_plan(email=email, plan_code=plan_code)
     return str(login_response.json()["access_token"])
 
 
@@ -209,6 +221,34 @@ def test_financial_history_daily_grouping(client: TestClient) -> None:
     periods = history["periods"]
     assert [period["period_start"] for period in periods] == ["2026-09-01", "2026-09-02"]
     assert [period["gross_revenue"] for period in periods] == ["100.00", "150.00"]
+
+
+def test_free_plan_financial_history_is_restricted_but_summary_still_works(
+    client: TestClient,
+) -> None:
+    token = register_and_login(client, "free-history@email.com", plan_code="free")
+
+    history_response = client.get(
+        "/financial-history",
+        params={
+            "start_date": "2026-09-01",
+            "end_date": "2026-09-01",
+            "grouping": "daily",
+        },
+        headers=auth_headers(token),
+    )
+    summary_response = client.get(
+        "/financial-summary",
+        params={"start_date": "2026-09-01", "end_date": "2026-09-01"},
+        headers=auth_headers(token),
+    )
+
+    assert history_response.status_code == 403
+    assert history_response.json() == {
+        "code": "plan_limit_reached",
+        "detail": "Seu plano atual nao inclui historico avancado.",
+    }
+    assert summary_response.status_code == 200
 
 
 def test_financial_history_weekly_grouping(client: TestClient) -> None:

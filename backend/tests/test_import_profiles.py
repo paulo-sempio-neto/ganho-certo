@@ -8,7 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import CsvImportProfile
+from app.models import CsvImportProfile, Plan, User
 
 HEADERS = ["date", "gross_revenue", "distance_km", "worked_minutes", "trip_count"]
 MAPPING = {
@@ -60,7 +60,18 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def register_and_login(client: TestClient, email: str) -> str:
+def set_user_plan(email: str, plan_code: str) -> None:
+    override_get_db = app.dependency_overrides[get_db]
+    db_session = next(override_get_db())
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
+
+
+def register_and_login(client: TestClient, email: str, plan_code: str = "pro") -> str:
     register_response = client.post(
         "/auth/register",
         json={"name": "Paulo", "email": email, "password": "senha123"},
@@ -72,6 +83,7 @@ def register_and_login(client: TestClient, email: str) -> str:
         json={"email": email, "password": "senha123"},
     )
     assert login_response.status_code == 200
+    set_user_plan(email=email, plan_code=plan_code)
     return str(login_response.json()["access_token"])
 
 
@@ -139,6 +151,40 @@ def test_create_list_update_delete_import_profile(client: TestClient) -> None:
     assert delete_response.status_code == 204
 
     assert client.get("/import-profiles", headers=auth_headers(token)).json() == []
+
+
+def test_free_plan_cannot_create_match_or_update_import_profiles(client: TestClient) -> None:
+    token = register_and_login(client, "free-profiles@example.com", plan_code="free")
+
+    create_response = client.post(
+        "/import-profiles",
+        json={
+            "name": "CSV",
+            "import_type": "work_sessions",
+            "headers": HEADERS,
+            "column_mapping": MAPPING,
+            "vehicle_id": None,
+        },
+        headers=auth_headers(token),
+    )
+    match_response = client.post(
+        "/import-profiles/match",
+        json={"import_type": "work_sessions", "headers": HEADERS},
+        headers=auth_headers(token),
+    )
+    update_response = client.put(
+        "/import-profiles/1",
+        json={"name": "Outro nome"},
+        headers=auth_headers(token),
+    )
+
+    assert create_response.status_code == 403
+    assert create_response.json() == {
+        "code": "plan_limit_reached",
+        "detail": "Seu plano atual nao inclui importacao CSV.",
+    }
+    assert match_response.status_code == 403
+    assert update_response.status_code == 403
 
 
 def test_import_profiles_require_authentication(client: TestClient) -> None:

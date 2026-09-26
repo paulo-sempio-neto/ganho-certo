@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.entitlements import ADVANCED_HISTORY_FEATURE, has_feature_access, raise_plan_limit_reached
 from app.financial_history import result_per_hour, result_per_km
 from app.financial_summary import (
     ZERO_MONEY,
@@ -317,6 +318,9 @@ def get_work_patterns(
     end_date: Annotated[date, Query()],
     vehicle_id: Annotated[int | None, Query(gt=0)] = None,
 ) -> WorkPatternsResponse:
+    if not has_feature_access(current_user, ADVANCED_HISTORY_FEATURE, db):
+        raise_plan_limit_reached("Seu plano atual nao inclui historico avancado.")
+
     validate_date_range(start_date=start_date, end_date=end_date)
     validate_user_vehicle(vehicle_id=vehicle_id, user_id=current_user.id, db=db)
 

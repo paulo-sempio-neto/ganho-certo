@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import VehicleCostProfile
+from app.models import Plan, User, VehicleCostProfile
 
 
 @pytest.fixture
@@ -58,6 +58,15 @@ def register_and_login(client: TestClient, email: str) -> str:
     )
     assert login_response.status_code == 200
     return str(login_response.json()["access_token"])
+
+
+def set_user_plan(db_session: Session, email: str, plan_code: str) -> None:
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
 
 
 def create_vehicle(client: TestClient, token: str, name: str = "Carro do app") -> int:
@@ -226,7 +235,9 @@ def test_cost_profile_normalizes_fields_incompatible_with_ownership_type(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    token = register_and_login(client, "normalize-ownership@email.com")
+    email = "normalize-ownership@email.com"
+    token = register_and_login(client, email)
+    set_user_plan(db_session, email, "pro")
     owned_vehicle = create_vehicle(client, token, "Proprio")
     rented_vehicle = create_vehicle(client, token, "Alugado")
     financed_vehicle = create_vehicle(client, token, "Financiado")

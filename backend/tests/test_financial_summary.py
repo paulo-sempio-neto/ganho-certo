@@ -2,12 +2,13 @@ from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.models import Plan, User
 
 
 @pytest.fixture
@@ -56,6 +57,17 @@ def register_and_login(client: TestClient, email: str) -> str:
     )
     assert login_response.status_code == 200
     return str(login_response.json()["access_token"])
+
+
+def set_user_plan(email: str, plan_code: str) -> None:
+    override_get_db = app.dependency_overrides[get_db]
+    db_session = next(override_get_db())
+    user = db_session.scalar(select(User).where(User.email == email))
+    plan = db_session.scalar(select(Plan).where(Plan.code == plan_code))
+    assert user is not None
+    assert plan is not None
+    user.current_plan_id = plan.id
+    db_session.commit()
 
 
 def create_vehicle(client: TestClient, token: str, name: str = "Carro") -> int:
@@ -221,7 +233,9 @@ def test_summary_for_period_calculates_all_main_metrics(client: TestClient) -> N
 
 
 def test_summary_filters_by_vehicle_without_unlinked_expenses(client: TestClient) -> None:
-    token = register_and_login(client, "paulo@email.com")
+    email = "paulo@email.com"
+    token = register_and_login(client, email)
+    set_user_plan(email, "pro")
     vehicle_a = create_vehicle(client, token, "Carro A")
     vehicle_b = create_vehicle(client, token, "Carro B")
     create_work_session(client, token, vehicle_a, "2026-09-22", "100.00", "10.00", 60, 2)
@@ -455,7 +469,9 @@ def test_summary_recurring_respects_inclusive_dates_end_date_and_inactive(
 def test_summary_recurring_vehicle_filter_excludes_unlinked_recurring_expenses(
     client: TestClient,
 ) -> None:
-    token = register_and_login(client, "recurring-vehicles@email.com")
+    email = "recurring-vehicles@email.com"
+    token = register_and_login(client, email)
+    set_user_plan(email, "pro")
     vehicle_a = create_vehicle(client, token, "Carro A")
     vehicle_b = create_vehicle(client, token, "Carro B")
     create_work_session(client, token, vehicle_a, "2026-01-10", "100.00", "10.00", 60, 1)
@@ -543,7 +559,9 @@ def test_summary_recurring_deduplicates_real_expense_same_key(client: TestClient
 def test_summary_recurring_deduplicates_vehicle_cost_profile_categories(
     client: TestClient,
 ) -> None:
-    token = register_and_login(client, "recurring-profile-dedup@email.com")
+    email = "recurring-profile-dedup@email.com"
+    token = register_and_login(client, email)
+    set_user_plan(email, "pro")
     rented_vehicle = create_vehicle(client, token, "Alugado")
     financed_vehicle = create_vehicle(client, token, "Financiado")
     create_work_session(client, token, rented_vehicle, "2026-01-10", "700.00", "10.00", 60, 1)
@@ -811,7 +829,9 @@ def test_summary_uses_real_maintenance_expense_when_profile_has_no_maintenance_p
 def test_summary_aggregates_multiple_vehicles_separately_and_filters_by_vehicle(
     client: TestClient,
 ) -> None:
-    token = register_and_login(client, "paulo@email.com")
+    email = "paulo@email.com"
+    token = register_and_login(client, email)
+    set_user_plan(email, "pro")
     vehicle_a = create_vehicle(client, token, "Carro A")
     vehicle_b = create_vehicle(client, token, "Carro B")
     create_work_session(client, token, vehicle_a, "2026-01-10", "100.00", "10.00", 60, 2)
