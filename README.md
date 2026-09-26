@@ -101,6 +101,26 @@ SMTP_USE_TLS=true
 FRONTEND_BASE_URL=<URL publica do frontend>
 ```
 
+## Billing e Mercado Pago
+
+Billing fica desabilitado por padrao com `BILLING_PROVIDER=none`. Para a beta com
+cobranca real, habilite Mercado Pago somente no backend:
+
+```text
+BILLING_PROVIDER=mercado_pago
+BILLING_PRO_MONTHLY_AMOUNT=<valor mensal do Pro, ex: 29.90>
+BILLING_CURRENCY_ID=BRL
+MERCADOPAGO_ACCESS_TOKEN=<access token privado>
+MERCADOPAGO_WEBHOOK_SECRET=<segredo configurado no webhook>
+MERCADOPAGO_PUBLIC_KEY=<public key, se necessaria para operacao>
+```
+
+O checkout nao ativa plano localmente. A assinatura Pro so e liberada depois de
+webhook assinado, validacao do evento e consulta ao estado da assinatura no
+Mercado Pago. O frontend nunca deve receber `MERCADOPAGO_ACCESS_TOKEN`,
+`MERCADOPAGO_WEBHOOK_SECRET`, `BILLING_SECRET_KEY`, `DATABASE_URL` ou
+`JWT_SECRET`.
+
 ## Production deployment
 
 Arquitetura planejada:
@@ -141,6 +161,10 @@ APP_ENV=production
 DATABASE_URL=<URL do PostgreSQL gerenciado>
 JWT_SECRET=<segredo forte e aleatorio gerado para producao>
 CORS_ALLOWED_ORIGINS=<URL publica do frontend na Vercel>
+FRONTEND_BASE_URL=<URL publica do frontend na Vercel>
+ALLOWED_HOSTS=<host publico do backend, sem esquema ou porta>
+SMTP_HOST=<host SMTP>
+SMTP_FROM_EMAIL=<email remetente valido>
 ```
 
 O `APP_ENV=production` e obrigatorio em deploy publico: nesse modo a API desabilita
@@ -157,15 +181,8 @@ Variavel obrigatoria na Vercel:
 VITE_API_BASE_URL=<URL publica do backend no Render>
 ```
 
-Nao exponha `DATABASE_URL` ou `JWT_SECRET` no frontend.
+Nao exponha `DATABASE_URL`, `JWT_SECRET`, SMTP ou segredos de billing no frontend.
 
-## Fora do escopo desta fase
+## Historico de escopo inicial
 
-- Autenticacao
-- Usuarios
-- Veiculos
-- Jornadas
-- Receitas
-- Despesas
-- Calculos financeiros
 - Integracao com Uber Driver API ou OAuth 2.0

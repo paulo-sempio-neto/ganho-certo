@@ -12,9 +12,24 @@ Checklist operacional mínimo antes de convidar usuários reais para a beta fech
 - [ ] `JWT_SECRET` forte, aleatório e exclusivo do ambiente de produção.
 - [ ] `DATABASE_URL` apontando para o PostgreSQL de produção.
 - [ ] `CORS_ALLOWED_ORIGINS` restrito à origem real do frontend.
+- [ ] `ALLOWED_HOSTS` restrito aos hosts reais do backend/health check.
+- [ ] `FRONTEND_BASE_URL` apontando para a URL pública real do frontend.
 - [ ] `VITE_API_BASE_URL` apontando para a URL pública real do backend.
+- [ ] SMTP configurado com TLS para recuperação de senha:
+  - `SMTP_HOST`
+  - `SMTP_FROM_EMAIL`
+  - `SMTP_USERNAME` e `SMTP_PASSWORD`, se o provedor exigir autenticação.
+- [ ] Mercado Pago configurado se a beta aceitar pagamento real:
+  - `BILLING_PROVIDER=mercado_pago`
+  - `BILLING_PRO_MONTHLY_AMOUNT`
+  - `BILLING_CURRENCY_ID=BRL`
+  - `MERCADOPAGO_ACCESS_TOKEN`
+  - `MERCADOPAGO_WEBHOOK_SECRET`
+- [ ] Webhook do Mercado Pago apontando para `/billing/webhook`.
+- [ ] Segredo do webhook no provedor igual ao `MERCADOPAGO_WEBHOOK_SECRET`.
 - [ ] Migrações Alembic aplicadas com sucesso.
 - [ ] `/health` confirmado no backend publicado.
+- [ ] `/ready` confirmado no backend publicado depois das migrações.
 - [ ] Build de produção do frontend confirmado.
 - [ ] Limites de autenticação revisados para a beta:
   - `AUTH_LOGIN_RATE_LIMIT`
@@ -44,6 +59,19 @@ Frontend:
 Verificação:
 
 - Acessar `/health` no backend publicado e confirmar resposta `{"status":"ok"}`.
+- Acessar `/ready` no backend publicado e confirmar resposta `{"status":"ready"}`.
+
+## Billing safety
+
+- O frontend chama apenas `/billing/checkout` para receber a URL de checkout.
+- O checkout cria a preapproval no Mercado Pago, mas não ativa o Pro localmente.
+- A ativação do Pro depende de webhook assinado, consulta ao provedor e status
+  ativo/autorizado da assinatura.
+- Eventos duplicados são ignorados por `provider` + `external_event_id`.
+- Assinaturas canceladas, pausadas ou expiradas cancelam a assinatura local quando
+  o provedor envia esse estado.
+- Não crie rota administrativa pública para ativar plano durante a beta. O backend
+  deve continuar sendo a fonte da verdade para plano, assinatura e entitlements.
 
 ## Operacao em producao
 
@@ -99,6 +127,10 @@ Verificação:
 - [ ] Registrar uma jornada.
 - [ ] Adicionar uma despesa.
 - [ ] Verificar o dashboard financeiro.
+- [ ] Iniciar checkout Pro com conta de teste.
+- [ ] Confirmar que o plano segue Free antes do webhook aprovado.
+- [ ] Confirmar que webhook aprovado ativa Pro.
+- [ ] Reenviar o mesmo evento e confirmar comportamento idempotente.
 - [ ] Fazer logout e login novamente.
 - [ ] Inspecionar os logs do host para erros inesperados.
 
@@ -117,7 +149,5 @@ Verificação:
 - Redesign global de paginação.
 - Migração para cookies `HttpOnly`.
 - Lint tooling no frontend.
-- Timeout genérico no `fetch`.
-- Assinaturas/pagamentos.
 - Analytics.
 - Serviços externos de monitoramento.
