@@ -3,6 +3,9 @@
 Use este roteiro com cada tester da beta. A ideia e validar o fluxo real, anotar
 friccoes e coletar feedback sem transformar o teste em suporte tecnico longo.
 
+Compartilhe o guia curto [`BETA_TESTER_GUIDE.md`](BETA_TESTER_GUIDE.md) com
+o tester. Este checklist e para quem acompanha a sessao e revisa sinais internos.
+
 ## Antes de comecar
 
 - Confirme qual dispositivo e navegador o tester vai usar.
@@ -26,12 +29,20 @@ friccoes e coletar feedback sem transformar o teste em suporte tecnico longo.
 - [ ] Confirmar que o app nao pede informacoes excessivas para comecar.
 - [ ] Registrar o primeiro dia em `Registrar meu dia`.
 - [ ] Confirmar que o resultado parcial aparece apos salvar.
+- [ ] Ler o resultado e confirmar que fica claro quanto sobrou depois dos gastos.
+- [ ] Confirmar que a orientacao convida a salvar um segundo dia para formar
+      uma base de comparacao.
 - [ ] Adicionar um gasto do dia, como combustivel ou recarga.
 - [ ] Abrir o dashboard e conferir se os numeros principais fazem sentido para o tester.
 
 ## Uso diario
 
 - [ ] Registrar mais um dia com data diferente.
+- [ ] Confirmar que a orientacao muda para revisar tendencias depois de mais de um registro.
+- [ ] Abrir historico, comparacoes e padroes para verificar o que ficou
+      disponivel. Comparacao com periodo anterior exige registros tambem no
+      periodo anterior.
+- [ ] Confirmar que estados sem dados suficientes explicam o que mais registros desbloqueiam.
 - [ ] Editar uma jornada cadastrada.
 - [ ] Excluir uma jornada de teste, se o tester criou uma entrada claramente errada.
 - [ ] Adicionar uma despesa recorrente relevante, se fizer sentido para o tester.
@@ -58,6 +69,7 @@ friccoes e coletar feedback sem transformar o teste em suporte tecnico longo.
 ## Fluxo Pro
 
 - [ ] Abrir `Mais` e conferir o plano atual.
+- [ ] Confirmar que a pagina explica claramente o que permanece no FREE e o que o PRO libera.
 - [ ] Iniciar checkout Pro, se a conta de teste estiver autorizada para isso.
 - [ ] Confirmar que voltar/cancelar nao ativa Pro.
 - [ ] Confirmar que o app informa que a assinatura depende da confirmacao do pagamento.

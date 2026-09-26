@@ -131,6 +131,9 @@ Arquitetura planejada:
 
 Antes de convidar usuários reais para a beta fechada, siga o checklist em
 [`docs/BETA_CHECKLIST.md`](docs/BETA_CHECKLIST.md).
+Para acompanhar ativacao, retencao inicial, duvidas e interesse no PRO por lote,
+use tambem [`docs/BETA_LEARNING_CHECKLIST.md`](docs/BETA_LEARNING_CHECKLIST.md).
+Compartilhe [`docs/BETA_TESTER_GUIDE.md`](docs/BETA_TESTER_GUIDE.md) com os testers.
 Para validar a primeira sessao com testers, use tambem
 [`docs/BETA_TEST_CHECKLIST.md`](docs/BETA_TEST_CHECKLIST.md).
 Para preparar o primeiro deploy real, siga o runbook em

@@ -77,6 +77,10 @@ Verificação:
 
 ## Aprendizado da beta
 
+Use [`BETA_LEARNING_CHECKLIST.md`](BETA_LEARNING_CHECKLIST.md) para acompanhar
+ativacao, segunda jornada, duvidas e interesse no PRO por lote. Entregue
+[`BETA_TESTER_GUIDE.md`](BETA_TESTER_GUIDE.md) aos participantes.
+
 - O app coleta feedback autenticado em `/feedback`, gravado em `beta_feedback`
   com usuario, categoria, mensagem, caminho da tela e user agent resumido.
 - Feedbacks possuem `priority`, `status` e `resolved_at` para triagem simples.
@@ -98,7 +102,7 @@ Verificação:
 - A visao interna `/internal/beta/feedback` mostra total, abertos, contagens por
   categoria/status/prioridade e feedbacks recentes. Use `PATCH
   /internal/beta/feedback/{id}` para alterar categoria, prioridade ou status.
-- Revise feedbacks pelo banco durante a beta pequena; ainda nao ha painel interno
+- Revise feedbacks pela visao interna protegida; ainda nao ha painel interno
   nem integracao externa de suporte.
 - Eventos uteis para acompanhar manualmente nesta fase:
   - conta criada;
