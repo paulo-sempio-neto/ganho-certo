@@ -1,6 +1,6 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
-import { requestApi } from "./api/client";
+import { NETWORK_ERROR_MESSAGE, requestApi } from "./api/client";
 import {
   createExpense,
   createRecurringExpense,
@@ -894,8 +894,13 @@ function App() {
           loadMaintenancePlans(token),
           refreshDashboardData(token),
         ]);
-      } catch {
-        endSession("Sessao expirada ou invalida. Entre novamente.");
+      } catch (error) {
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setUser(null);
+          setMessage(error instanceof Error ? error.message : NETWORK_ERROR_MESSAGE);
+        }
       }
     }
 
@@ -3091,6 +3096,8 @@ function App() {
                   summaryError={dashboardError}
                   insightsError={financialInsightsError}
                   historyError={financialHistoryError}
+                  onSummaryRetry={() => void loadFinancialSummary()}
+                  onInsightsRetry={() => void loadFinancialInsights()}
                   onHistoryRetry={() => void loadFinancialHistory()}
                   getAuthHeaders={getAuthHeaders}
                   endSession={endSession}

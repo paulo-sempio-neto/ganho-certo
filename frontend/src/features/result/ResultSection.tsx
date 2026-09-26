@@ -51,6 +51,8 @@ type ResultSectionProps = {
   summaryError: string;
   insightsError: string;
   historyError: string;
+  onSummaryRetry: () => void;
+  onInsightsRetry: () => void;
   onHistoryRetry: () => void;
   getAuthHeaders: () => Record<string, string>;
   endSession: (message: string) => void;
@@ -71,6 +73,8 @@ export function ResultSection({
   summaryError,
   insightsError,
   historyError,
+  onSummaryRetry,
+  onInsightsRetry,
   onHistoryRetry,
   getAuthHeaders,
   endSession,
@@ -149,7 +153,19 @@ export function ResultSection({
       </div>
 
       {isSummaryLoading ? <p className="empty-state">Carregando dashboard...</p> : null}
-      {summaryError ? <p className="form-message">{summaryError}</p> : null}
+      {summaryError ? (
+        <div className="history-error">
+          <p className="form-message compact-message">{summaryError}</p>
+          <button
+            className="text-button"
+            disabled={isSummaryLoading}
+            type="button"
+            onClick={onSummaryRetry}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : null}
 
       {!isSummaryLoading && summary ? (
         <>
@@ -162,6 +178,7 @@ export function ResultSection({
             insights={insights}
             isLoading={isInsightsLoading}
             error={insightsError}
+            onRetry={onInsightsRetry}
           />
 
           <HistoricalPerformanceSection

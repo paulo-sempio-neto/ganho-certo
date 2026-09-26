@@ -34,6 +34,35 @@ select {
   padding: 48px;
 }
 
+.app-error-boundary {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: #f6f4ee;
+  padding: 24px;
+}
+
+.app-error-boundary section {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 440px);
+  border: 1px solid #d9ded5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgb(29 39 31 / 10%);
+  padding: 28px;
+}
+
+.app-error-boundary h1 {
+  font-size: 2rem;
+}
+
+.app-error-boundary p {
+  margin: 0;
+  color: #465048;
+  line-height: 1.45;
+}
+
 .page-dashboard {
   grid-template-columns: minmax(280px, 0.6fr) minmax(0, 1.4fr);
   align-items: start;
@@ -194,6 +223,7 @@ select:focus {
   color: #76510d;
   padding: 12px 14px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .success-message {
@@ -203,6 +233,7 @@ select:focus {
   color: #21643f;
   padding: 12px 14px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -1499,6 +1530,7 @@ select:focus {
   color: #58625a;
   padding: 18px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .vehicle-card {
@@ -1550,6 +1582,7 @@ select:focus {
 .card-actions {
   display: flex;
   flex-shrink: 0;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
