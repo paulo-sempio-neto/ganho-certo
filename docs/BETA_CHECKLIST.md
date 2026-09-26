@@ -144,6 +144,8 @@ Verificação:
 
 ## AFTER DEPLOY
 
+- [ ] Seguir o roteiro de teste em [`docs/BETA_TEST_CHECKLIST.md`](BETA_TEST_CHECKLIST.md)
+  com pelo menos uma conta de teste antes de convidar usuarios reais.
 - [ ] Registrar uma conta de teste da beta.
 - [ ] Fazer login.
 - [ ] Criar um veículo.
