@@ -20,6 +20,7 @@ describe("account api", () => {
       current_plan: { id: 1, name: "Free", code: "free" },
       features: { csv_import: false },
       limits: { vehicle_limit: 1 },
+      subscription: null,
     };
     requestApiMock.mockResolvedValue(response);
 

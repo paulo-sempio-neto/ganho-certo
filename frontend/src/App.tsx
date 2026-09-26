@@ -1,6 +1,7 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { getAccountPlan, type AccountPlanResponse } from "./api/account";
+import { createBillingCheckout } from "./api/billing";
 import { NETWORK_ERROR_MESSAGE, requestApi } from "./api/client";
 import {
   createExpense,
@@ -460,6 +461,8 @@ function App() {
   const [financialInsightsError, setFinancialInsightsError] = useState("");
   const [financialHistoryError, setFinancialHistoryError] = useState("");
   const [accountPlanError, setAccountPlanError] = useState("");
+  const [billingCheckoutError, setBillingCheckoutError] = useState("");
+  const [billingCheckoutMessage, setBillingCheckoutMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isVehiclesLoading, setIsVehiclesLoading] = useState(false);
   const [isWorkSessionsLoading, setIsWorkSessionsLoading] = useState(false);
@@ -479,6 +482,7 @@ function App() {
   const [isMaintenanceRecordSaving, setIsMaintenanceRecordSaving] = useState(false);
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
+  const [isBillingCheckoutLoading, setIsBillingCheckoutLoading] = useState(false);
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -527,6 +531,8 @@ function App() {
     setFinancialInsightsError("");
     setFinancialHistoryError("");
     setAccountPlanError("");
+    setBillingCheckoutError("");
+    setBillingCheckoutMessage("");
     setHistoryVehicleId("");
     setMessage(nextMessage);
   }
@@ -644,6 +650,31 @@ function App() {
       }
     } finally {
       setIsAccountPlanLoading(false);
+    }
+  }
+
+  async function handleCheckoutPro() {
+    if (!token) {
+      return;
+    }
+
+    setIsBillingCheckoutLoading(true);
+    setBillingCheckoutError("");
+    setBillingCheckoutMessage("Redirecionando para pagamento...");
+    try {
+      const checkout = await createBillingCheckout(getAuthHeaders(token));
+      window.location.assign(checkout.checkout_url);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessao")) {
+        endSession(error.message);
+      } else {
+        setBillingCheckoutMessage("");
+        setBillingCheckoutError(
+          error instanceof Error ? error.message : "Nao foi possivel iniciar a assinatura.",
+        );
+      }
+    } finally {
+      setIsBillingCheckoutLoading(false);
     }
   }
 
@@ -908,6 +939,8 @@ function App() {
       setAccountPlan(null);
       setFinancialHistoryError("");
       setAccountPlanError("");
+      setBillingCheckoutError("");
+      setBillingCheckoutMessage("");
       setMaintenancePlanForm(emptyMaintenancePlanForm);
       setMaintenanceRecordForm(emptyMaintenanceRecordForm);
       setRecordingMaintenancePlanId(null);
@@ -942,6 +975,36 @@ function App() {
     }
 
     void loadSession();
+  }, [token, isResetPasswordRoute]);
+
+  useEffect(() => {
+    if (!token || isResetPasswordRoute) {
+      return;
+    }
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const billingStatus = searchParams.get("billing");
+    if (!billingStatus) {
+      return;
+    }
+
+    if (billingStatus === "success") {
+      setBillingCheckoutMessage(
+        "Sua assinatura sera atualizada apos confirmacao do pagamento.",
+      );
+      setBillingCheckoutError("");
+    } else if (billingStatus === "cancel") {
+      setBillingCheckoutMessage("");
+      setBillingCheckoutError("Assinatura nao concluida. Voce pode tentar novamente quando quiser.");
+    }
+
+    searchParams.delete("billing");
+    const nextSearch = searchParams.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`,
+    );
   }, [token, isResetPasswordRoute]);
 
   useEffect(() => {
@@ -2026,8 +2089,12 @@ function App() {
                 </dl>
                 <AccountPlanPanel
                   accountPlan={accountPlan}
+                  billingError={billingCheckoutError}
+                  billingMessage={billingCheckoutMessage}
                   error={accountPlanError}
+                  isCheckoutLoading={isBillingCheckoutLoading}
                   isLoading={isAccountPlanLoading}
+                  onCheckoutPro={() => void handleCheckoutPro()}
                   onRetry={() => void loadAccountPlan()}
                 />
                 <button

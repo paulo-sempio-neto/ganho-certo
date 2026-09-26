@@ -2,8 +2,12 @@ import type { AccountPlanResponse } from "../../api/account";
 
 type AccountPlanPanelProps = {
   accountPlan: AccountPlanResponse | null;
+  billingError: string;
+  billingMessage: string;
   error: string;
+  isCheckoutLoading: boolean;
   isLoading: boolean;
+  onCheckoutPro: () => void;
   onRetry: () => void;
 };
 
@@ -42,12 +46,45 @@ function getLockedFeatures(accountPlan: AccountPlanResponse): string[] {
     .map(([featureCode]) => getFeatureLabel(featureCode));
 }
 
+function getSubscriptionStatusLabel(accountPlan: AccountPlanResponse): string {
+  const subscriptionStatus = accountPlan.subscription?.status.toLowerCase();
+
+  if (subscriptionStatus === "active" || subscriptionStatus === "trialing") {
+    return "Plano Pro ativo";
+  }
+
+  if (subscriptionStatus === "pending") {
+    return "Pagamento em processamento";
+  }
+
+  if (subscriptionStatus === "canceled" || subscriptionStatus === "cancelled") {
+    return "Assinatura cancelada";
+  }
+
+  if (accountPlan.current_plan.code === "pro") {
+    return "Plano Pro ativo";
+  }
+
+  return "Plano gratuito";
+}
+
+function shouldShowUpgradeButton(accountPlan: AccountPlanResponse): boolean {
+  const subscriptionStatus = accountPlan.subscription?.status.toLowerCase();
+  return accountPlan.current_plan.code === "free" && subscriptionStatus !== "pending";
+}
+
 export function AccountPlanPanel({
   accountPlan,
+  billingError,
+  billingMessage,
   error,
+  isCheckoutLoading,
   isLoading,
+  onCheckoutPro,
   onRetry,
 }: AccountPlanPanelProps) {
+  const lockedFeatures = accountPlan ? getLockedFeatures(accountPlan) : [];
+
   return (
     <section className="account-plan-panel" aria-live="polite">
       <div className="account-plan-header">
@@ -75,6 +112,16 @@ export function AccountPlanPanel({
 
       {accountPlan ? (
         <>
+          <div className="plan-status-panel">
+            <strong>{getSubscriptionStatusLabel(accountPlan)}</strong>
+            {accountPlan.subscription?.period_end ? (
+              <span>
+                Valido ate{" "}
+                {new Date(accountPlan.subscription.period_end).toLocaleDateString("pt-BR")}
+              </span>
+            ) : null}
+          </div>
+
           <div className="plan-feature-group">
             <h4>Recursos disponiveis</h4>
             <ul className="plan-feature-list">
@@ -88,10 +135,10 @@ export function AccountPlanPanel({
           </div>
 
           <div className="plan-feature-group">
-            <h4>Recursos Pro</h4>
-            {getLockedFeatures(accountPlan).length > 0 ? (
+            <h4>Beneficios Pro</h4>
+            {lockedFeatures.length > 0 ? (
               <ul className="plan-feature-list">
-                {getLockedFeatures(accountPlan).map((feature) => (
+                {lockedFeatures.map((feature) => (
                   <li key={feature}>
                     <span className="status-dot status-dot-locked" aria-hidden="true" />
                     {feature}
@@ -99,9 +146,30 @@ export function AccountPlanPanel({
                 ))}
               </ul>
             ) : (
-              <p className="subtle-note">Nenhum recurso bloqueado neste plano.</p>
+              <p className="subtle-note">Todos os recursos Pro estao liberados neste plano.</p>
             )}
           </div>
+
+          {shouldShowUpgradeButton(accountPlan) ? (
+            <div className="plan-upgrade-panel">
+              <p>
+                Desbloqueie importacao CSV, historico avancado e inteligencia financeira.
+              </p>
+              <button
+                className="button"
+                disabled={isCheckoutLoading}
+                type="button"
+                onClick={onCheckoutPro}
+              >
+                {isCheckoutLoading ? "Redirecionando..." : "Assinar Pro"}
+              </button>
+            </div>
+          ) : null}
+
+          {billingMessage ? (
+            <p className="success-message compact-message">{billingMessage}</p>
+          ) : null}
+          {billingError ? <p className="form-message compact-message">{billingError}</p> : null}
         </>
       ) : null}
     </section>
