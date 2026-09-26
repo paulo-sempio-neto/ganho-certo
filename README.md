@@ -137,6 +137,8 @@ Para preparar o primeiro deploy real, siga o runbook em
 [`docs/PRODUCTION_DEPLOYMENT.md`](docs/PRODUCTION_DEPLOYMENT.md).
 Para executar o deploy passo a passo, use o guia pratico em
 [`docs/PRODUCTION_DEPLOYMENT_GUIDE.md`](docs/PRODUCTION_DEPLOYMENT_GUIDE.md).
+Para a decisao pratica de provedores e custos iniciais, veja
+[`docs/PRODUCTION_STACK_DECISION.md`](docs/PRODUCTION_STACK_DECISION.md).
 
 ### Backend no Render
 
