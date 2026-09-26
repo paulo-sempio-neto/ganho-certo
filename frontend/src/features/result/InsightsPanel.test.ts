@@ -80,4 +80,55 @@ describe("InsightsPanel", () => {
 
     expect(html).toContain("Ainda não há dados suficientes para gerar insights deste período.");
   });
+
+  it("puts comparison and weekly insights before performance and expense details", () => {
+    const html = renderToStaticMarkup(
+      createElement(InsightsPanel, {
+        insights: [
+          {
+            code: "expense_share",
+            type: "info",
+            title: "Despesas",
+            message: "Detalhes de despesas.",
+          },
+          {
+            code: "best_day",
+            type: "positive",
+            title: "Melhor dia",
+            message: "Desempenho.",
+          },
+          {
+            code: "weekly_performance_summary",
+            type: "positive",
+            title: "Resumo semanal prioritario",
+            message: "Comparacao semanal.",
+          },
+          {
+            code: "net_result_change",
+            type: "positive",
+            title: "Comparacao do periodo",
+            message: "Resultado anterior.",
+          },
+          {
+            code: "activity_consistency",
+            type: "info",
+            title: "Consistencia",
+            message: "Dias registrados.",
+          },
+        ],
+        isLoading: false,
+        error: "",
+        onRetry: vi.fn(),
+      }),
+    );
+
+    expect(html.indexOf("Comparacao do periodo")).toBeLessThan(
+      html.indexOf("Resumo semanal prioritario"),
+    );
+    expect(html.indexOf("Resumo semanal prioritario")).toBeLessThan(
+      html.indexOf("Consistencia"),
+    );
+    expect(html.indexOf("Consistencia")).toBeLessThan(html.indexOf("Melhor dia"));
+    expect(html.indexOf("Melhor dia")).toBeLessThan(html.indexOf("Despesas"));
+  });
 });

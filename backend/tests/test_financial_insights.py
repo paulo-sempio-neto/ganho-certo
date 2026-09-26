@@ -193,6 +193,15 @@ def test_financial_insights_return_retention_activity_and_weekly_summary(
 
     assert response.status_code == 200
     insights = insights_by_code(response.json())
+    insight_codes = [str(insight["code"]) for insight in response.json()["insights"]]
+    assert insight_codes[:6] == [
+        "weekly_performance_summary",
+        "activity_consistency",
+        "net_per_hour",
+        "net_per_km",
+        "best_weekday",
+        "best_day",
+    ]
     assert insights["activity_consistency"]["message"] == (
         "Voce registrou movimentacao em 2 de 7 dias do periodo (28,6%)."
     )

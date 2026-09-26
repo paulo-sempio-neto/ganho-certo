@@ -2120,8 +2120,6 @@ function App() {
   const betaNextStep = getBetaActivationNextStep({
     vehicleCount: vehicles.length,
     workSessionCount: workSessions.length,
-    expenseCount: expenses.length,
-    hasQuickDailyResult: quickDailyEntryResult !== null,
   });
 
   return (

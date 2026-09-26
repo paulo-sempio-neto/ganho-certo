@@ -167,6 +167,20 @@ function hasPatternData(patterns: WorkPatternsResponse): boolean {
   );
 }
 
+export function getWorkPatternsGuidance(activeDays: number): string {
+  return activeDays <= 1
+    ? "Seu primeiro registro ja aparece aqui. Com mais dias, as comparacoes por dia da semana ficam mais confiaveis."
+    : "Ja ha registros neste periodo. Com mais dias, as comparacoes por dia da semana ficam mais confiaveis.";
+}
+
+export function getWorkPatternsLimitedMessage(): string {
+  return "Estes sao dados iniciais. Continue registrando para tornar as comparacoes mais confiaveis.";
+}
+
+export function getWorkPatternsEmptyStateMessage(): string {
+  return "Ainda nao ha jornadas neste periodo para identificar padroes. Registre mais dias e esta area mostrara comparacoes por dia da semana.";
+}
+
 function hasUsableSample(patterns: WorkPatternsResponse): boolean {
   return patterns.weekdays.some((weekday) => weekday.sample_classification === "usable");
 }
@@ -252,7 +266,6 @@ export function WorkPatternsSection({
 
   const hasData = patterns ? hasPatternData(patterns) : false;
   const hasUsableData = patterns ? hasUsableSample(patterns) : false;
-  const hasOnlyInsufficientSamples = patterns ? patterns.overall.active_days <= 1 : true;
   const observations = patterns?.observations.slice(0, 3) ?? [];
   const chartWeekdays = patterns?.weekdays ?? [];
   const chartValues = chartWeekdays.map((weekday) =>
@@ -364,9 +377,7 @@ export function WorkPatternsSection({
             ) : (
               <div className="pattern-callout">
                 <p>
-                  {hasOnlyInsufficientSamples || hasUsableData
-                    ? "Continue registrando seus dias para descobrir seus padrões de trabalho."
-                    : "Seus primeiros padrões já estão aparecendo. Continue registrando para tornar as comparações mais confiáveis."}
+                  {getWorkPatternsGuidance(patterns.overall.active_days)}
                 </p>
                 <a className="button button-primary" href="#hoje">
                   Registrar meu dia
@@ -410,8 +421,7 @@ export function WorkPatternsSection({
 
             {!hasUsableData ? (
               <p className="subtle-note pattern-limited-note">
-                Seus primeiros padrões já estão aparecendo. Continue registrando para tornar as
-                comparações mais confiáveis.
+                {getWorkPatternsLimitedMessage()}
               </p>
             ) : null}
 
@@ -559,7 +569,9 @@ export function WorkPatternsSection({
           </>
         ) : (
           <div className="empty-state history-empty-state">
-            <p>Você ainda não tem histórico suficiente para identificar padrões.</p>
+            <p>
+              {getWorkPatternsEmptyStateMessage()}
+            </p>
             <a className="button button-primary" href="#hoje">
               Registrar meu dia
             </a>

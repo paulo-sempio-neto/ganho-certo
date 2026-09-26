@@ -158,6 +158,14 @@ function hasPreviousComparisonData(history: FinancialHistoryResponse): boolean {
   ].some((value) => value !== null && Number(value) !== 0);
 }
 
+export function getHistoryComparisonUnavailableMessage(): string {
+  return "Voce ja tem registros neste periodo. A comparacao fica disponivel quando houver dados no periodo anterior tambem.";
+}
+
+export function getHistoryEmptyStateMessage(): string {
+  return "Ainda nao ha dados suficientes neste periodo para acompanhar sua evolucao. Registre mais dias para comparar periodos.";
+}
+
 function getComparisonDirectionLabel(comparison: FinancialHistoryMetricComparison): string {
   if (comparison.absolute_delta === null || Number(comparison.absolute_delta) === 0) {
     return "sem mudança";
@@ -369,8 +377,7 @@ export function HistoricalPerformanceSection({
                   <h3>Como vocÃª estÃ¡ em relaÃ§Ã£o ao perÃ­odo anterior?</h3>
                   {!hasPreviousComparisonData(history) ? (
                     <p className="subtle-note">
-                      Continue registrando seus dias para comparar sua evoluÃ§Ã£o com perÃ­odos
-                      anteriores.
+                      {getHistoryComparisonUnavailableMessage()}
                     </p>
                   ) : null}
                 </div>
@@ -513,7 +520,7 @@ export function HistoricalPerformanceSection({
           </>
         ) : (
           <div className="empty-state history-empty-state">
-            <p>VocÃª ainda nÃ£o tem dados suficientes para acompanhar sua evoluÃ§Ã£o.</p>
+            <p>{getHistoryEmptyStateMessage()}</p>
             <a className="button button-primary" href="#quick-start">
               Registrar meu dia
             </a>

@@ -7,8 +7,34 @@ type InsightsPanelProps = {
   onRetry: () => void;
 };
 
+const insightPriority: Record<string, number> = {
+  gross_revenue_change: 10,
+  net_result_change: 10,
+  net_per_hour_change: 10,
+  weekly_performance_summary: 20,
+  activity_consistency: 30,
+  net_per_hour: 40,
+  net_per_km: 40,
+  best_weekday: 40,
+  best_day: 40,
+  expense_share: 50,
+  top_expense_category: 50,
+};
+
+function prioritizeInsights(insights: FinancialInsight[]): FinancialInsight[] {
+  return insights
+    .map((insight, index) => ({ insight, index }))
+    .sort(
+      (left, right) =>
+        (insightPriority[left.insight.code] ?? 100) -
+          (insightPriority[right.insight.code] ?? 100) ||
+        left.index - right.index,
+    )
+    .map(({ insight }) => insight);
+}
+
 export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsPanelProps) {
-  const visibleInsights = insights.slice(0, 6);
+  const visibleInsights = prioritizeInsights(insights).slice(0, 6);
 
   return (
     <div className="financial-insights" id="insights">

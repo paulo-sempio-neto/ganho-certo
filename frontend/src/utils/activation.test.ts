@@ -7,8 +7,6 @@ describe("getBetaActivationNextStep", () => {
     const step = getBetaActivationNextStep({
       vehicleCount: 0,
       workSessionCount: 0,
-      expenseCount: 0,
-      hasQuickDailyResult: false,
     });
 
     expect(step).toEqual({
@@ -24,34 +22,31 @@ describe("getBetaActivationNextStep", () => {
     const step = getBetaActivationNextStep({
       vehicleCount: 1,
       workSessionCount: 0,
-      expenseCount: 0,
-      hasQuickDailyResult: false,
     });
 
     expect(step?.title).toBe("Registre seu primeiro dia");
     expect(step?.targetId).toBe("hoje");
   });
 
-  it("asks for the first expense after a saved work day", () => {
+  it("explains that another workday enables comparisons", () => {
     const step = getBetaActivationNextStep({
       vehicleCount: 1,
       workSessionCount: 1,
-      expenseCount: 0,
-      hasQuickDailyResult: true,
     });
 
-    expect(step?.title).toBe("Inclua o primeiro gasto");
-    expect(step?.actionLabel).toBe("Adicionar gasto");
+    expect(step?.title).toBe("Registre mais um dia para comparar");
+    expect(step?.message).toContain("outro registro");
+    expect(step?.actionLabel).toBe("Registrar outro dia");
   });
 
-  it("does not interrupt an activated existing user", () => {
+  it("encourages trend review after multiple saved workdays", () => {
     const step = getBetaActivationNextStep({
       vehicleCount: 1,
       workSessionCount: 3,
-      expenseCount: 2,
-      hasQuickDailyResult: false,
     });
 
-    expect(step).toBeNull();
+    expect(step?.title).toBe("Revise suas tendencias");
+    expect(step?.actionLabel).toBe("Ver tendencias");
+    expect(step?.targetId).toBe("resultado");
   });
 });

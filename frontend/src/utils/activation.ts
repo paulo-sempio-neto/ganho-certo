@@ -8,15 +8,11 @@ export type BetaActivationNextStep = {
 export type BetaActivationState = {
   vehicleCount: number;
   workSessionCount: number;
-  expenseCount: number;
-  hasQuickDailyResult: boolean;
 };
 
 export function getBetaActivationNextStep({
   vehicleCount,
   workSessionCount,
-  expenseCount,
-  hasQuickDailyResult,
 }: BetaActivationState): BetaActivationNextStep | null {
   if (vehicleCount === 0) {
     return {
@@ -37,21 +33,23 @@ export function getBetaActivationNextStep({
     };
   }
 
-  if (expenseCount === 0) {
+  if (workSessionCount === 1) {
     return {
-      title: "Inclua o primeiro gasto",
-      message: "Combustivel, recarga ou manutencao deixam a sobra do dia mais fiel.",
-      actionLabel: "Adicionar gasto",
+      title: "Registre mais um dia para comparar",
+      message:
+        "Com outro registro, voce podera comparar seus resultados e entender melhor sua evolucao.",
+      actionLabel: "Registrar outro dia",
       targetId: "hoje",
     };
   }
 
-  if (!hasQuickDailyResult && workSessionCount < 3) {
+  if (workSessionCount > 1) {
     return {
-      title: "Continue por mais alguns dias",
-      message: "Com mais registros, o historico e os padroes de trabalho ficam mais uteis.",
-      actionLabel: "Registrar outro dia",
-      targetId: "hoje",
+      title: "Revise suas tendencias",
+      message:
+        "Voce ja tem varios dias salvos. Revise o Resultado para acompanhar sua evolucao e seus padroes.",
+      actionLabel: "Ver tendencias",
+      targetId: "resultado",
     };
   }
 

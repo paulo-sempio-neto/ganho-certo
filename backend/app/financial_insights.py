@@ -391,24 +391,6 @@ def get_financial_insights(
     )
     insights: list[FinancialInsight] = []
 
-    add_activity_consistency_insight(insights, summary, start_date, end_date)
-    add_weekly_performance_summary(insights, summary, start_date, end_date)
-    add_best_weekday_insight(insights, summary)
-    add_expense_share_insight(insights, summary)
-    add_net_per_hour_insight(insights, summary)
-    add_net_per_km_insight(insights, summary)
-    add_top_expense_category_insight(
-        insights=insights,
-        expenses_by_category=get_expenses_by_category(
-            db=db,
-            user_id=current_user.id,
-            start_date=start_date,
-            end_date=end_date,
-            vehicle_id=vehicle_id,
-        ),
-    )
-    add_best_day_insight(insights, summary)
-
     if start_date is not None and end_date is not None:
         previous_start, previous_end = previous_equivalent_period(start_date, end_date)
         previous_summary = get_financial_summary(
@@ -419,5 +401,23 @@ def get_financial_insights(
             vehicle_id=vehicle_id,
         )
         add_previous_period_comparisons(insights, summary, previous_summary)
+
+    add_weekly_performance_summary(insights, summary, start_date, end_date)
+    add_activity_consistency_insight(insights, summary, start_date, end_date)
+    add_net_per_hour_insight(insights, summary)
+    add_net_per_km_insight(insights, summary)
+    add_best_weekday_insight(insights, summary)
+    add_best_day_insight(insights, summary)
+    add_expense_share_insight(insights, summary)
+    add_top_expense_category_insight(
+        insights=insights,
+        expenses_by_category=get_expenses_by_category(
+            db=db,
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date,
+            vehicle_id=vehicle_id,
+        ),
+    )
 
     return FinancialInsightsResponse(insights=insights)
