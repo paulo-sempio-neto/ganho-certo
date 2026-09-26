@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from fastapi import status
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.models import Feature, Plan, PlanFeature, User
 
@@ -120,20 +120,9 @@ def get_default_plan(db: Session) -> Plan:
 
 
 def get_user_plan(user: User, db: Session) -> Plan:
-    ensure_default_entitlements(db)
-    plan = db.scalar(
-        select(Plan)
-        .where(Plan.id == user.current_plan_id, Plan.active.is_(True))
-        .options(selectinload(Plan.plan_features).selectinload(PlanFeature.feature))
-    )
-    if plan is not None:
-        return plan
+    from app.subscriptions import get_effective_plan
 
-    plan = get_default_plan(db)
-    user.current_plan_id = plan.id
-    db.commit()
-    db.refresh(user)
-    return plan
+    return get_effective_plan(user, db)
 
 
 def get_plan_feature(plan: Plan, feature_code: str) -> PlanFeature | None:

@@ -106,10 +106,19 @@ class AccountPlanPublic(BaseModel):
     code: PlanCode
 
 
+class AccountSubscriptionPublic(BaseModel):
+    status: str
+    provider: str
+    period_start: datetime | None = None
+    period_end: datetime | None = None
+    canceled_at: datetime | None = None
+
+
 class AccountPlanResponse(BaseModel):
     current_plan: AccountPlanPublic
     features: dict[str, bool]
     limits: dict[str, int]
+    subscription: AccountSubscriptionPublic | None = None
 
 
 class PasswordChangeRequest(BaseModel):

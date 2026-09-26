@@ -13,6 +13,7 @@ from app.models import (  # noqa: F401
     Plan,
     PlanFeature,
     RecurringExpense,
+    Subscription,
     User,
     Vehicle,
     WorkSession,

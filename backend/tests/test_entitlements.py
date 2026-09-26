@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -18,7 +18,12 @@ from app.entitlements import (
     has_feature_access,
 )
 from app.main import app
-from app.models import Feature, Plan, User
+from app.models import Feature, Plan, Subscription, User
+from app.subscriptions import (
+    get_active_subscription,
+    get_effective_plan,
+    has_active_subscription,
+)
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -81,6 +86,7 @@ def test_account_plan_defaults_to_free(client: TestClient, db_session: Session) 
         "financial_insights": True,
     }
     assert body["limits"] == {"vehicle_limit": 1}
+    assert body["subscription"] is None
     assert user is not None
     assert user.current_plan_id == body["current_plan"]["id"]
 
@@ -110,6 +116,125 @@ def test_feature_access_and_limits_use_plan_features(
     assert response.json()["current_plan"]["code"] == "pro"
     assert response.json()["features"]["csv_import"] is True
     assert "vehicle_limit" not in response.json()["limits"]
+    assert response.json()["subscription"] is None
+
+
+def test_active_subscription_becomes_effective_plan(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, email="assinante@email.com")
+    user = db_session.scalar(select(User).where(User.email == "assinante@email.com"))
+    pro_plan = db_session.scalar(select(Plan).where(Plan.code == "pro"))
+    assert user is not None
+    assert pro_plan is not None
+    now = datetime.now(UTC)
+    subscription = Subscription(
+        user_id=user.id,
+        plan_id=pro_plan.id,
+        status="active",
+        provider="internal",
+        external_subscription_id=None,
+        started_at=now,
+        current_period_start=now,
+        current_period_end=now + timedelta(days=30),
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add(subscription)
+    db_session.commit()
+
+    effective_plan = get_effective_plan(user, db_session)
+    response = client.get("/account/plan", headers=auth_headers(token))
+
+    assert effective_plan.code == "pro"
+    assert has_active_subscription(user, db_session)
+    assert has_feature_access(user, "csv_import", db_session)
+    assert response.status_code == 200
+    assert response.json()["current_plan"]["code"] == "pro"
+    assert response.json()["subscription"]["status"] == "active"
+    assert response.json()["subscription"]["provider"] == "internal"
+    assert response.json()["subscription"]["period_end"] is not None
+
+
+def test_canceled_subscription_does_not_override_current_plan(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    token = register_and_login(client, email="cancelado@email.com")
+    user = db_session.scalar(select(User).where(User.email == "cancelado@email.com"))
+    pro_plan = db_session.scalar(select(Plan).where(Plan.code == "pro"))
+    assert user is not None
+    assert pro_plan is not None
+    now = datetime.now(UTC)
+    db_session.add(
+        Subscription(
+            user_id=user.id,
+            plan_id=pro_plan.id,
+            status="canceled",
+            provider="internal",
+            external_subscription_id=None,
+            started_at=now - timedelta(days=30),
+            current_period_start=now - timedelta(days=30),
+            current_period_end=now + timedelta(days=1),
+            canceled_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    db_session.commit()
+
+    response = client.get("/account/plan", headers=auth_headers(token))
+
+    assert get_active_subscription(user, db_session) is None
+    assert get_effective_plan(user, db_session).code == "free"
+    assert not has_active_subscription(user, db_session)
+    assert not has_feature_access(user, "csv_import", db_session)
+    assert response.status_code == 200
+    assert response.json()["current_plan"]["code"] == "free"
+    assert response.json()["subscription"] is None
+
+
+def test_subscription_effective_plan_is_isolated_between_users(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    user_a_token = register_and_login(client, email="assinante-a@email.com")
+    user_b_token = register_and_login(client, email="assinante-b@email.com")
+    user_a = db_session.scalar(select(User).where(User.email == "assinante-a@email.com"))
+    user_b = db_session.scalar(select(User).where(User.email == "assinante-b@email.com"))
+    pro_plan = db_session.scalar(select(Plan).where(Plan.code == "pro"))
+    assert user_a is not None
+    assert user_b is not None
+    assert pro_plan is not None
+    now = datetime.now(UTC)
+    db_session.add(
+        Subscription(
+            user_id=user_a.id,
+            plan_id=pro_plan.id,
+            status="trialing",
+            provider="internal",
+            external_subscription_id=None,
+            started_at=now,
+            current_period_start=now,
+            current_period_end=None,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    db_session.commit()
+
+    user_a_response = client.get("/account/plan", headers=auth_headers(user_a_token))
+    user_b_response = client.get("/account/plan", headers=auth_headers(user_b_token))
+
+    assert user_a_response.status_code == 200
+    assert user_b_response.status_code == 200
+    assert user_a_response.json()["current_plan"]["code"] == "pro"
+    assert user_a_response.json()["subscription"]["status"] == "trialing"
+    assert user_b_response.json()["current_plan"]["code"] == "free"
+    assert user_b_response.json()["subscription"] is None
+    assert get_effective_plan(user_a, db_session).code == "pro"
+    assert get_effective_plan(user_b, db_session).code == "free"
 
 
 def test_account_plan_is_isolated_between_users(
@@ -130,6 +255,7 @@ def test_account_plan_is_isolated_between_users(
 
     assert paulo_response.status_code == 200
     assert ana_response.status_code == 200
+    assert {"current_plan", "features", "limits", "subscription"} <= set(paulo_response.json())
     assert paulo_response.json()["current_plan"]["code"] == "free"
     assert ana_response.json()["current_plan"]["code"] == "pro"
 

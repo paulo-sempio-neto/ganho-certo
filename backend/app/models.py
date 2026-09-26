@@ -40,6 +40,7 @@ class User(Base):
         nullable=False,
     )
     current_plan: Mapped[Plan | None] = relationship(back_populates="users")
+    subscriptions: Mapped[list[Subscription]] = relationship(back_populates="user")
     password_reset_tokens: Mapped[list[PasswordResetToken]] = relationship(back_populates="user")
     vehicles: Mapped[list[Vehicle]] = relationship(back_populates="user")
     work_sessions: Mapped[list[WorkSession]] = relationship(back_populates="user")
@@ -62,6 +63,7 @@ class Plan(Base):
         nullable=False,
     )
     users: Mapped[list[User]] = relationship(back_populates="current_plan")
+    subscriptions: Mapped[list[Subscription]] = relationship(back_populates="plan")
     plan_features: Mapped[list[PlanFeature]] = relationship(
         back_populates="plan",
         cascade="all, delete-orphan",
@@ -104,6 +106,61 @@ class PlanFeature(Base):
     )
     plan: Mapped[Plan] = relationship(back_populates="plan_features")
     feature: Mapped[Feature] = relationship(back_populates="plan_features")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index(
+            "ix_subscriptions_user_status_period",
+            "user_id",
+            "status",
+            "current_period_end",
+        ),
+        Index(
+            "ix_subscriptions_provider_external",
+            "provider",
+            "external_subscription_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    external_subscription_id: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+        index=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    current_period_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
+    canceled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
+    )
+    user: Mapped[User] = relationship(back_populates="subscriptions")
+    plan: Mapped[Plan] = relationship(back_populates="subscriptions")
 
 
 class PasswordResetToken(Base):
