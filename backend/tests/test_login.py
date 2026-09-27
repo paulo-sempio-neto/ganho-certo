@@ -105,16 +105,24 @@ def test_me_with_valid_token(client: TestClient) -> None:
     assert "password_hash" not in response.json()
 
 
-def test_me_without_token_returns_401(client: TestClient) -> None:
-    response = client.get("/auth/me")
+@pytest.mark.parametrize("authorization", [None, "Basic invalid", "Bearer"])
+def test_me_without_bearer_credentials_returns_401(
+    client: TestClient, authorization: str | None,
+) -> None:
+    headers = {"Authorization": authorization} if authorization is not None else {}
+    response = client.get("/auth/me", headers=headers)
 
     assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+    assert response.headers["WWW-Authenticate"] == "Bearer"
 
 
 def test_me_with_invalid_token_returns_401(client: TestClient) -> None:
     response = client.get("/auth/me", headers={"Authorization": "Bearer invalid-token"})
 
     assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid credentials."
+    assert response.headers["WWW-Authenticate"] == "Bearer"
 
 
 def test_login_and_me_responses_do_not_expose_password_hash(client: TestClient) -> None:

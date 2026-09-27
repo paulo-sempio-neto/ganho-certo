@@ -44,6 +44,15 @@ def test_production_app_enables_public_api_docs(environment: str) -> None:
     assert "post" in openapi_response.json()["paths"]["/auth/login"]
     assert health_response.status_code == 200
 
+    schema = openapi_response.json()
+    assert schema["components"]["securitySchemes"] == {
+        "HTTPBearer": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
+    }
+    assert schema["paths"]["/auth/me"]["get"]["security"] == [{"HTTPBearer": []}]
+    login = schema["paths"]["/auth/login"]["post"]
+    assert "security" not in login
+    assert "application/json" in login["requestBody"]["content"]
+
 
 @pytest.mark.parametrize(
     "jwt_secret",
