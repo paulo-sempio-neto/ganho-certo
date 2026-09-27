@@ -162,6 +162,10 @@ export function getHistoryComparisonUnavailableMessage(): string {
   return "Voce ja tem registros neste periodo. A comparacao fica disponivel quando houver dados no periodo anterior tambem.";
 }
 
+export function getHistoryComparisonScopeMessage(): string {
+  return "A comparacao descreve registros de periodos equivalentes; ela nao aponta a causa de uma mudanca.";
+}
+
 export function getHistoryEmptyStateMessage(): string {
   return "Ainda nao ha dados suficientes neste periodo para acompanhar sua evolucao. Registre mais dias para comparar periodos.";
 }
@@ -375,6 +379,7 @@ export function HistoricalPerformanceSection({
               <div className="list-header">
                 <div>
                   <h3>Como vocÃª estÃ¡ em relaÃ§Ã£o ao perÃ­odo anterior?</h3>
+                  <p className="subtle-note">{getHistoryComparisonScopeMessage()}</p>
                   {!hasPreviousComparisonData(history) ? (
                     <p className="subtle-note">
                       {getHistoryComparisonUnavailableMessage()}

@@ -33,13 +33,32 @@ function prioritizeInsights(insights: FinancialInsight[]): FinancialInsight[] {
     .map(({ insight }) => insight);
 }
 
+function getInsightDataLabel(code: string): string | null {
+  if (code === "expense_share" || code === "top_expense_category") {
+    return "Despesas registradas";
+  }
+
+  if (
+    code === "gross_revenue_change" ||
+    code === "net_result_change" ||
+    code === "net_per_hour_change"
+  ) {
+    return "Comparacao entre periodos";
+  }
+
+  return "Dados registrados";
+}
+
 export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsPanelProps) {
   const visibleInsights = prioritizeInsights(insights).slice(0, 6);
 
   return (
     <div className="financial-insights" id="insights">
       <div className="list-header">
-        <h3>Insights do seu periodo</h3>
+        <div>
+          <h3>Insights do seu periodo</h3>
+          <p className="subtle-note">Resumo descritivo dos dados registrados neste periodo.</p>
+        </div>
       </div>
 
       {isLoading ? <p className="empty-state compact-empty-state">Carregando insights...</p> : null}
@@ -61,6 +80,11 @@ export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsP
                 key={insight.code}
               >
                 <strong>{insight.title}</strong>
+                {getInsightDataLabel(insight.code) ? (
+                  <span className="financial-insight-label">
+                    {getInsightDataLabel(insight.code)}
+                  </span>
+                ) : null}
                 <p>{insight.message}</p>
               </article>
             ))}

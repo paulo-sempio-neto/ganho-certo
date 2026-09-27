@@ -73,6 +73,9 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("Sobra no caixa: faturamento menos despesas registradas.");
     expect(html).toContain("Resultado apos custos estruturais estimados do veiculo.");
     expect(html).toContain("Estimado mais despesas recorrentes previstas para o periodo.");
+    expect(html).toContain("Desempenho registrado");
+    expect(html).toContain("Sobra no caixa dividida pelas horas registradas.");
+    expect(html).toContain("Custos estruturais estimados");
     expect(html.indexOf("Realizado")).toBeLessThan(html.indexOf("Estimado"));
     expect(html.indexOf("Estimado")).toBeLessThan(html.indexOf("Projetado"));
   });

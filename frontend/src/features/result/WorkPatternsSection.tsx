@@ -177,6 +177,10 @@ export function getWorkPatternsLimitedMessage(): string {
   return "Estes sao dados iniciais. Continue registrando para tornar as comparacoes mais confiaveis.";
 }
 
+export function getWorkPatternsPerformanceScopeMessage(): string {
+  return "Estas metricas descrevem seus registros. Com poucos dias, a comparacao por dia da semana fica limitada.";
+}
+
 export function getWorkPatternsEmptyStateMessage(): string {
   return "Ainda nao ha jornadas neste periodo para identificar padroes. Registre mais dias e esta area mostrara comparacoes por dia da semana.";
 }
@@ -292,6 +296,7 @@ export function WorkPatternsSection({
           Veja em quais dias seus resultados costumam ser melhores com base no seu próprio
           histórico.
         </p>
+        <p className="subtle-note">{getWorkPatternsPerformanceScopeMessage()}</p>
       </div>
 
       <div className="dashboard-filters history-filters pattern-filters">
@@ -387,9 +392,9 @@ export function WorkPatternsSection({
 
             <div className="metric-grid pattern-summary-grid">
               <article className="metric-card">
-                <span>Dias trabalhados</span>
+                <span>Dias ativos</span>
                 <strong>{patterns.overall.active_days}</strong>
-                <small>No período selecionado</small>
+                <small>Dias com jornada registrada no período.</small>
               </article>
               <article className="metric-card">
                 <span>Horas trabalhadas</span>
@@ -509,7 +514,7 @@ export function WorkPatternsSection({
                   </div>
                   <dl>
                     <div>
-                      <dt>Resultado/dia ativo</dt>
+                      <dt>Resultado médio por dia ativo</dt>
                       <dd>{formatNullableMoney(weekday.average_estimated_result_per_active_day)}</dd>
                     </div>
                     <div>

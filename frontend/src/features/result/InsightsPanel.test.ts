@@ -65,6 +65,8 @@ describe("InsightsPanel", () => {
     expect(html).toContain("Resumo semanal");
     expect(html).toContain("Dia da semana em destaque");
     expect(html).toContain("Maior categoria de despesa");
+    expect(html).toContain("Dados registrados");
+    expect(html).toContain("Despesas registradas");
     expect(html).not.toContain("Insight oculto");
   });
 

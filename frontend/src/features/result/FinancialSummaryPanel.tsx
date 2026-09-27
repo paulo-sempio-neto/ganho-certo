@@ -218,7 +218,13 @@ export function FinancialSummaryPanel({
 
       <div className="structural-breakdown">
         <div className="list-header">
-          <h3>Para onde seu dinheiro esta indo?</h3>
+          <div>
+            <h3>Custos estruturais estimados</h3>
+            <p className="subtle-note">
+              Estimativas baseadas nos custos do veiculo configurados. Elas nao representam,
+              necessariamente, despesas pagas neste periodo.
+            </p>
+          </div>
         </div>
 
         {getStructuralCostItems(summary).length === 0 ? (
@@ -244,41 +250,57 @@ export function FinancialSummaryPanel({
         )}
       </div>
 
+      <div className="list-header">
+        <div>
+          <h3>Desempenho registrado</h3>
+          <p className="subtle-note">
+            Estas metricas descrevem os registros deste periodo e nao indicam a causa de uma
+            mudanca.
+          </p>
+        </div>
+      </div>
+
       <div className="metric-grid">
         <article className="metric-card">
-          <span>Ganho bruto por hora</span>
+          <span>Resultado bruto por hora</span>
           <strong>{getMetricValue(summary.gross_per_hour, formatMoney)}</strong>
+          <small>Faturamento dividido pelas horas registradas.</small>
         </article>
         <article className="metric-card">
-          <span>Ganho líquido por hora</span>
+          <span>Resultado apos despesas por hora</span>
           <strong>{getMetricValue(summary.net_per_hour, formatMoney)}</strong>
+          <small>Sobra no caixa dividida pelas horas registradas.</small>
         </article>
         <article className="metric-card">
-          <span>Ganho bruto por km</span>
+          <span>Resultado bruto por km</span>
           <strong>{getMetricValue(summary.gross_per_km, formatMoney)}</strong>
+          <small>Faturamento dividido pelos km registrados.</small>
         </article>
         <article className="metric-card">
-          <span>Ganho líquido por km</span>
+          <span>Resultado apos despesas por km</span>
           <strong>{getMetricValue(summary.net_per_km, formatMoney)}</strong>
+          <small>Sobra no caixa dividida pelos km registrados.</small>
         </article>
         <article className="metric-card">
-          <span>Custo por km</span>
+          <span>Custo registrado por km</span>
           <strong>{getMetricValue(summary.expense_per_km, formatMoney)}</strong>
+          <small>Despesas registradas divididas pelos km.</small>
         </article>
         <article className="metric-card">
           <span>Ticket médio</span>
           <strong>{getMetricValue(summary.average_ticket, formatMoney)}</strong>
+          <small>Faturamento dividido pelas corridas registradas.</small>
         </article>
         <article className="metric-card">
-          <span>Total de corridas</span>
+          <span>Corridas registradas</span>
           <strong>{summary.total_trip_count}</strong>
         </article>
         <article className="metric-card">
-          <span>Horas trabalhadas</span>
+          <span>Horas registradas</span>
           <strong>{formatWorkTime(summary.total_worked_minutes)}</strong>
         </article>
         <article className="metric-card">
-          <span>Km rodados</span>
+          <span>Km registrados</span>
           <strong>{formatDistance(summary.total_distance_km)} km</strong>
         </article>
       </div>
