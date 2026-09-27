@@ -18,7 +18,9 @@ Current deployment-relevant files:
   possible.
 - `frontend/.env.example`: local example for `VITE_API_BASE_URL`.
 - `render.yaml`: Render Blueprint for the backend service, including the
-  Alembic pre-deploy migration command.
+  startup command that runs Alembic before the server.
+- `backend/scripts/render-start.sh`: Render Free startup script that runs
+  migrations and then starts the FastAPI server.
 - `backend/pyproject.toml`: Python package and runtime dependencies.
 - `backend/app/server.py`: production entrypoint for `python -m app.server`.
 - `backend/alembic.ini` and `backend/alembic/env.py`: Alembic migration setup.
@@ -83,17 +85,18 @@ python -m pip install -e .
 4. Set the start command:
 
 ```bash
-python -m app.server
+bash scripts/render-start.sh
 ```
 
-5. Set the pre-deploy command so migrations run before the app starts:
+This script runs the migration and only starts the server if it succeeds:
 
 ```bash
 alembic upgrade head
+python -m app.server
 ```
 
-6. Use Render's host-provided `PORT`. Do not hardcode a port.
-7. Use a paid always-on service for real users, especially if Mercado Pago
+5. Use Render's host-provided `PORT`. Do not hardcode a port.
+6. Use a paid always-on service for real users, especially if Mercado Pago
    webhooks are enabled.
 
 ### Step 3: Configure Render environment variables

@@ -2,12 +2,11 @@
 # Keep secrets in Render, not in this file.
 services:
   - type: web
-    name: ganhocerto-backend
+    name: ganho-certo-api
     runtime: python
     rootDir: backend
     buildCommand: python -m pip install -e .
-    preDeployCommand: alembic upgrade head
-    startCommand: python -m app.server
+    startCommand: bash scripts/render-start.sh
     healthCheckPath: /ready
     autoDeployTrigger: commit
     envVars:

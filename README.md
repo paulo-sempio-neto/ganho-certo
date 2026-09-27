@@ -165,22 +165,21 @@ Build command:
 python -m pip install -e .
 ```
 
-Pre-deploy command (disponivel em servicos pagos):
-
-```bash
-alembic upgrade head
-```
-
 Start command:
 
 ```bash
+bash scripts/render-start.sh
+```
+
+O script versionado `backend/scripts/render-start.sh` executa:
+
+```bash
+alembic upgrade head
 python -m app.server
 ```
 
-Sem Pre-deploy, execute as migrations em um ambiente autorizado com acesso ao
-banco antes de publicar. Para um primeiro deploy com uma unica instancia, o
-Start command pode ser `alembic upgrade head && python -m app.server`.
-Nao execute migrations concorrentes em varias instancias.
+No plano Free do Render, onde Pre-Deploy Command nao fica disponivel, mantenha
+esse Start command. O servidor so inicia se o Alembic terminar com sucesso.
 Veja as [etapas de deploy do Render](https://render.com/docs/deploys).
 
 Configure o health check como `/ready`, que testa a conexao com PostgreSQL;
@@ -308,7 +307,7 @@ ou `npm run preview` como servidor de producao. Referencia:
 3. Reserve a URL do frontend na Vercel ou no Render Static Site. Crie um Web
    Service Python ligado ao repositorio e a branch `main`, Root Directory
    `backend`, na mesma regiao do banco. Para o SMTP padrao na porta 587, use
-   instancia paga. Configure os comandos de build, pre-deploy e start acima.
+   instancia paga. Configure os comandos de build e start acima.
 
 4. Cadastre as variaveis de producao listadas acima no Web Service. Copie o host
    real atribuido ao backend para `ALLOWED_HOSTS`, sem `https://`; acrescente os

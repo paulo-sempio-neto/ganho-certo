@@ -121,18 +121,14 @@ Build command:
 python -m pip install -e .
 ```
 
-Migration or release command:
-
-```bash
-alembic upgrade head
-```
-
 Start command:
 
 ```bash
-python -m app.server
+bash scripts/render-start.sh
 ```
 
+The versioned startup script runs `alembic upgrade head` before starting
+`python -m app.server`. The server only starts if the migration succeeds.
 The host should provide `PORT`. The server reads `PORT`/`APP_PORT`,
 `HOST`/`APP_HOST` and `FORWARDED_ALLOW_IPS`.
 

@@ -30,20 +30,16 @@ Build command:
 python -m pip install -e .
 ```
 
-Release or migration command:
-
-```bash
-alembic upgrade head
-```
-
 Start command:
 
 ```bash
-python -m app.server
+bash scripts/render-start.sh
 ```
 
-`python -m app.server` reads `HOST`/`APP_HOST`, `PORT`/`APP_PORT`,
-`FORWARDED_ALLOW_IPS`, disables Uvicorn access logs, and enables proxy headers.
+The startup script runs `alembic upgrade head` and then `python -m app.server`.
+The server starts only if the migration succeeds. `python -m app.server` reads
+`HOST`/`APP_HOST`, `PORT`/`APP_PORT`, `FORWARDED_ALLOW_IPS`, disables Uvicorn
+access logs, and enables proxy headers.
 On Render-like hosts, keep using the host-provided `PORT`.
 
 ## Backend environment variables
