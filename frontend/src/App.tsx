@@ -23,6 +23,14 @@ import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
 import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
 import {
+  getGoalCurrentValueLabel,
+  getGoalProgressScopeMessage,
+  getGoalProgressStatusMessage,
+  getGoalRequiredPaceMessage,
+  getGoalUpdatedAfterWorkMessage,
+  getMatchingNetGoal,
+} from "./features/goals/goalMessages";
+import {
   VehiclesSection,
   type VehiclesSectionHandle,
 } from "./features/vehicles/VehiclesSection";
@@ -1310,9 +1318,10 @@ function App() {
       vehicle_id: String(vehicle.id),
     });
     setQuickDailyEntryShowDate(false);
-    setSuccessMessage("Dia registrado. Veja a sobra apos gastos abaixo.");
     await loadWorkSessions();
+    await loadFinancialGoals();
     await refreshDashboardData();
+    setSuccessMessage(getGoalUpdatedAfterWorkMessage(financialGoals.some((goal) => goal.active)));
     requestAnimationFrame(() =>
       document.getElementById("hoje")?.scrollIntoView({ behavior: "smooth" }),
     );
@@ -1395,6 +1404,7 @@ function App() {
       setDailyExpenseForm(emptyExpenseForm);
       setSuccessMessage("Gasto de hoje adicionado com sucesso.");
       await loadExpenses();
+      await loadFinancialGoals();
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1467,6 +1477,7 @@ function App() {
     setPendingQuickStartAction(null);
     setSuccessMessage("Seu primeiro dia foi registrado com os dados da simulação.");
     await loadWorkSessions();
+    await loadFinancialGoals();
     await loadExpenses();
     await refreshDashboardData();
     document.getElementById("mais")?.scrollIntoView({ behavior: "smooth" });
@@ -1566,6 +1577,7 @@ function App() {
 
       resetWorkSessionForm();
       await loadWorkSessions();
+      await loadFinancialGoals();
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1594,6 +1606,7 @@ function App() {
       });
       setSuccessMessage("Jornada excluida com sucesso.");
       await loadWorkSessions();
+      await loadFinancialGoals();
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1647,6 +1660,7 @@ function App() {
 
       resetExpenseForm();
       await loadExpenses();
+      await loadFinancialGoals();
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1672,6 +1686,7 @@ function App() {
       await deleteExpense(getAuthHeaders(), expense.id);
       setSuccessMessage("Despesa excluida com sucesso.");
       await loadExpenses();
+      await loadFinancialGoals();
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1735,6 +1750,7 @@ function App() {
 
       resetRecurringExpenseForm();
       await loadRecurringExpenses();
+      await loadFinancialGoals();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1769,6 +1785,7 @@ function App() {
           : "Despesa recorrente ativada.",
       );
       await loadRecurringExpenses();
+      await loadFinancialGoals();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1795,6 +1812,7 @@ function App() {
       await deleteRecurringExpense(getAuthHeaders(), recurringExpense.id);
       setSuccessMessage("Despesa recorrente excluida com sucesso.");
       await loadRecurringExpenses();
+      await loadFinancialGoals();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2111,6 +2129,16 @@ function App() {
   const quickDailyRemainingCents = quickDailyEntryResult
     ? quickDailyEntryResult.grossRevenueCents - quickDailyExpenseTotalCents
     : 0n;
+  const quickDailyGoal = quickDailyEntryResult
+    ? getMatchingNetGoal(
+        financialGoals,
+        quickDailyEntryResult.workDate,
+        quickDailyEntryResult.vehicle.id,
+      )
+    : null;
+  const quickDailyGoalProgress = quickDailyGoal
+    ? financialGoalProgressById[quickDailyGoal.id]
+    : null;
   const maintenanceAlert = getPrimaryMaintenanceAlert();
   const shouldShowCostPrecisionPrompt =
     vehicles.length > 0 &&
@@ -2560,6 +2588,14 @@ function App() {
                       <strong>{formatCents(quickDailyRemainingCents)}</strong>
                     </article>
                   </div>
+
+                  {quickDailyGoal && quickDailyGoalProgress ? (
+                    <p className="subtle-note">
+                      Meta do periodo: {formatMoney(quickDailyGoalProgress.current_amount)} de{" "}
+                      {formatMoney(quickDailyGoal.target_amount)} em sobra registrada ate agora.{" "}
+                      <a href="#metas">Ver progresso da meta</a>
+                    </p>
+                  ) : null}
 
                   {quickDailyExpenseTotalCents === 0n ? (
                     <div className="action-prompt">
@@ -3038,10 +3074,11 @@ function App() {
             <section className="manager-section" id="metas">
               <div className="section-title">
                 <p className="eyebrow">Metas</p>
-                <h3>Metas inteligentes</h3>
+                <h3>Metas financeiras</h3>
                 <p className="subtle-note">
-                  Acompanhe quanto falta, o ritmo necessario e uma estimativa simples de esforco
-                  para chegar ao seu objetivo.
+                  Acompanhe o valor registrado, quanto falta e o ritmo necessario dentro do
+                  periodo da meta. Ritmo e fechamento sao referencias baseadas nos registros, nao
+                  garantias.
                 </p>
               </div>
 
@@ -3228,16 +3265,22 @@ function App() {
 
                           {progress ? (
                             <div className="goal-progress-panel">
+                              <p className="subtle-note">{getGoalProgressScopeMessage()}</p>
                               <div className="goal-progress-main">
-                                <span>{isReached ? "Status" : "Faltam"}</span>
+                                <span>{isReached ? "Status" : "Valor restante"}</span>
                                 <strong>
                                   {isReached ? "Meta atingida" : formatMoney(progress.remaining_amount)}
                                 </strong>
-                                {!isReached ? (
+                                {!isReached && progress.days_remaining > 0 ? (
                                   <small>
-                                    Voce precisa de aproximadamente{" "}
+                                    Ritmo necessario: aproximadamente{" "}
                                     {formatMoney(progress.required_daily_amount)} por dia ate{" "}
                                     {formatDate(goal.end_date)}.
+                                  </small>
+                                ) : null}
+                                {!isReached ? (
+                                  <small>
+                                    {getGoalRequiredPaceMessage(progress.days_remaining, isReached)}
                                   </small>
                                 ) : null}
                                 {!isReached && progress.estimated_hours_remaining ? (
@@ -3252,16 +3295,16 @@ function App() {
                                 <i style={{ width: getProgressWidth(progress.progress_percentage) }} />
                               </div>
                               <p className="goal-progress-status">
-                                {progress.estimated_hours_remaining === null && averagePerHour == null
-                                  ? "Ainda nao ha dados suficientes para estimar seu ritmo."
-                                  : progress.on_track
-                                    ? "Voce esta no ritmo necessario para esta meta."
-                                    : "Seu ritmo atual esta abaixo do necessario para esta meta."}
+                                {getGoalProgressStatusMessage(
+                                  isReached,
+                                  progress.estimated_hours_remaining !== null && averagePerHour != null,
+                                  progress.on_track,
+                                )}
                               </p>
 
                               <dl className="session-metrics goal-metrics">
                                 <div>
-                                  <dt>Valor atual</dt>
+                                  <dt>{getGoalCurrentValueLabel(goal.goal_type)}</dt>
                                   <dd>{formatMoney(progress.current_amount)}</dd>
                                 </div>
                                 <div>
@@ -3269,20 +3312,38 @@ function App() {
                                   <dd>{formatPercent(progress.progress_percentage)}</dd>
                                 </div>
                                 <div>
+                                  <dt>Dias decorridos</dt>
+                                  <dd>
+                                    {progress.days_elapsed} de {progress.days_total}
+                                  </dd>
+                                </div>
+                                <div>
                                   <dt>Dias restantes</dt>
                                   <dd>{progress.days_remaining}</dd>
                                 </div>
                                 <div>
-                                  <dt>Ritmo por dia</dt>
-                                  <dd>{isReached ? "—" : formatMoney(progress.required_daily_amount)}</dd>
+                                  <dt>Ritmo necessario por dia</dt>
+                                  <dd>
+                                    {isReached || progress.days_remaining === 0
+                                      ? "—"
+                                      : formatMoney(progress.required_daily_amount)}
+                                  </dd>
                                 </div>
                                 <div>
-                                  <dt>Horas restantes</dt>
+                                  <dt>Ritmo atual por hora</dt>
+                                  <dd>{averagePerHour ? formatMoney(averagePerHour) : "Dados insuficientes"}</dd>
+                                </div>
+                                <div>
+                                  <dt>Horas estimadas restantes</dt>
                                   <dd>{isReached ? "—" : formatHours(progress.estimated_hours_remaining)}</dd>
                                 </div>
                                 <div>
-                                  <dt>Projecao de fechamento</dt>
-                                  <dd>{formatMoney(progress.projected_completion_amount)}</dd>
+                                  <dt>Fechamento estimado</dt>
+                                  <dd>
+                                    {progress.days_elapsed > 0
+                                      ? formatMoney(progress.projected_completion_amount)
+                                      : "Dados insuficientes"}
+                                  </dd>
                                 </div>
                               </dl>
                             </div>

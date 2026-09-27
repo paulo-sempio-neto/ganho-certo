@@ -241,6 +241,9 @@ def test_goal_isolation_between_users(client: TestClient) -> None:
     goal_id = create_goal(client, user_b_token)
 
     get_response = client.get(f"/financial-goals/{goal_id}", headers=auth_headers(user_a_token))
+    progress_response = client.get(
+        f"/financial-goals/{goal_id}/progress", headers=auth_headers(user_a_token)
+    )
     update_response = client.put(
         f"/financial-goals/{goal_id}",
         json=goal_payload(),
@@ -252,6 +255,7 @@ def test_goal_isolation_between_users(client: TestClient) -> None:
     )
 
     assert get_response.status_code == 404
+    assert progress_response.status_code == 404
     assert update_response.status_code == 404
     assert delete_response.status_code == 404
 
