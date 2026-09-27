@@ -3,6 +3,7 @@ import {
   forwardRef,
   type FormEvent,
   useImperativeHandle,
+  useRef,
   useState,
 } from "react";
 
@@ -157,6 +158,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
     const [isVehicleSaving, setIsVehicleSaving] = useState(false);
     const [isCostProfileLoading, setIsCostProfileLoading] = useState(false);
     const [isCostProfileSaving, setIsCostProfileSaving] = useState(false);
+    const vehicleSubmitInFlightRef = useRef(false);
 
     const selectedCostProfileVehicle =
       vehicles.find((vehicle) => vehicle.id === costProfileVehicleId) ?? null;
@@ -225,6 +227,11 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
 
     async function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
       event.preventDefault();
+      if (vehicleSubmitInFlightRef.current) {
+        return;
+      }
+
+      vehicleSubmitInFlightRef.current = true;
       setIsVehicleSaving(true);
       setMessage("");
       setSuccessMessage("");
@@ -259,6 +266,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
           setMessage(error instanceof Error ? error.message : "Erro ao salvar veiculo.");
         }
       } finally {
+        vehicleSubmitInFlightRef.current = false;
         setIsVehicleSaving(false);
       }
     }

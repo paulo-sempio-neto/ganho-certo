@@ -186,6 +186,15 @@ type QuickDailyEntryResult = {
   workDate: string;
 };
 
+type SubmitLockKey =
+  | "auth"
+  | "feedback"
+  | "quickDailyEntry"
+  | "dailyExpense"
+  | "quickStartRegister"
+  | "workSession"
+  | "expense";
+
 function getResetPasswordTokenFromUrl(): string {
   if (window.location.pathname !== RESET_PASSWORD_PATH) {
     return "";
@@ -504,6 +513,20 @@ function App() {
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
   const [isBillingCheckoutLoading, setIsBillingCheckoutLoading] = useState(false);
   const [isFeedbackSaving, setIsFeedbackSaving] = useState(false);
+  const submitLocksRef = useRef<Partial<Record<SubmitLockKey, boolean>>>({});
+
+  function beginSubmitLock(key: SubmitLockKey): boolean {
+    if (submitLocksRef.current[key]) {
+      return false;
+    }
+
+    submitLocksRef.current[key] = true;
+    return true;
+  }
+
+  function releaseSubmitLock(key: SubmitLockKey) {
+    submitLocksRef.current[key] = false;
+  }
 
   function endSession(nextMessage = "") {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -729,6 +752,9 @@ function App() {
     if (!token) {
       return;
     }
+    if (!beginSubmitLock("feedback")) {
+      return;
+    }
 
     setIsFeedbackSaving(true);
     setMessage("");
@@ -750,6 +776,7 @@ function App() {
       }
     } finally {
       setIsFeedbackSaving(false);
+      releaseSubmitLock("feedback");
     }
   }
 
@@ -1174,6 +1201,10 @@ function App() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!beginSubmitLock("auth")) {
+      return;
+    }
+
     setIsLoading(true);
     setMessage("");
     setSuccessMessage("");
@@ -1188,6 +1219,7 @@ function App() {
       setMessage(error instanceof Error ? error.message : "Erro inesperado.");
     } finally {
       setIsLoading(false);
+      releaseSubmitLock("auth");
     }
   }
 
@@ -1328,6 +1360,10 @@ function App() {
 
   async function handleQuickDailyEntrySubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!beginSubmitLock("quickDailyEntry")) {
+      return;
+    }
+
     setIsQuickDailyEntrySaving(true);
     setMessage("");
     setSuccessMessage("");
@@ -1354,6 +1390,7 @@ function App() {
       }
     } finally {
       setIsQuickDailyEntrySaving(false);
+      releaseSubmitLock("quickDailyEntry");
     }
   }
 
@@ -1384,6 +1421,10 @@ function App() {
 
   async function handleDailyExpenseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!beginSubmitLock("dailyExpense")) {
+      return;
+    }
+
     setIsDailyExpenseSaving(true);
     setMessage("");
     setSuccessMessage("");
@@ -1415,6 +1456,7 @@ function App() {
       }
     } finally {
       setIsDailyExpenseSaving(false);
+      releaseSubmitLock("dailyExpense");
     }
   }
 
@@ -1488,11 +1530,15 @@ function App() {
     if (!quickStartResult) {
       return;
     }
+    if (!beginSubmitLock("quickStartRegister")) {
+      return;
+    }
 
     setMessage("");
     setSuccessMessage("");
     if (!vehicles[0]) {
       setPendingQuickStartAction("register");
+      releaseSubmitLock("quickStartRegister");
       setMessage("Cadastre seu veículo para registrar o dia. Seus dados da simulação foram mantidos.");
       document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
       return;
@@ -1500,7 +1546,9 @@ function App() {
 
     try {
       await registerQuickStartDay(vehicles[0]);
+      releaseSubmitLock("quickStartRegister");
     } catch (error) {
+      releaseSubmitLock("quickStartRegister");
       setMessage(error instanceof Error ? error.message : "Não foi possível registrar o dia.");
     }
   }
@@ -1543,6 +1591,10 @@ function App() {
 
   async function handleWorkSessionSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!beginSubmitLock("workSession")) {
+      return;
+    }
+
     setIsWorkSessionSaving(true);
     setMessage("");
     setSuccessMessage("");
@@ -1586,6 +1638,7 @@ function App() {
       }
     } finally {
       setIsWorkSessionSaving(false);
+      releaseSubmitLock("workSession");
     }
   }
 
@@ -1636,6 +1689,10 @@ function App() {
 
   async function handleExpenseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!beginSubmitLock("expense")) {
+      return;
+    }
+
     setIsExpenseSaving(true);
     setMessage("");
     setSuccessMessage("");
@@ -1669,6 +1726,7 @@ function App() {
       }
     } finally {
       setIsExpenseSaving(false);
+      releaseSubmitLock("expense");
     }
   }
 
