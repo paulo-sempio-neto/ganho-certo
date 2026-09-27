@@ -114,8 +114,13 @@ def test_readiness(healthy: bool, caplog: pytest.LogCaptureFixture) -> None:
     assert "private" not in response.text + caplog.text
 
 
-def test_headers_hosts_and_cors() -> None:
-    with TestClient(create_app(production_settings())) as client:
+@pytest.mark.parametrize("origins", [
+    "https://app.example.com",
+    ' [" https://app.example.com/ ", "https://other.example.com"] ',
+    '"https://app.example.com/, https://other.example.com/"',
+])
+def test_headers_hosts_and_cors(origins: str) -> None:
+    with TestClient(create_app(production_settings(cors_allowed_origins=origins))) as client:
         allowed = client.get("/health", headers={"Origin": "https://app.example.com"})
         denied = client.get("/health", headers={"Origin": "https://attacker.example.com"})
         invalid_host = client.get("/health", headers={"Host": "attacker.example.com"})
@@ -138,12 +143,77 @@ def test_headers_hosts_and_cors() -> None:
         assert response.headers["Permissions-Policy"] == "camera=(), microphone=(), geolocation=()"
 
 
+@pytest.mark.parametrize("variable", ["CORS_ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS"])
+@pytest.mark.parametrize("value", [
+    " https://app.example.com/ , https://other.example.com/ , ",
+    '[" https://app.example.com/ ", "https://other.example.com", "https://app.example.com"]',
+    "'https://app.example.com/,https://other.example.com/'",
+    '\'["https://app.example.com/", "https://other.example.com/"]\'',
+])
+def test_cors_reads_environment_formats(
+    monkeypatch: pytest.MonkeyPatch, variable: str, value: str,
+) -> None:
+    values = production_settings().model_dump(exclude={"cors_allowed_origins"})
+    for name in ("CORS_ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(variable, value)
+
+    settings = Settings(_env_file=None, **values)
+
+    assert settings.cors_origins == ["https://app.example.com", "https://other.example.com"]
+
+
+@pytest.mark.parametrize("environment", ["local", "development", "test", "production", "prod"])
+@pytest.mark.parametrize("value", [None, "", "  ", "[]"])
+def test_empty_cors_defaults_depend_on_environment(
+    monkeypatch: pytest.MonkeyPatch, environment: str, value: str | None,
+) -> None:
+    values = production_settings().model_dump(exclude={"cors_allowed_origins"})
+    values["app_env"] = environment
+    for name in ("CORS_ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS"):
+        monkeypatch.delenv(name, raising=False)
+    if value is not None:
+        monkeypatch.setenv("CORS_ALLOWED_ORIGINS", value)
+
+    settings = Settings(_env_file=None, **values)
+
+    if settings.is_production:
+        assert settings.cors_origins == []
+    else:
+        assert settings.cors_origins == ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def test_production_without_cors_starts_and_denies_cross_origin_requests() -> None:
+    with TestClient(create_app(production_settings(cors_allowed_origins=""))) as client:
+        assert client.get("/health").status_code == 200
+        for origin in ("https://app.example.com", "http://localhost:5173"):
+            response = client.options("/auth/login", headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+            })
+            assert response.status_code == 400
+            assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize("value", [
+    '["https://app.example.com",]', '[123]', '[null]', '[{}]',
+    '["https://app.example.com,https://other.example.com"]',
+    '"https://app.example.com', "https://app.example.com//",
+    "https://app.example.com?", "https://app.example.com#fragment",
+    "https://*.example.com", "<URL publica do frontend>",
+    "http://localhost:5173", '["https://app.example.com", "*"]',
+])
+def test_invalid_cors_is_not_silently_ignored(value: str) -> None:
+    with pytest.raises(ValidationError, match="CORS_ALLOWED_ORIGINS"):
+        production_settings(cors_allowed_origins=value)
+
+
 @pytest.mark.parametrize(("setting", "value"), [
     ("app_env", "prodution"), ("cors_allowed_origins", "*"),
     ("cors_allowed_origins", "https://app.example.com/path"),
     ("cors_allowed_origins", "https://user:password@app.example.com"),
     ("cors_allowed_origins", "https://app.example.com:invalid"),
-    ("cors_allowed_origins", ""), ("cors_allowed_origins", "http://app.example.com"),
+    ("cors_allowed_origins", "http://app.example.com"),
     ("frontend_base_url", "http://localhost:5173"),
     ("database_url", "not-a-url-with-private-secret"),
     ("database_url", "postgresql+psycopg://user:change_me@host/db"),

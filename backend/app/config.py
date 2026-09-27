@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 from functools import lru_cache
 from ipaddress import ip_network
@@ -17,7 +18,7 @@ def valid_origin(value: str, *, production: bool) -> bool:
             parsed.scheme in ({"https"} if production else {"http", "https"})
             and parsed.hostname
             and not any(char.isspace() for char in value)
-            and not any(char in value for char in ("*", "\\", "?", "#"))
+            and not any(char in value for char in ("*", "\\", "?", "#", "'", '"', "<", ">", ","))
             and not parsed.username
             and not parsed.password
             and not parsed.path
@@ -68,7 +69,7 @@ class Settings(BaseSettings):
         validation_alias="AUTH_RATE_LIMIT_MAX_ENTRIES",
     )
     cors_allowed_origins: str = Field(
-        default="http://localhost:5173,http://127.0.0.1:5173",
+        default="",
         validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "BACKEND_CORS_ORIGINS"),
     )
     password_reset_token_expire_minutes: int = Field(
@@ -121,6 +122,41 @@ class Settings(BaseSettings):
     @property
     def trusted_hosts(self) -> list[str]:
         return [host.strip() for host in self.allowed_hosts.split(",") if host.strip()]
+
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def normalize_cors_allowed_origins(cls, value: str) -> str:
+        value = value.strip()
+        # Dashboard values may include quotes copied from a .env file.
+        if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]:
+            value = value[1:-1].strip()
+        if value.startswith("["):
+            try:
+                origins = json.loads(value)
+            except ValueError:
+                raise ValueError(
+                    "CORS_ALLOWED_ORIGINS must be a valid JSON array of strings."
+                ) from None
+            if not isinstance(origins, list) or any(not isinstance(item, str) for item in origins):
+                raise ValueError("CORS_ALLOWED_ORIGINS must be a JSON array of strings.")
+        else:
+            origins = value.split(",")
+
+        normalized = []
+        for origin in origins:
+            origin = origin.strip()
+            if not origin:
+                continue
+            # A root URL denotes the same origin; paths remain invalid.
+            origin = origin.removesuffix("/")
+            if not valid_origin(origin, production=False):
+                raise ValueError(
+                    "CORS_ALLOWED_ORIGINS must contain explicit http(s) origins without paths, "
+                    "queries or wildcards; use comma-separated URLs or a JSON array."
+                )
+            if origin not in normalized:
+                normalized.append(origin)
+        return ",".join(normalized)
 
     @field_validator("app_env")
     @classmethod
@@ -180,6 +216,8 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
+        if not self.cors_allowed_origins and self.app_env in {"local", "development", "test"}:
+            return ["http://localhost:5173", "http://127.0.0.1:5173"]
         return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
 
     @property
@@ -240,10 +278,12 @@ class Settings(BaseSettings):
                     "BILLING_PRO_MONTHLY_AMOUNT must be configured when Mercado Pago is enabled."
                 )
 
-        if not self.cors_origins or any(
+        if any(
             not valid_origin(origin, production=is_production) for origin in self.cors_origins
         ):
-            raise ValueError("CORS_ALLOWED_ORIGINS must contain valid explicit origins.")
+            raise ValueError(
+                "CORS_ALLOWED_ORIGINS must contain explicit HTTPS origins in production."
+            )
 
         if not valid_origin(self.frontend_base_url.rstrip("/"), production=is_production):
             raise ValueError("FRONTEND_BASE_URL must be a valid frontend origin.")
