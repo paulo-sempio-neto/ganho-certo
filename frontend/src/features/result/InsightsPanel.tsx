@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import type { FinancialInsight } from "../../types/financial";
 
 type InsightsPanelProps = {
@@ -61,10 +62,10 @@ export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsP
         </div>
       </div>
 
-      {isLoading ? <p className="empty-state compact-empty-state">Carregando insights...</p> : null}
+      {isLoading ? <FeedbackMessage kind="loading" compact>Carregando insights...</FeedbackMessage> : null}
       {error ? (
         <div className="history-error">
-          <p className="form-message compact-message">{error}</p>
+          <FeedbackMessage kind="error" compact>{error}</FeedbackMessage>
           <button className="text-button" disabled={isLoading} type="button" onClick={onRetry}>
             Tentar novamente
           </button>

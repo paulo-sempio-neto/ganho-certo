@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { FormEvent, useState } from "react";
 
 import { resetPassword } from "../../api/auth";
@@ -89,8 +90,8 @@ export function ResetPasswordForm({
         />
       </label>
 
-      {message ? <p className="form-message">{message}</p> : null}
-      {successMessage ? <p className="success-message">{successMessage}</p> : null}
+      {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
+      {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
 
       {successMessage ? (
         <button className="button" type="button" onClick={() => onBackToLogin(successMessage)}>

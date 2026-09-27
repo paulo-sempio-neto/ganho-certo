@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { useEffect, useRef } from "react";
 import type {
   DashboardPeriod,
@@ -174,10 +175,10 @@ export function ResultSection({
         </label>
       </div>
 
-      {isSummaryLoading ? <p className="empty-state">Carregando dashboard...</p> : null}
+      {isSummaryLoading ? <FeedbackMessage kind="loading">Carregando dashboard...</FeedbackMessage> : null}
       {summaryError ? (
         <div className="history-error">
-          <p className="form-message compact-message">{summaryError}</p>
+          <FeedbackMessage kind="error" compact>{summaryError}</FeedbackMessage>
           <button
             className="text-button"
             disabled={isSummaryLoading}

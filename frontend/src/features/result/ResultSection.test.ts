@@ -1,10 +1,10 @@
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { ResultSection } from "./ResultSection";
 
-function renderResultSection(): string {
+function renderResultSection(overrides: Partial<ComponentProps<typeof ResultSection>> = {}): string {
   return renderToStaticMarkup(
     createElement(ResultSection, {
       vehicles: [],
@@ -46,11 +46,25 @@ function renderResultSection(): string {
       endSession: vi.fn(),
       getVehicleLabel: () => "Carro",
       getExpenseCategoryLabel: () => "Combustivel",
+      ...overrides,
     }),
   );
 }
 
 describe("ResultSection", () => {
+  it("announces loading separately from an empty result", () => {
+    const html = renderResultSection({ isSummaryLoading: true });
+    expect(html).toContain('class="loading-state" role="status"');
+    expect(html).not.toContain("Ainda nao ha dados");
+  });
+
+  it("announces a failure and keeps retry available", () => {
+    const html = renderResultSection({ summaryError: "Falha temporaria" });
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Falha temporaria");
+    expect(html).toContain("Tentar novamente");
+  });
+
   it("renders the history navigation label with correct accents", () => {
     expect(renderResultSection()).toContain('<a href="#evolucao">Evolu\u00e7\u00e3o</a>');
   });

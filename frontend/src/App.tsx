@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "./components/FeedbackMessage";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { getAccountPlan, type AccountPlanResponse } from "./api/account";
@@ -2158,7 +2159,7 @@ function App() {
         <p className="subtitle">Descubra quanto você realmente ganha dirigindo.</p>
       </section>
 
-      <section className={user ? "auth-panel vehicle-panel" : "auth-panel"} aria-live="polite">
+      <section className={user ? "auth-panel vehicle-panel" : "auth-panel"}>
         {user ? (
           <div className="session">
             <div className="session-header">
@@ -2271,8 +2272,8 @@ function App() {
               </details>
             </div>
 
-            {message ? <p className="form-message">{message}</p> : null}
-            {successMessage ? <p className="success-message">{successMessage}</p> : null}
+            {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
+            {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
 
             <nav className="dashboard-nav" aria-label="Navegacao principal">
               <a href="#hoje">Hoje</a>
@@ -3226,7 +3227,7 @@ function App() {
                     </button>
                   </div>
 
-                  {isFinancialGoalsLoading ? <p className="empty-state">Carregando metas...</p> : null}
+                  {isFinancialGoalsLoading ? <FeedbackMessage kind="loading">Carregando metas...</FeedbackMessage> : null}
 
                   {!isFinancialGoalsLoading && financialGoals.length === 0 ? (
                     <p className="empty-state">
@@ -3348,7 +3349,7 @@ function App() {
                               </dl>
                             </div>
                           ) : (
-                            <p className="empty-state compact-empty-state">Carregando progresso...</p>
+                            <FeedbackMessage kind="loading" compact>Carregando progresso...</FeedbackMessage>
                           )}
 
                           <dl className="session-metrics goal-summary-metrics">
@@ -3400,7 +3401,7 @@ function App() {
             </section>
 
             {workSessions.length > 0 ? (
-              <Suspense fallback={<p className="empty-state">Carregando resultado...</p>}>
+              <Suspense fallback={<FeedbackMessage kind="loading">Carregando resultado...</FeedbackMessage>}>
                 <ResultSection
                   vehicles={vehicles}
                   dashboardFilters={{
@@ -3445,7 +3446,7 @@ function App() {
               </Suspense>
             ) : null}
             <section className="manager-section" id="mais">
-              <Suspense fallback={<p className="empty-state">Carregando importacao...</p>}>
+              <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
                 <CsvImportSection
                   type="work_sessions"
                   token={token}
@@ -3635,7 +3636,7 @@ function App() {
                   </div>
 
                   {isWorkSessionsLoading ? (
-                    <p className="empty-state">Carregando jornadas...</p>
+                    <FeedbackMessage kind="loading">Carregando jornadas...</FeedbackMessage>
                   ) : null}
 
                   {!isWorkSessionsLoading && vehicles.length === 0 ? (
@@ -3697,7 +3698,7 @@ function App() {
             </section>
 
             <section className="manager-section" id="custos">
-              <Suspense fallback={<p className="empty-state">Carregando importacao...</p>}>
+              <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
                 <CsvImportSection
                   type="expenses"
                   token={token}
@@ -3847,7 +3848,7 @@ function App() {
                     </button>
                   </div>
 
-                  {isExpensesLoading ? <p className="empty-state">Carregando despesas...</p> : null}
+                  {isExpensesLoading ? <FeedbackMessage kind="loading">Carregando despesas...</FeedbackMessage> : null}
 
                   {!isExpensesLoading && expenses.length === 0 ? (
                     <p className="empty-state">
@@ -4106,7 +4107,7 @@ function App() {
                   </div>
 
                   {isRecurringExpensesLoading ? (
-                    <p className="empty-state">Carregando despesas recorrentes...</p>
+                    <FeedbackMessage kind="loading">Carregando despesas recorrentes...</FeedbackMessage>
                   ) : null}
 
                   {!isRecurringExpensesLoading && recurringExpenses.length === 0 ? (
@@ -4374,7 +4375,7 @@ function App() {
                   </div>
 
                   {isMaintenanceLoading ? (
-                    <p className="empty-state">Carregando manutencoes...</p>
+                    <FeedbackMessage kind="loading">Carregando manutencoes...</FeedbackMessage>
                   ) : null}
 
                   {!isMaintenanceLoading && maintenancePlans.length === 0 ? (
@@ -4618,9 +4619,10 @@ function App() {
             ) : (
               <>
                 {mode === "forgot-password" ? null : (
-                  <div className="tabs" role="tablist" aria-label="Autenticacao">
+                  <div className="tabs" role="group" aria-label="Autenticacao">
                     <button
                       className={mode === "login" ? "tab tab-active" : "tab"}
+                      aria-pressed={mode === "login"}
                       type="button"
                       onClick={() => resetForm("login")}
                     >
@@ -4628,6 +4630,7 @@ function App() {
                     </button>
                     <button
                       className={mode === "register" ? "tab tab-active" : "tab"}
+                      aria-pressed={mode === "register"}
                       type="button"
                       onClick={() => resetForm("register")}
                     >
@@ -4681,8 +4684,8 @@ function App() {
                       />
                     </label>
 
-                    {message ? <p className="form-message">{message}</p> : null}
-                    {successMessage ? <p className="success-message">{successMessage}</p> : null}
+                    {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
+                    {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
 
                     <button className="button" disabled={isLoading} type="submit">
                       {isLoading ? "Enviando..." : mode === "login" ? "Entrar" : "Cadastrar"}

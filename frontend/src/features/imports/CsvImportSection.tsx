@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { ChangeEvent, DragEvent, useEffect, useState } from "react";
 
 import {
@@ -951,9 +952,9 @@ export function CsvImportSection({
                 ) : null}
 
                 {matchedWorkSessionImportProfile ? (
-                  <p className="form-message compact-message">
+                  <FeedbackMessage kind="info" compact>
                     Configuracao aplicada: {matchedWorkSessionImportProfile.name}.
-                  </p>
+                  </FeedbackMessage>
                 ) : null}
 
                 {workSessionImportColumns.length && !isWorkSessionImportMappingVisible ? (
@@ -1030,7 +1031,7 @@ export function CsvImportSection({
                 </div>
 
                 {workSessionImportError ? (
-                  <p className="form-message compact-message">{workSessionImportError}</p>
+                  <FeedbackMessage kind="error" compact>{workSessionImportError}</FeedbackMessage>
                 ) : null}
 
                 {workSessionImportPreview ? (
@@ -1321,12 +1322,12 @@ export function CsvImportSection({
           ) : null}
 
           {matchedExpenseImportProfile ? (
-            <p className="form-message compact-message">
+            <FeedbackMessage kind="info" compact>
               Configuracao aplicada: {matchedExpenseImportProfile.name}.{" "}
               <button className="text-button" type="button" onClick={handleIgnoreExpenseImportProfile}>
                 Ignorar
               </button>
-            </p>
+            </FeedbackMessage>
           ) : null}
 
           {expenseImportColumns.length && !isExpenseImportMappingVisible ? (
@@ -1398,7 +1399,7 @@ export function CsvImportSection({
           </div>
 
           {expenseImportError ? (
-            <p className="form-message compact-message">{expenseImportError}</p>
+            <FeedbackMessage kind="error" compact>{expenseImportError}</FeedbackMessage>
           ) : null}
 
           {expenseImportPreview ? (

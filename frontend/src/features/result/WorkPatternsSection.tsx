@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { useEffect, useState } from "react";
 
 import { getWorkPatterns } from "../../api/financial";
@@ -355,12 +356,12 @@ export function WorkPatternsSection({
       </div>
 
       {isLoading ? (
-        <p className="empty-state compact-empty-state">Carregando padrões...</p>
+        <FeedbackMessage kind="loading" compact>Carregando padrões...</FeedbackMessage>
       ) : null}
 
       {error ? (
         <div className="history-error">
-          <p className="form-message compact-message">{error}</p>
+          <FeedbackMessage kind="error" compact>{error}</FeedbackMessage>
           <button className="text-button" type="button" onClick={() => void loadPatterns()}>
             Tentar novamente
           </button>

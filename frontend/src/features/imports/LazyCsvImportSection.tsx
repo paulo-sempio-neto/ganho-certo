@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { lazy, Suspense, useState } from "react";
 
 import type { CsvImportSectionProps } from "./CsvImportSection";
@@ -28,7 +29,7 @@ export function LazyCsvImportSection(props: CsvImportSectionProps) {
         </button>
       </div>
       {hasOpened ? (
-        <Suspense fallback={isVisible ? <p className="empty-state">Carregando importacao...</p> : null}>
+        <Suspense fallback={isVisible ? <FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage> : null}>
           <CsvImportSection {...props} isVisible={isVisible} />
         </Suspense>
       ) : null}

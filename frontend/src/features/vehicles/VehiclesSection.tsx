@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import {
   forwardRef,
   type FormEvent,
@@ -461,7 +462,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
               </button>
             </div>
 
-            {isVehiclesLoading ? <p className="empty-state">Carregando veiculos...</p> : null}
+            {isVehiclesLoading ? <FeedbackMessage kind="loading">Carregando veiculos...</FeedbackMessage> : null}
 
             {!isVehiclesLoading && vehicles.length === 0 ? (
               <p className="empty-state">
@@ -522,7 +523,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
             </div>
 
             {isCostProfileLoading ? (
-              <p className="empty-state">Carregando perfil de custos...</p>
+              <FeedbackMessage kind="loading">Carregando perfil de custos...</FeedbackMessage>
             ) : null}
 
             <fieldset className="form-group" disabled={isCostProfileLoading}>

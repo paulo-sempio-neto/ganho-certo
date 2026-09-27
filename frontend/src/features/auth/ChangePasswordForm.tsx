@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { FormEvent, useState } from "react";
 
 import { changePassword } from "../../api/auth";
@@ -91,7 +92,7 @@ export function ChangePasswordForm({
         />
       </label>
 
-      {message ? <p className="form-message">{message}</p> : null}
+      {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
 
       <div className="form-actions">
         <button className="button" disabled={isLoading} type="submit">

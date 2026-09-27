@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import type { AccountPlanResponse } from "../../api/account";
 
 type AccountPlanPanelProps = {
@@ -113,7 +114,7 @@ export function AccountPlanPanel({
     : null;
 
   return (
-    <section className="account-plan-panel" aria-live="polite">
+    <section className="account-plan-panel">
       <div className="account-plan-header">
         <div>
           <p className="eyebrow">Meu Plano</p>
@@ -126,11 +127,11 @@ export function AccountPlanPanel({
         ) : null}
       </div>
 
-      {isLoading ? <p className="empty-state compact-empty-state">Carregando plano...</p> : null}
+      {isLoading ? <FeedbackMessage kind="loading" compact>Carregando plano...</FeedbackMessage> : null}
 
       {error ? (
         <div className="history-error">
-          <p className="form-message compact-message">{error}</p>
+          <FeedbackMessage kind="error" compact>{error}</FeedbackMessage>
           <button className="text-button" type="button" onClick={onRetry}>
             Tentar novamente
           </button>
@@ -200,9 +201,9 @@ export function AccountPlanPanel({
           ) : null}
 
           {billingMessage ? (
-            <p className="success-message compact-message">{billingMessage}</p>
+            <FeedbackMessage kind="success" compact>{billingMessage}</FeedbackMessage>
           ) : null}
-          {billingError ? <p className="form-message compact-message">{billingError}</p> : null}
+          {billingError ? <FeedbackMessage kind="error" compact>{billingError}</FeedbackMessage> : null}
         </>
       ) : null}
     </section>

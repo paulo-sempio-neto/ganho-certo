@@ -70,6 +70,12 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("Realizado");
     expect(html).toContain("Estimado");
     expect(html).toContain("Projetado");
+    expect(html).toContain('data-result-kind="realized"');
+    expect(html).toContain('data-result-kind="estimated"');
+    expect(html).toContain('data-result-kind="projected"');
+    expect(html).toContain("R$ 120,00");
+    expect(html).toContain("R$ 80,00");
+    expect(html).toContain("R$ 70,00");
     expect(html).toContain("Sobra no caixa: faturamento menos despesas registradas.");
     expect(html).toContain("Resultado apos custos estruturais estimados do veiculo.");
     expect(html).toContain("Estimado mais despesas recorrentes previstas para o periodo.");
@@ -78,6 +84,17 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("Custos estruturais estimados");
     expect(html.indexOf("Realizado")).toBeLessThan(html.indexOf("Estimado"));
     expect(html.indexOf("Estimado")).toBeLessThan(html.indexOf("Projetado"));
+  });
+
+  it("keeps negative amounts distinct from the certainty of a result", () => {
+    const html = renderToStaticMarkup(createElement(FinancialSummaryPanel, {
+      summary: { ...emptySummary, estimated_economic_result: "-40.00" },
+      getExpenseCategoryLabel: () => "Combustivel",
+    }));
+
+    expect(html).toContain('class="metric-card metric-negative" data-result-kind="estimated"');
+    expect(html).toContain("R$ -40,00");
+    expect(html).toContain("Estimado");
   });
 
   it("explains which missing inputs limit estimated and projected results", () => {

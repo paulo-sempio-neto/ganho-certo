@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { FormEvent, useState } from "react";
 
 import { forgotPassword } from "../../api/auth";
@@ -48,8 +49,8 @@ export function ForgotPasswordForm({ initialEmail, onBackToLogin }: ForgotPasswo
         />
       </label>
 
-      {message ? <p className="form-message">{message}</p> : null}
-      {successMessage ? <p className="success-message">{successMessage}</p> : null}
+      {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
+      {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
 
       <button className="button" disabled={isLoading} type="submit">
         {isLoading ? "Enviando..." : "Enviar instrucoes"}

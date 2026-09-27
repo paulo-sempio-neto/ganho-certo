@@ -1,3 +1,4 @@
+import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { useState } from "react";
 
 import type {
@@ -360,12 +361,12 @@ export function HistoricalPerformanceSection({
       </div>
 
       {isLoading ? (
-        <p className="empty-state compact-empty-state">Carregando evolução...</p>
+        <FeedbackMessage kind="loading" compact>Carregando evolução...</FeedbackMessage>
       ) : null}
 
       {error ? (
         <div className="history-error">
-          <p className="form-message compact-message">{error}</p>
+          <FeedbackMessage kind="error" compact>{error}</FeedbackMessage>
           <button className="text-button" type="button" onClick={onRetry}>
             Tentar novamente
           </button>

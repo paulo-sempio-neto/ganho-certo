@@ -87,17 +87,17 @@ export function FinancialSummaryPanel({
         </div>
 
         <div className="metric-grid result-summary-grid">
-          <article className={getResultCardClass(summary.estimated_net_profit)}>
+          <article className={getResultCardClass(summary.estimated_net_profit)} data-result-kind="realized">
             <span>Realizado</span>
             <strong>{formatMoney(summary.estimated_net_profit)}</strong>
             <small>Sobra no caixa: faturamento menos despesas registradas.</small>
           </article>
-          <article className={getResultCardClass(summary.estimated_economic_result)}>
+          <article className={getResultCardClass(summary.estimated_economic_result)} data-result-kind="estimated">
             <span>Estimado</span>
             <strong>{formatMoney(summary.estimated_economic_result)}</strong>
             <small>Resultado apos custos estruturais estimados do veiculo.</small>
           </article>
-          <article className={getResultCardClass(summary.projected_economic_result)}>
+          <article className={getResultCardClass(summary.projected_economic_result)} data-result-kind="projected">
             <span>Projetado</span>
             <strong>{formatMoney(summary.projected_economic_result)}</strong>
             <small>Estimado mais despesas recorrentes previstas para o periodo.</small>
