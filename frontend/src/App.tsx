@@ -1,4 +1,5 @@
 import { FeedbackMessage } from "./components/FeedbackMessage";
+import { DashboardStart } from "./features/home/DashboardStart";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { getAccountPlan, type AccountPlanResponse } from "./api/account";
@@ -2153,11 +2154,13 @@ function App() {
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
-      <section className="intro" aria-labelledby="page-title">
-        <p className="brand">GanhoCerto</p>
-        <h1 id="page-title">Seu faturamento não é seu lucro.</h1>
-        <p className="subtitle">Descubra quanto você realmente ganha dirigindo.</p>
-      </section>
+      {!user ? (
+        <section className="intro" aria-labelledby="page-title">
+          <p className="brand">GanhoCerto</p>
+          <h1 id="page-title">Seu faturamento não é seu lucro.</h1>
+          <p className="subtitle">Descubra quanto você realmente ganha dirigindo.</p>
+        </section>
+      ) : null}
 
       <section className={user ? "auth-panel vehicle-panel" : "auth-panel"}>
         {user ? (
@@ -2165,9 +2168,7 @@ function App() {
             <div className="session-header">
               <div>
                 <p className="eyebrow">GanhoCerto</p>
-                <h2>
-                  {workSessions.length === 0 ? "Registre seu primeiro dia" : `Ola, ${user.name}.`}
-                </h2>
+                <h1 className="dashboard-greeting">Olá, {user.name}.</h1>
               </div>
               <details className="account-menu" id="mais">
                 <summary>Mais</summary>
@@ -2275,89 +2276,50 @@ function App() {
             {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
             {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
 
-            <nav className="dashboard-nav" aria-label="Navegacao principal">
+            <nav className="dashboard-nav" aria-label="Navegação principal">
               <a href="#hoje">Hoje</a>
-              {workSessions.length > 0 ? <a href="#resultado">Resultado</a> : <a href="#quick-start">Resultado</a>}
+              <a href={workSessions.length > 0 ? "#resultado" : "#primeiro-resultado"}>Resultado</a>
               <a href="#custos">Custos</a>
               <a href="#mais">Mais</a>
             </nav>
 
-            {betaNextStep ? (
-              <div className="action-prompt beta-next-step">
-                <div>
-                  <strong>{betaNextStep.title}</strong>
-                  <p>{betaNextStep.message}</p>
-                </div>
-                <button
-                  className="button button-ghost"
-                  type="button"
-                  onClick={() =>
-                    document.getElementById(betaNextStep.targetId)?.scrollIntoView({
-                      behavior: "smooth",
-                    })
-                  }
-                >
-                  {betaNextStep.actionLabel}
-                </button>
-              </div>
-            ) : null}
+            <DashboardStart
+              nextStep={betaNextStep}
+              hasWorkdays={workSessions.length > 0}
+              isLoading={isVehiclesLoading || isWorkSessionsLoading}
+              onRegister={() => document.getElementById("daily-revenue")?.focus()}
+            />
 
             <section className="daily-entry" id="hoje">
               <div className="section-title">
-                <p className="eyebrow">Registro rapido</p>
-                <h3>Registrar meu dia</h3>
+                <h2>Registro do dia</h2>
                 <p className="subtle-note">
-                  Preencha o essencial e salve sua jornada em poucos segundos.
+                  Preencha os valores do seu trabalho. Os gastos podem ser adicionados depois.
                 </p>
               </div>
 
-              {workSessions.length === 0 ? (
-                <div className="activation-panel">
-                  <h4>
-                    {vehicles.length === 0
-                      ? "Comece pelo registro do dia"
-                      : "Registre seu primeiro dia"}
-                  </h4>
-                  <p>
-                    {vehicles.length === 0
-                      ? "Digite faturamento, km e horas agora. Se faltar o veiculo, mantemos os dados e levamos voce ao cadastro."
-                      : "Salve uma jornada real para ver quanto sobrou depois dos gastos registrados."}
-                  </p>
-                  <div className="quick-action-grid">
-                    <a className="button" href="#hoje">
-                      {vehicles.length === 0 ? "Preencher meu dia" : "Registrar meu dia"}
-                    </a>
-                    {vehicles.length === 0 ? (
-                      <a className="button button-ghost" href="#veiculos">
-                        Cadastrar veiculo
-                      </a>
-                    ) : (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={() => {
-                          setQuickStartVisible(true);
-                          requestAnimationFrame(() =>
-                            document
-                              .getElementById("quick-start")
-                              ?.scrollIntoView({ behavior: "smooth" }),
-                          );
-                        }}
-                      >
-                        Simular sem salvar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="quick-action-grid" aria-label="Ações rápidas de hoje">
-                <a className="button" href="#hoje">
-                  Registrar meu dia
-                </a>
-                <button className="button button-ghost" type="button" onClick={openDailyExpenseShortcut}>
+              <div className="daily-entry-tools" aria-label="Outras ações do dia">
+                <button className="text-button" type="button" onClick={openDailyExpenseShortcut}>
                   Adicionar gasto
                 </button>
+                {workSessions.length === 0 ? (
+                  vehicles.length === 0 ? (
+                    <a href="#veiculos">Cadastrar veículo</a>
+                  ) : (
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() => {
+                        setQuickStartVisible(true);
+                        requestAnimationFrame(() =>
+                          document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
+                        );
+                      }}
+                    >
+                      Simular sem salvar
+                    </button>
+                  )
+                ) : null}
               </div>
 
               {shouldShowCostPrecisionPrompt ? (
@@ -2428,6 +2390,7 @@ function App() {
                 <label>
                   Faturamento
                   <input
+                    id="daily-revenue"
                     inputMode="decimal"
                     onChange={(event) =>
                       setQuickDailyEntryForm({

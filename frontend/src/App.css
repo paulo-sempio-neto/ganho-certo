@@ -92,8 +92,60 @@ textarea {
 }
 
 .page-dashboard {
-  grid-template-columns: minmax(280px, 0.6fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
+  width: min(100%, 1120px);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-6);
+}
+
+.page-dashboard > .auth-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.dashboard-greeting {
+  font-size: var(--text-2xl);
+  line-height: var(--leading-tight);
+}
+
+.dashboard-start {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  align-items: center;
+  gap: var(--space-6);
+  padding-block: var(--space-4) var(--space-6);
+}
+
+.dashboard-start-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.dashboard-result-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-compact);
+  font-weight: var(--weight-semibold);
+}
+
+.daily-entry-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+}
+
+.daily-entry-tools > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-compact);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
 }
 
 .intro {
@@ -2065,6 +2117,34 @@ textarea:focus {
     grid-template-columns: 1fr;
     gap: var(--space-9);
     padding: var(--space-8) var(--space-5);
+  }
+
+  .page.page-dashboard {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .dashboard-start {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    padding-block: var(--space-2) var(--space-4);
+  }
+
+  .page-dashboard .session-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .page-dashboard .account-menu:not([open]) {
+    width: auto;
+  }
+
+  .page-dashboard .dashboard-nav {
+    gap: var(--space-2);
+  }
+
+  .page-dashboard .dashboard-nav a {
+    flex: 1 1 auto;
+    padding-inline: var(--space-3);
   }
 
   .vehicles-layout,
