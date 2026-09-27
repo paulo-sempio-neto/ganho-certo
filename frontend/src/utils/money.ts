@@ -106,7 +106,7 @@ export function parseNonNegativeDecimal(value: string, fieldName: string) {
 
 export function divideAndRound(numerator: bigint, denominator: bigint): bigint {
   if (denominator === 0n) {
-    throw new Error("NÃ£o Ã© possÃ­vel dividir por zero.");
+    throw new Error("Não é possível dividir por zero.");
   }
 
   const isNegative = numerator < 0n !== denominator < 0n;

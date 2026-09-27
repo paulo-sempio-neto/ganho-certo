@@ -117,7 +117,7 @@ export function ResultSection({
         <a href="#resultado">Visão geral</a>
         <a href="#metas">Metas</a>
         <a href="#insights">Insights</a>
-        <a href="#evolucao">EvoluÃ§Ã£o</a>
+        <a href="#evolucao">Evolução</a>
         <a href="#padroes">Padrões</a>
       </div>
 

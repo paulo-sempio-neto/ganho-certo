@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { formatMoney, formatMoneyPerKm, moneyInputToApi, optionalMoneyInputToApi } from "./money";
+import {
+  divideAndRound,
+  formatMoney,
+  formatMoneyPerKm,
+  moneyInputToApi,
+  optionalMoneyInputToApi,
+} from "./money";
 
 describe("money utilities", () => {
+  it("preserves Portuguese accents in the division error", () => {
+    expect(() => divideAndRound(1n, 0n)).toThrow("N\u00e3o \u00e9 poss\u00edvel dividir por zero.");
+  });
+
   it("normalizes common Brazilian and decimal money inputs", () => {
     expect(moneyInputToApi("250.50")).toBe("250.50");
     expect(moneyInputToApi("250,50")).toBe("250.50");

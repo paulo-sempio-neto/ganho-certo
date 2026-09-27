@@ -5,6 +5,7 @@ import {
   formatHours,
   formatPercent,
   formatWorkTime,
+  getImportFieldLabel,
   getProgressWidth,
 } from "./formatters";
 
@@ -15,11 +16,15 @@ describe("formatters", () => {
   });
 
   it("is null and invalid-number safe", () => {
-    expect(formatPercent(null)).not.toContain("NaN");
-    expect(formatHours(null)).not.toContain("Infinity");
+    expect(formatPercent(null)).toBe("\u2014");
+    expect(formatHours(null)).toBe("\u2014");
     expect(getProgressWidth(null)).toBe("0%");
     expect(getProgressWidth("NaN")).toBe("0%");
     expect(getProgressWidth("Infinity")).toBe("0%");
+  });
+
+  it("preserves Portuguese accents in import labels", () => {
+    expect(getImportFieldLabel("header")).toBe("Cabe\u00e7alho");
   });
 
   it("clamps progress width", () => {

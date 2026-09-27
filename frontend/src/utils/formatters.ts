@@ -33,7 +33,7 @@ export function getImportFieldLabel(field: string): string {
     amount: "Valor",
     category: "Categoria",
     description: "Descricao",
-    header: "CabeÃ§alho",
+    header: "Cabeçalho",
     file: "Arquivo",
   };
 
@@ -51,7 +51,7 @@ export function formatDate(value: string): string {
 
 export function formatPercent(value: string | null): string {
   if (value === null) {
-    return "â€”";
+    return "—";
   }
 
   const normalized = value.replace(".", ",");
@@ -73,7 +73,7 @@ export function getProgressWidth(value: string | null): string {
 
 export function formatHours(value: string | null): string {
   if (value === null) {
-    return "â€”";
+    return "—";
   }
 
   return `${value.replace(".", ",")} h`;

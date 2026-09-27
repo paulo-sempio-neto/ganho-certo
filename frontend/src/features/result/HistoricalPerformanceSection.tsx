@@ -283,16 +283,16 @@ export function HistoricalPerformanceSection({
   return (
     <div className="financial-history" id="evolucao">
       <div className="section-title">
-        <p className="eyebrow">EvoluÃ§Ã£o</p>
+        <p className="eyebrow">Evolução</p>
         <h3>Como seu resultado esta mudando?</h3>
         <p className="subtle-note">
-          Veja como seus ganhos e sua eficiÃªncia estÃ£o mudando com o tempo.
+          Veja como seus ganhos e sua eficiência estão mudando com o tempo.
         </p>
       </div>
 
       <div className="dashboard-filters history-filters">
         <label>
-          PerÃ­odo
+          Período
           <select
             onChange={(event) => onPeriodChange(event.target.value as HistoryPeriodPreset)}
             value={period}
@@ -308,7 +308,7 @@ export function HistoricalPerformanceSection({
         {period === "custom" ? (
           <>
             <label>
-              InÃ­cio
+              Início
               <input
                 onChange={(event) => onDateChange("start", event.target.value)}
                 type="date"
@@ -328,9 +328,9 @@ export function HistoricalPerformanceSection({
 
         {vehicles.length > 1 ? (
           <label>
-            VeÃ­culo
+            Veículo
             <select onChange={(event) => onVehicleChange(event.target.value)} value={vehicleId}>
-              <option value="">Todos os veÃ­culos</option>
+              <option value="">Todos os veículos</option>
               {vehicles.map((vehicle) => (
                 <option key={vehicle.id} value={vehicle.id}>
                   {vehicle.name} - {vehicle.brand} {vehicle.model}
@@ -340,7 +340,7 @@ export function HistoricalPerformanceSection({
           </label>
         ) : (
           <p className="history-single-vehicle">
-            {vehicles[0] ? getVehicleLabel(vehicles[0].id) : "Todos os veÃ­culos"}
+            {vehicles[0] ? getVehicleLabel(vehicles[0].id) : "Todos os veículos"}
           </p>
         )}
 
@@ -360,7 +360,7 @@ export function HistoricalPerformanceSection({
       </div>
 
       {isLoading ? (
-        <p className="empty-state compact-empty-state">Carregando evoluÃ§Ã£o...</p>
+        <p className="empty-state compact-empty-state">Carregando evolução...</p>
       ) : null}
 
       {error ? (
@@ -378,7 +378,7 @@ export function HistoricalPerformanceSection({
             <div className="history-comparison">
               <div className="list-header">
                 <div>
-                  <h3>Como vocÃª estÃ¡ em relaÃ§Ã£o ao perÃ­odo anterior?</h3>
+                  <h3>Como você está em relação ao período anterior?</h3>
                   <p className="subtle-note">{getHistoryComparisonScopeMessage()}</p>
                   {!hasPreviousComparisonData(history) ? (
                     <p className="subtle-note">
@@ -416,7 +416,7 @@ export function HistoricalPerformanceSection({
                 <div>
                   <h3>{getHistoryChartMetricLabel(chartMetric)}</h3>
                   <p className="subtle-note">
-                    Uma visÃ£o simples da evoluÃ§Ã£o no perÃ­odo selecionado.
+                    Uma visão simples da evolução no período selecionado.
                   </p>
                   <p className="subtle-note">
                     Faixa: {formatHistoryChartValue(chartMin.toFixed(2), chartMetric)} a{" "}
@@ -424,7 +424,7 @@ export function HistoricalPerformanceSection({
                   </p>
                 </div>
                 <label>
-                  MÃ©trica
+                  Métrica
                   <select
                     onChange={(event) => setChartMetric(event.target.value as HistoryChartMetric)}
                     value={chartMetric}
@@ -438,7 +438,7 @@ export function HistoricalPerformanceSection({
                 </label>
               </div>
 
-              <div className="history-chart" aria-label="GrÃ¡fico de evoluÃ§Ã£o">
+              <div className="history-chart" aria-label="Gráfico de evolução">
                 <svg role="img" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
                   <line
                     className="history-chart-zero"
@@ -473,7 +473,7 @@ export function HistoricalPerformanceSection({
             </div>
 
             <details className="calculation-details history-details">
-              <summary>Ver detalhes por perÃ­odo</summary>
+              <summary>Ver detalhes por período</summary>
               <div className="history-period-list">
                 {history.periods.map((historyPeriod) => (
                   <article

@@ -3906,7 +3906,7 @@ function App() {
                 <p className="eyebrow">Despesas recorrentes</p>
                 <h3>Custos que se repetem</h3>
                 <p className="subtle-note">
-                  Cadastre custos que se repetem para nÃ£o precisar informÃ¡-los novamente todos os meses.
+                  Cadastre custos que se repetem para não precisar informá-los novamente todos os meses.
                 </p>
                 <p className="subtle-note">
                   Despesas recorrentes entram nas projeções do GanhoCerto, mas não são registradas
@@ -3945,7 +3945,7 @@ function App() {
                     </label>
 
                     <label>
-                      FrequÃªncia
+                      Frequência
                       <select
                         name="recurring-expense-frequency"
                         onChange={(event) =>
@@ -3986,7 +3986,7 @@ function App() {
                     </label>
 
                     <label>
-                      VeÃ­culo
+                      Veículo
                       <select
                         name="recurring-expense-vehicle"
                         onChange={(event) =>
@@ -3997,7 +3997,7 @@ function App() {
                         }
                         value={recurringExpenseForm.vehicle_id}
                       >
-                        <option value="">Todos / sem veÃ­culo especÃ­fico</option>
+                        <option value="">Todos / sem veículo específico</option>
                         {vehicles.map((vehicle) => (
                           <option key={vehicle.id} value={vehicle.id}>
                             {vehicle.name} - {vehicle.brand} {vehicle.model}
@@ -4009,7 +4009,7 @@ function App() {
 
                   <div className="form-grid">
                     <label>
-                      Data de inÃ­cio
+                      Data de início
                       <input
                         name="recurring-expense-start-date"
                         onChange={(event) =>
@@ -4025,7 +4025,7 @@ function App() {
                     </label>
 
                     <label>
-                      Data de tÃ©rmino <span className="optional-label">(opcional)</span>
+                      Data de término <span className="optional-label">(opcional)</span>
                       <input
                         name="recurring-expense-end-date"
                         onChange={(event) =>
@@ -4041,7 +4041,7 @@ function App() {
                   </div>
 
                   <label>
-                    DescriÃ§Ã£o <span className="optional-label">(opcional)</span>
+                    Descrição <span className="optional-label">(opcional)</span>
                     <input
                       maxLength={255}
                       name="recurring-expense-description"
@@ -4077,8 +4077,8 @@ function App() {
                       {isRecurringExpenseSaving
                         ? "Salvando..."
                         : editingRecurringExpenseId
-                          ? "Salvar recorrÃªncia"
-                          : "Cadastrar recorrÃªncia"}
+                          ? "Salvar recorrência"
+                          : "Cadastrar recorrência"}
                     </button>
                     {editingRecurringExpenseId ? (
                       <button
@@ -4094,7 +4094,7 @@ function App() {
 
                 <div className="vehicles-list" aria-busy={isRecurringExpensesLoading}>
                   <div className="list-header">
-                    <h3>Minhas recorrÃªncias</h3>
+                    <h3>Minhas recorrências</h3>
                     <button
                       className="text-button"
                       disabled={isRecurringExpensesLoading}
@@ -4111,7 +4111,7 @@ function App() {
 
                   {!isRecurringExpensesLoading && recurringExpenses.length === 0 ? (
                     <p className="empty-state">
-                      Nenhuma despesa recorrente cadastrada ainda. Use esta Ã¡rea para guardar
+                      Nenhuma despesa recorrente cadastrada ainda. Use esta área para guardar
                       custos fixos ou frequentes.
                     </p>
                   ) : null}
@@ -4134,24 +4134,24 @@ function App() {
                         <p>{formatMoney(recurringExpense.amount)}</p>
                         <dl className="session-metrics recurring-metrics">
                           <div>
-                            <dt>FrequÃªncia</dt>
+                            <dt>Frequência</dt>
                             <dd>{getRecurringFrequencyLabel(recurringExpense.frequency)}</dd>
                           </div>
                           <div>
-                            <dt>VeÃ­culo</dt>
+                            <dt>Veículo</dt>
                             <dd>
                               {recurringExpense.vehicle_id
                                 ? getVehicleLabel(recurringExpense.vehicle_id)
-                                : "Todos / sem veÃ­culo"}
+                                : "Todos / sem veículo"}
                             </dd>
                           </div>
                           <div>
-                            <dt>PerÃ­odo</dt>
+                            <dt>Período</dt>
                             <dd>
-                              {formatDate(recurringExpense.start_date)} atÃ©{" "}
+                              {formatDate(recurringExpense.start_date)} até{" "}
                               {recurringExpense.end_date
                                 ? formatDate(recurringExpense.end_date)
-                                : "sem tÃ©rmino"}
+                                : "sem término"}
                             </dd>
                           </div>
                         </dl>

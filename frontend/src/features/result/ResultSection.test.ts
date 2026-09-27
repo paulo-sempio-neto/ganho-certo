@@ -51,6 +51,10 @@ function renderResultSection(): string {
 }
 
 describe("ResultSection", () => {
+  it("renders the history navigation label with correct accents", () => {
+    expect(renderResultSection()).toContain('<a href="#evolucao">Evolu\u00e7\u00e3o</a>');
+  });
+
   it("renders a clear empty state when the dashboard has no summary yet", () => {
     const html = renderResultSection();
 
