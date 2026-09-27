@@ -309,20 +309,21 @@ class Settings(BaseSettings):
                 raise ValueError("DATABASE_URL must configure a production PostgreSQL database.")
             if self.allowed_hosts == "localhost,127.0.0.1,testserver":
                 raise ValueError("ALLOWED_HOSTS must be configured in production.")
-            if not self.smtp_host or not self.smtp_from_email or not self.smtp_use_tls:
-                raise ValueError(
-                    "Production password recovery requires SMTP_HOST, SMTP_FROM_EMAIL and TLS."
-                )
-            if bool(self.smtp_username) != bool(self.smtp_password):
-                raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together.")
+            if any((self.smtp_host, self.smtp_from_email, self.smtp_username, self.smtp_password)):
+                if not self.smtp_host or not self.smtp_from_email or not self.smtp_use_tls:
+                    raise ValueError(
+                        "Configured SMTP requires SMTP_HOST, SMTP_FROM_EMAIL and TLS in production."
+                    )
+                if bool(self.smtp_username) != bool(self.smtp_password):
+                    raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together.")
+                if not valid_origin(f"https://{self.smtp_host}", production=True):
+                    raise ValueError("SMTP_HOST must be a valid hostname.")
+                try:
+                    TypeAdapter(EmailStr).validate_python(self.smtp_from_email)
+                except ValueError:
+                    raise ValueError("SMTP_FROM_EMAIL must be a valid email address.") from None
             if self.beta_admin_token is not None and len(self.beta_admin_token) < 32:
                 raise ValueError("BETA_ADMIN_TOKEN must have at least 32 characters.")
-            if not valid_origin(f"https://{self.smtp_host}", production=True):
-                raise ValueError("SMTP_HOST must be a valid hostname.")
-            try:
-                TypeAdapter(EmailStr).validate_python(self.smtp_from_email)
-            except ValueError:
-                raise ValueError("SMTP_FROM_EMAIL must be a valid email address.") from None
 
         return self
 

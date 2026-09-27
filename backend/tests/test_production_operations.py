@@ -230,6 +230,31 @@ def test_unsafe_production_config_fails_without_secrets(setting: str, value: Any
     assert "abcdefghijklmnopqrstuvwxyz" not in str(error.value)
 
 
+@pytest.mark.parametrize("value", [None, ""])
+def test_production_starts_without_smtp(value: str | None) -> None:
+    settings = production_settings(
+        smtp_host=value, smtp_from_email=value, smtp_username=value, smtp_password=value,
+    )
+    with TestClient(create_app(settings)) as client:
+        assert client.get("/health").status_code == 200
+
+
+@pytest.mark.parametrize("overrides", [
+    {"smtp_host": "smtp.example.com"},
+    {"smtp_from_email": "support@example.com"},
+    {"smtp_username": "user", "smtp_password": "private-secret"},
+    {"smtp_host": "smtp.example.com", "smtp_from_email": "support@example.com",
+     "smtp_use_tls": False},
+])
+def test_partial_or_insecure_smtp_still_rejected(overrides: dict[str, Any]) -> None:
+    values: dict[str, Any] = {
+        "smtp_host": None, "smtp_from_email": None, "smtp_username": None, "smtp_password": None,
+    }
+    values.update(overrides)
+    with pytest.raises(ValidationError, match="SMTP"):
+        production_settings(**values)
+
+
 def test_request_size_limit_counts_streamed_bytes() -> None:
     async def run() -> None:
         reached = False

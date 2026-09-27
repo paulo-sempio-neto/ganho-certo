@@ -1,6 +1,7 @@
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -107,6 +108,72 @@ def request_password_reset(client: TestClient, email: str = "paulo@email.com") -
     response = client.post("/auth/forgot-password", json={"email": email})
     assert response.status_code == 200
     assert response.json()["message"] == PUBLIC_RESET_MESSAGE
+
+
+@pytest.fixture
+def production_settings() -> Settings:
+    return Settings(
+        _env_file=None,
+        app_env="production", jwt_secret_key=STRONG_SECRET,
+        database_url="postgresql+psycopg://example:example@db.example.com/app",
+        frontend_base_url="https://app.example.com", allowed_hosts="testserver",
+        cors_allowed_origins="", billing_provider="none",
+        smtp_host=None, smtp_from_email=None, smtp_username=None, smtp_password=None,
+        auth_register_rate_limit=100,
+    )
+
+
+def test_production_without_smtp_disables_reset_requests_without_creating_tokens(
+    db_session: Session, production_settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smtp = MagicMock()
+    monkeypatch.setattr("app.email.smtplib.SMTP", smtp)
+    with make_client(production_settings, db_session) as client:
+        register_user(client)
+        for email in ("paulo@email.com", "unknown@email.com"):
+            response = client.post("/auth/forgot-password", json={"email": email})
+            assert response.status_code == 503
+            assert response.json() == {"detail": "Recuperacao de senha indisponivel no momento."}
+        assert db_session.scalar(select(PasswordResetToken)) is None
+        assert login_user(client)
+    smtp.assert_not_called()
+
+
+def test_production_smtp_sends_reset_email_with_tls_and_credentials(
+    db_session: Session, production_settings: Settings, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(_env_file=None, **{
+        **production_settings.model_dump(),
+        "smtp_host": "smtp.example.com", "smtp_from_email": "support@example.com",
+        "smtp_username": "smtp-user", "smtp_password": "smtp-password", "smtp_use_tls": True,
+    })
+    smtp_factory = MagicMock()
+    smtp = smtp_factory.return_value.__enter__.return_value
+    monkeypatch.setattr("app.email.smtplib.SMTP", smtp_factory)
+    with make_client(settings, db_session) as client:
+        register_user(client)
+        request_password_reset(client)
+        smtp_factory.assert_called_once_with("smtp.example.com", 587, timeout=10)
+        smtp.starttls.assert_called_once_with()
+        smtp.login.assert_called_once_with("smtp-user", "smtp-password")
+        smtp.send_message.assert_called_once()
+        assert [call[0] for call in smtp.mock_calls] == ["starttls", "login", "send_message"]
+        message = smtp.send_message.call_args.args[0]
+        assert message["To"] == "paulo@email.com"
+        assert message["From"] == "support@example.com"
+        reset_url = next(
+            word for word in message.get_content().split()
+            if word.startswith("https://app.example.com/reset-password?token=")
+        )
+        raw_token = extract_token_from_reset_url(reset_url)
+        stored_token = db_session.scalar(select(PasswordResetToken))
+        assert stored_token is not None
+        assert stored_token.token_hash == hash_token(raw_token)
+        response = client.post("/auth/reset-password", json={
+            "token": raw_token, "new_password": "novaSenha123",
+        })
+        assert response.status_code == 200
+        assert login_user(client, password="novaSenha123")
 
 
 def test_change_password_success_rejects_old_jwt_and_allows_new_login(

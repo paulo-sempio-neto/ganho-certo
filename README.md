@@ -88,8 +88,13 @@ enviado por email usa `FRONTEND_BASE_URL` no formato
 `/reset-password?token=<token>`.
 
 Em desenvolvimento local, se `SMTP_HOST` e `SMTP_FROM_EMAIL` nao estiverem
-configurados, o email nao e enviado. Em `APP_ENV=production`, a aplicacao recusa
-iniciar sem `SMTP_HOST`, `SMTP_FROM_EMAIL` e `SMTP_USE_TLS=true`.
+configurados, o email nao e enviado. Em `APP_ENV=production`, a aplicacao pode
+iniciar com `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_USERNAME` e `SMTP_PASSWORD`
+vazios ou ausentes. Nesse caso, `/auth/forgot-password` retorna HTTP 503 com uma
+mensagem de indisponibilidade para qualquer email e nao cria tokens.
+Para habilitar o envio, configure host e remetente validos, `SMTP_USE_TLS=true`
+e as credenciais exigidas pelo provedor. Configuracao parcial ou sem TLS continua
+sendo rejeitada em producao. Cadastro e login continuam funcionando sem SMTP.
 
 Variaveis SMTP:
 
@@ -193,9 +198,9 @@ JWT_SECRET=<segredo aleatorio com pelo menos 48 caracteres>
 CORS_ALLOWED_ORIGINS=
 FRONTEND_BASE_URL=<URL publica do frontend na Vercel>
 ALLOWED_HOSTS=<host publico do backend, sem esquema ou porta>
-SMTP_HOST=<host SMTP>
+SMTP_HOST=
 SMTP_PORT=587
-SMTP_FROM_EMAIL=<email remetente valido>
+SMTP_FROM_EMAIL=
 SMTP_USE_TLS=true
 BILLING_PROVIDER=none
 ```
@@ -207,6 +212,9 @@ mesmo se CORS ainda estiver vazio. Sem um endereco definido, configure/crie
 primeiro o projeto do frontend para obter sua URL. Nao use o dominio de terceiros
 nem a URL da API para os links de recuperacao de senha.
 
+No deploy inicial, deixe `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_USERNAME` e
+`SMTP_PASSWORD` vazios ou ausentes para desabilitar a solicitacao de recuperacao
+de senha. Para habilita-la, configure host e remetente validos mantendo TLS.
 Se o SMTP exigir autenticacao, configure `SMTP_USERNAME` e `SMTP_PASSWORD`
 juntos. O envio atual usa STARTTLS. O [Render Free](https://render.com/docs/free)
 bloqueia saidas nas portas SMTP 25, 465 e 587: com a porta padrao, a recuperacao
@@ -221,7 +229,7 @@ Variaveis que podem ficar vazias ou ausentes no primeiro deploy:
 | `BETA_ADMIN_TOKEN` | Endpoints administrativos da beta desativados |
 | `BILLING_SECRET_KEY` | Com `BILLING_PROVIDER=none` |
 | `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET` | Com `BILLING_PROVIDER=none` |
-| `SMTP_USERNAME`, `SMTP_PASSWORD` | Ambos vazios somente se o servidor SMTP dispensar autenticacao |
+| `SMTP_HOST`, `SMTP_FROM_EMAIL`, `SMTP_USERNAME`, `SMTP_PASSWORD` | Todos vazios desabilitam a solicitacao de recuperacao; com SMTP ativo, credenciais podem ser omitidas somente se o provedor dispensar autenticacao |
 
 Omita `BILLING_PRO_MONTHLY_AMOUNT` enquanto billing estiver desativado; se ativar,
 use um decimal positivo. Nao deixe valores numericos ou booleanos vazios.
