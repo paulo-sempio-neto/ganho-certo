@@ -33,7 +33,7 @@ python -m pip install -e .
 Release or migration command:
 
 ```bash
-python -m alembic upgrade head
+alembic upgrade head
 ```
 
 Start command:
@@ -146,8 +146,8 @@ Before first user:
 - Run at least one restore test into a separate safe database.
 - Confirm the backend `DATABASE_URL` does not use the example `change_me`
   password.
-- Run migrations with `python -m alembic upgrade head`.
-- Confirm the migration head with `python -m alembic heads`; current head is
+- Run migrations with `alembic upgrade head`.
+- Confirm the migration head with `alembic heads`; current head is
   `20260926_0021`.
 
 Rollback considerations:

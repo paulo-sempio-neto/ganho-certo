@@ -17,6 +17,8 @@ Current deployment-relevant files:
 - `frontend/package-lock.json`: lockfile exists; use `npm ci` in Vercel when
   possible.
 - `frontend/.env.example`: local example for `VITE_API_BASE_URL`.
+- `render.yaml`: Render Blueprint for the backend service, including the
+  Alembic pre-deploy migration command.
 - `backend/pyproject.toml`: Python package and runtime dependencies.
 - `backend/app/server.py`: production entrypoint for `python -m app.server`.
 - `backend/alembic.ini` and `backend/alembic/env.py`: Alembic migration setup.
@@ -27,13 +29,12 @@ Current deployment-relevant files:
 Files not present:
 
 - No `Dockerfile`.
-- No `render.yaml`.
 - No `vercel.json`.
 - No `frontend/public` static asset directory.
 
-These are not blockers for the first deployment. Configure Render and Vercel in
-their dashboards using the commands in this document. Add infrastructure config
-files later only if repeated manual setup becomes painful.
+These are not blockers for the first deployment. Configure Vercel in its
+dashboard and sync the Render backend from `render.yaml` or mirror the same
+commands manually in the Render service.
 
 ## 2. Exact deployment order
 
@@ -85,8 +86,14 @@ python -m pip install -e .
 python -m app.server
 ```
 
-5. Use Render's host-provided `PORT`. Do not hardcode a port.
-6. Use a paid always-on service for real users, especially if Mercado Pago
+5. Set the pre-deploy command so migrations run before the app starts:
+
+```bash
+alembic upgrade head
+```
+
+6. Use Render's host-provided `PORT`. Do not hardcode a port.
+7. Use a paid always-on service for real users, especially if Mercado Pago
    webhooks are enabled.
 
 ### Step 3: Configure Render environment variables
@@ -160,15 +167,15 @@ Use one of these safe options:
 - Preferred: configure Render's deploy/release command to run:
 
 ```bash
-python -m alembic upgrade head
+alembic upgrade head
 ```
 
 - Manual first deploy option: open a Render shell/job with the same production
   environment and run:
 
 ```bash
-python -m alembic upgrade head
-python -m alembic heads
+alembic upgrade head
+alembic heads
 ```
 
 Expected current migration head:
@@ -389,7 +396,6 @@ Missing external items before deployment:
 Repository items not required for first deployment:
 
 - `Dockerfile`: not needed for Render's Python build path.
-- `render.yaml`: dashboard setup is acceptable for the first deploy.
 - `vercel.json`: Vercel can build Vite from the `frontend` root without it.
 - `frontend/public`: no required static assets are currently stored there.
 
@@ -413,7 +419,7 @@ cd backend
 python -m pytest
 python -m ruff check .
 python -m mypy app tests
-python -m alembic heads
+alembic heads
 ```
 
 Frontend:

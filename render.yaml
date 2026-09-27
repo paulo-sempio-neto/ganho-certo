@@ -1,0 +1,31 @@
+# Render Blueprint for the production backend service.
+# Keep secrets in Render, not in this file.
+services:
+  - type: web
+    name: ganhocerto-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: python -m pip install -e .
+    preDeployCommand: alembic upgrade head
+    startCommand: python -m app.server
+    healthCheckPath: /ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"

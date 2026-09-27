@@ -124,7 +124,7 @@ python -m pip install -e .
 Migration or release command:
 
 ```bash
-python -m alembic upgrade head
+alembic upgrade head
 ```
 
 Start command:
@@ -144,13 +144,13 @@ Before starting real traffic:
 2. Run:
 
 ```bash
-python -m alembic upgrade head
+alembic upgrade head
 ```
 
 3. Confirm the codebase head:
 
 ```bash
-python -m alembic heads
+alembic heads
 ```
 
 Expected current head:
@@ -325,7 +325,7 @@ Likely causes:
 Fix:
 
 - Check database availability and credentials.
-- Run `python -m alembic upgrade head`.
+- Run `alembic upgrade head`.
 - Review backend logs using request ID.
 
 ### Frontend shows network error
@@ -421,7 +421,7 @@ cd backend
 python -m pytest
 python -m ruff check .
 python -m mypy app tests
-python -m alembic heads
+alembic heads
 ```
 
 ```bash

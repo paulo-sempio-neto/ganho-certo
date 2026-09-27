@@ -168,7 +168,7 @@ python -m pip install -e .
 Pre-deploy command (disponivel em servicos pagos):
 
 ```bash
-python -m alembic upgrade head
+alembic upgrade head
 ```
 
 Start command:
@@ -179,7 +179,7 @@ python -m app.server
 
 Sem Pre-deploy, execute as migrations em um ambiente autorizado com acesso ao
 banco antes de publicar. Para um primeiro deploy com uma unica instancia, o
-Start command pode ser `python -m alembic upgrade head && python -m app.server`.
+Start command pode ser `alembic upgrade head && python -m app.server`.
 Nao execute migrations concorrentes em varias instancias.
 Veja as [etapas de deploy do Render](https://render.com/docs/deploys).
 
@@ -316,9 +316,9 @@ ou `npm run preview` como servidor de producao. Referencia:
    Mantenha CORS vazio ate liberar o frontend e nao copie o `.env.example` local
    inteiro para o Render.
 
-5. Execute o deploy e confirme nos logs que `python -m alembic upgrade head`
+5. Execute o deploy e confirme nos logs que `alembic upgrade head`
    terminou antes do start. No Shell do servico, execute
-   `python -m alembic current`: o resultado deve ser `20260926_0021 (head)`.
+   `alembic current`: o resultado deve ser `20260926_0021 (head)`.
    `alembic heads` mostra apenas a ultima revisao do codigo, nao comprova que o
    banco foi migrado. Nao use `create_all` nem `alembic stamp head` para substituir
    as migrations. Elas criam tambem os planos e permissoes iniciais.
