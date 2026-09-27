@@ -37,14 +37,19 @@ def configure_logging() -> None:
 def log_exception(
     request: Request, error: Exception, *, event: str = "unexpected_exception",
 ) -> None:
-    # Exception strings, source lines and locals can contain SQL, credentials or tokens.
-    # Keep the traceback locations and types, never the exception messages.
+    # Temporary production diagnostics: exception details stay in server logs only.
+    # Remove message and cause logging after diagnosing the registration failure.
+    original_error = getattr(error, "orig", None)
+    if original_error is None:
+        original_error = error.__cause__
     frames = traceback.extract_tb(error.__traceback__)
     logger.error(
         "%s request_id=%s", event, request.state.request_id,
         extra={"fields": {
             "request_id": request.state.request_id,
             "exception_type": type(error).__name__,
+            "exception_message": str(error),
+            "exception_cause": str(original_error) if original_error is not None else None,
             "stack_trace": [
                 {"file": frame.filename, "line": frame.lineno, "function": frame.name}
                 for frame in frames

@@ -76,11 +76,20 @@ def test_structured_logs_and_safe_database_failure(caplog: pytest.LogCaptureFixt
     assert response.json()["request_id"] == response.headers["X-Request-ID"]
     records = [record for record in caplog.records if record.name == "app.api"]
     logs = [json.loads(JsonLogFormatter().format(record)) for record in records]
-    serialized = json.dumps(logs)
-    assert secret not in serialized + response.text
-    assert "sensitive_sql" not in serialized + response.text
+    assert secret not in response.text
+    assert "sensitive_sql" not in response.text
     error = next(log for log in logs if "exception_type" in log)
     assert error["exception_type"] == "OperationalError"
+    assert secret in error["exception_message"]
+    assert "sensitive_sql" in error["exception_message"]
+    assert error["exception_cause"] == secret
+    other_fields = [
+        {key: value for key, value in log.items()
+         if key not in {"exception_message", "exception_cause"}}
+        for log in logs
+    ]
+    assert secret not in json.dumps(other_fields)
+    assert "sensitive_sql" not in json.dumps(other_fields)
     assert error["stack_trace"]
     assert error["request_id"] == response.headers["X-Request-ID"]
     completed = next(log for log in logs if log.get("status_code") == 500)
