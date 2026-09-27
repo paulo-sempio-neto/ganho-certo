@@ -66,6 +66,7 @@ import type {
 } from "./types/financial";
 import { getBetaActivationNextStep } from "./utils/activation";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
+import { getDailyEntryDate, getDefaultDailyVehicleId, readLastDailyVehicle, writeLastDailyVehicle } from "./utils/dailyEntry";
 import {
   formatDate,
   formatDistance,
@@ -84,6 +85,7 @@ import {
   optionalMoneyInputToApi,
   parseNonNegativeDecimal,
 } from "./utils/money";
+import { formatDurationInput, parseDurationToMinutes } from "./utils/duration";
 
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 const RESET_PASSWORD_PATH = "/reset-password";
@@ -99,8 +101,7 @@ type WorkSessionForm = {
   vehicle_id: string;
   gross_revenue: string;
   distance_km: string;
-  worked_hours: string;
-  worked_minutes: string;
+  worked_duration: string;
   trip_count: string;
 };
 
@@ -149,8 +150,7 @@ type MaintenanceRecordForm = {
 type QuickStartForm = {
   gross_revenue: string;
   distance_km: string;
-  worked_hours: string;
-  worked_minutes: string;
+  worked_duration: string;
   fuel_expense: string;
   expense_category: "fuel" | "charging";
   ownership_type: OwnershipType;
@@ -171,8 +171,7 @@ type QuickStartResult = {
 type QuickDailyEntryForm = {
   gross_revenue: string;
   distance_km: string;
-  worked_hours: string;
-  worked_minutes: string;
+  worked_duration: string;
   trip_count: string;
   vehicle_id: string;
   work_date: string;
@@ -243,8 +242,7 @@ const emptyWorkSessionForm: WorkSessionForm = {
   vehicle_id: "",
   gross_revenue: "",
   distance_km: "",
-  worked_hours: "",
-  worked_minutes: "",
+  worked_duration: "",
   trip_count: "",
 };
 
@@ -293,8 +291,7 @@ const emptyMaintenanceRecordForm: MaintenanceRecordForm = {
 const emptyQuickStartForm: QuickStartForm = {
   gross_revenue: "",
   distance_km: "",
-  worked_hours: "",
-  worked_minutes: "",
+  worked_duration: "",
   fuel_expense: "",
   expense_category: "fuel",
   ownership_type: "owned",
@@ -306,11 +303,10 @@ const emptyQuickStartForm: QuickStartForm = {
 const emptyQuickDailyEntryForm: QuickDailyEntryForm = {
   gross_revenue: "",
   distance_km: "",
-  worked_hours: "",
-  worked_minutes: "",
+  worked_duration: "",
   trip_count: "",
   vehicle_id: "",
-  work_date: toDateInputValue(new Date()),
+  work_date: "",
 };
 
 const feedbackCategoryOptions: Array<{ label: string; value: BetaFeedbackCategory }> = [
@@ -450,6 +446,7 @@ function App() {
     useState<QuickDailyEntryForm>(emptyQuickDailyEntryForm);
   const [quickDailyEntryResult, setQuickDailyEntryResult] =
     useState<QuickDailyEntryResult | null>(null);
+  const [lastSelectedVehicleId, setLastSelectedVehicleId] = useState("");
   const [quickDailyEntryShowDate, setQuickDailyEntryShowDate] = useState(false);
   const [pendingQuickDailyEntry, setPendingQuickDailyEntry] = useState(false);
   const [dailyExpenseForm, setDailyExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
@@ -513,6 +510,7 @@ function App() {
     setToken(null);
     setUser(null);
     setVehicles([]);
+    setLastSelectedVehicleId("");
     setWorkSessions([]);
     setExpenses([]);
     setRecurringExpenses([]);
@@ -603,7 +601,12 @@ function App() {
     setHistoryGrouping(getDefaultHistoryGrouping(nextStartDate, nextEndDate));
   }
 
-  async function loadVehicles(currentToken = token) {
+  function rememberDailyVehicle(vehicleId: string) {
+    setLastSelectedVehicleId(vehicleId);
+    if (user) writeLastDailyVehicle(user.id, vehicleId);
+  }
+
+  async function loadVehicles(currentToken = token, accountId = user?.id) {
     if (!currentToken) {
       return;
     }
@@ -612,21 +615,37 @@ function App() {
     try {
       const nextVehicles = await listVehicles(getAuthHeaders(currentToken));
       setVehicles(nextVehicles);
+      const availableVehicleIds = nextVehicles.map((vehicle) => vehicle.id);
+      const defaultVehicleId = getDefaultDailyVehicleId(
+        availableVehicleIds,
+        "",
+        (accountId === user?.id ? lastSelectedVehicleId : "") ||
+          (accountId === undefined ? "" : readLastDailyVehicle(accountId)),
+      );
+      setLastSelectedVehicleId(defaultVehicleId);
       setWorkSessionForm((currentForm) => ({
         ...currentForm,
-        vehicle_id: currentForm.vehicle_id || String(nextVehicles[0]?.id ?? ""),
+        vehicle_id: getDefaultDailyVehicleId(
+          availableVehicleIds,
+          currentForm.vehicle_id,
+          defaultVehicleId,
+        ),
       }));
       setQuickDailyEntryForm((currentForm) => ({
         ...currentForm,
-        vehicle_id:
-          currentForm.vehicle_id ||
-          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
+        vehicle_id: getDefaultDailyVehicleId(
+          availableVehicleIds,
+          currentForm.vehicle_id,
+          defaultVehicleId,
+        ),
       }));
       setDailyExpenseForm((currentForm) => ({
         ...currentForm,
-        vehicle_id:
-          currentForm.vehicle_id ||
-          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
+        vehicle_id: getDefaultDailyVehicleId(
+          availableVehicleIds,
+          currentForm.vehicle_id,
+          defaultVehicleId,
+        ),
       }));
       setMaintenancePlanForm((currentForm) => ({
         ...currentForm,
@@ -1011,7 +1030,7 @@ function App() {
         });
         setUser(currentUser);
         setMessage("");
-        await Promise.all([loadAccountPlan(token), loadVehicles(token)]);
+        await Promise.all([loadAccountPlan(token), loadVehicles(token, currentUser.id)]);
         await Promise.all([
           loadWorkSessions(token),
           loadExpenses(token),
@@ -1176,25 +1195,6 @@ function App() {
     endSession();
   }
 
-  function getWorkedMinutesFromFields(hoursValue: string, minutesValue: string): number {
-    if (!/^\d+$/.test(hoursValue) || !/^\d+$/.test(minutesValue)) {
-      throw new Error("Informe as horas e os minutos trabalhados.");
-    }
-
-    const hours = Number(hoursValue);
-    const minutes = Number(minutesValue);
-    if (!Number.isSafeInteger(hours) || !Number.isSafeInteger(minutes) || minutes > 59) {
-      throw new Error("Verifique o tempo trabalhado.");
-    }
-
-    const totalMinutes = hours * 60 + minutes;
-    if (!Number.isSafeInteger(totalMinutes) || totalMinutes <= 0) {
-      throw new Error("Informe um tempo trabalhado maior que zero.");
-    }
-
-    return totalMinutes;
-  }
-
   function getOptionalTripCount(value: string): number {
     if (!value.trim()) {
       return 0;
@@ -1213,7 +1213,7 @@ function App() {
   }
 
   function getQuickStartWorkedMinutes(): number {
-    return getWorkedMinutesFromFields(quickStartForm.worked_hours, quickStartForm.worked_minutes);
+    return parseDurationToMinutes(quickStartForm.worked_duration);
   }
 
   function getQuickStartTripCount(): number {
@@ -1229,10 +1229,7 @@ function App() {
   }
 
   function getQuickDailyWorkedMinutes(): number {
-    return getWorkedMinutesFromFields(
-      quickDailyEntryForm.worked_hours,
-      quickDailyEntryForm.worked_minutes,
-    );
+    return parseDurationToMinutes(quickDailyEntryForm.worked_duration);
   }
 
   function getQuickDailyTripCount(): number {
@@ -1284,7 +1281,7 @@ function App() {
       ),
       tripCount,
       vehicle,
-      workDate: quickDailyEntryForm.work_date || toDateInputValue(new Date()),
+      workDate: getDailyEntryDate(quickDailyEntryForm.work_date),
     };
   }
 
@@ -1307,6 +1304,7 @@ function App() {
     });
 
     setPendingQuickDailyEntry(false);
+    rememberDailyVehicle(String(vehicle.id));
     setQuickDailyEntryResult(result);
     setDailyExpenseForm({
       ...emptyExpenseForm,
@@ -1316,7 +1314,6 @@ function App() {
     setDailyExpenseVisible(false);
     setQuickDailyEntryForm({
       ...emptyQuickDailyEntryForm,
-      work_date: toDateInputValue(new Date()),
       vehicle_id: String(vehicle.id),
     });
     setQuickDailyEntryShowDate(false);
@@ -1325,7 +1322,7 @@ function App() {
     await refreshDashboardData();
     setSuccessMessage(getGoalUpdatedAfterWorkMessage(financialGoals.some((goal) => goal.active)));
     requestAnimationFrame(() =>
-      document.getElementById("hoje")?.scrollIntoView({ behavior: "smooth" }),
+      document.getElementById("daily-entry-result")?.focus(),
     );
   }
 
@@ -1336,8 +1333,10 @@ function App() {
     setSuccessMessage("");
 
     try {
+      getQuickDailyWorkedMinutes();
       const vehicle = getQuickDailyVehicle();
       if (!vehicle) {
+        setQuickDailyEntryForm((current) => ({ ...current, work_date: getDailyEntryDate(current.work_date) }));
         setPendingQuickDailyEntry(true);
         setMessage(
           "Dados mantidos. Cadastre seu veiculo para salvar este dia e ver quanto sobrou.",
@@ -1522,7 +1521,8 @@ function App() {
     setEditingWorkSessionId(null);
     setWorkSessionForm({
       ...emptyWorkSessionForm,
-      vehicle_id: String(vehicles[0]?.id ?? ""),
+      work_date: toDateInputValue(new Date()),
+      vehicle_id: getDefaultDailyVehicleId(vehicles.map((vehicle) => vehicle.id), workSessionForm.vehicle_id, lastSelectedVehicleId),
     });
   }
 
@@ -1533,10 +1533,10 @@ function App() {
       vehicle_id: String(workSession.vehicle_id),
       gross_revenue: formatMoney(workSession.gross_revenue).replace("R$ ", ""),
       distance_km: formatDistance(workSession.distance_km),
-      worked_hours: String(Math.floor(workSession.worked_minutes / 60)),
-      worked_minutes: String(workSession.worked_minutes % 60),
+      worked_duration: formatDurationInput(workSession.worked_minutes),
       trip_count: String(workSession.trip_count),
     });
+    rememberDailyVehicle(String(workSession.vehicle_id));
     setMessage("");
     setSuccessMessage("");
   }
@@ -1547,17 +1547,13 @@ function App() {
     setMessage("");
     setSuccessMessage("");
 
-    const workedHours = Number(workSessionForm.worked_hours || "0");
-    const workedMinutes = Number(workSessionForm.worked_minutes || "0");
-    const totalWorkedMinutes = workedHours * 60 + workedMinutes;
-
     try {
       const payload = {
         vehicle_id: Number(workSessionForm.vehicle_id),
         work_date: workSessionForm.work_date,
         gross_revenue: moneyInputToApi(workSessionForm.gross_revenue),
         distance_km: normalizeDecimalInput(workSessionForm.distance_km),
-        worked_minutes: totalWorkedMinutes,
+        worked_minutes: parseDurationToMinutes(workSessionForm.worked_duration),
         trip_count: Number(workSessionForm.trip_count),
       };
 
@@ -1577,6 +1573,7 @@ function App() {
         setSuccessMessage("Jornada cadastrada com sucesso.");
       }
 
+      rememberDailyVehicle(workSessionForm.vehicle_id);
       resetWorkSessionForm();
       await loadWorkSessions();
       await loadFinancialGoals();
@@ -2361,7 +2358,7 @@ function App() {
 
               <form className="auth-form daily-entry-form" onSubmit={handleQuickDailyEntrySubmit}>
                 <div className="daily-date-row">
-                  <p>Data: {formatDate(quickDailyEntryForm.work_date || toDateInputValue(new Date()))}</p>
+                  <p>Data: {formatDate(getDailyEntryDate(quickDailyEntryForm.work_date))}</p>
                   <button
                     className="text-button"
                     type="button"
@@ -2382,7 +2379,7 @@ function App() {
                         })
                       }
                       type="date"
-                      value={quickDailyEntryForm.work_date}
+                      value={getDailyEntryDate(quickDailyEntryForm.work_date)}
                     />
                   </label>
                 ) : null}
@@ -2422,40 +2419,24 @@ function App() {
                   />
                 </label>
 
-                <div className="form-grid daily-time-grid">
-                  <label>
-                    Horas trabalhadas
-                    <input
-                      min="0"
-                      onChange={(event) =>
-                        setQuickDailyEntryForm({
-                          ...quickDailyEntryForm,
-                          worked_hours: event.target.value,
-                        })
-                      }
-                      required
-                      type="number"
-                      value={quickDailyEntryForm.worked_hours}
-                    />
-                  </label>
-
-                  <label>
-                    Minutos trabalhados
-                    <input
-                      max="59"
-                      min="0"
-                      onChange={(event) =>
-                        setQuickDailyEntryForm({
-                          ...quickDailyEntryForm,
-                          worked_minutes: event.target.value,
-                        })
-                      }
-                      required
-                      type="number"
-                      value={quickDailyEntryForm.worked_minutes}
-                    />
-                  </label>
-                </div>
+                <label>
+                  Tempo trabalhado
+                  <input
+                    aria-describedby="daily-duration-help"
+                    inputMode="text"
+                    onChange={(event) =>
+                      setQuickDailyEntryForm({
+                        ...quickDailyEntryForm,
+                        worked_duration: event.target.value,
+                      })
+                    }
+                    placeholder="8:30 ou 8h30"
+                    required
+                    type="text"
+                    value={quickDailyEntryForm.worked_duration}
+                  />
+                  <small id="daily-duration-help">Ex.: 8:30 ou 8h30 para 8 horas e 30 minutos. Apenas 8 significa 8 horas.</small>
+                </label>
 
                 <label>
                   Numero de corridas <span className="optional-label">(opcional)</span>
@@ -2489,12 +2470,13 @@ function App() {
                   <label>
                     Veiculo
                     <select
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        rememberDailyVehicle(event.target.value);
                         setQuickDailyEntryForm({
                           ...quickDailyEntryForm,
                           vehicle_id: event.target.value,
-                        })
-                      }
+                        });
+                      }}
                       required
                       value={quickDailyEntryForm.vehicle_id}
                     >
@@ -2522,10 +2504,10 @@ function App() {
               </form>
 
               {quickDailyEntryResult ? (
-                <div className="daily-entry-result">
+                <div className="daily-entry-result" id="daily-entry-result" tabIndex={-1} aria-labelledby="daily-result-title">
                   <div className="section-title">
                     <p className="eyebrow">Resultado parcial de hoje</p>
-                    <h3>Quanto sobrou?</h3>
+                    <h3 id="daily-result-title">Quanto sobrou?</h3>
                     <p className="subtle-note">
                       Este valor considera os gastos de hoje que ja foram registrados. Adicione
                       combustivel, recarga ou outros custos para aproximar o resultado real.
@@ -2841,28 +2823,19 @@ function App() {
                           />
                         </label>
                         <label>
-                          Horas trabalhadas
+                          Tempo trabalhado
                           <input
-                            min="0"
+                            inputMode="text"
                             onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, worked_hours: event.target.value })
+                              setQuickStartForm({
+                                ...quickStartForm,
+                                worked_duration: event.target.value,
+                              })
                             }
+                            placeholder="Ex: 8:30"
                             required
-                            type="number"
-                            value={quickStartForm.worked_hours}
-                          />
-                        </label>
-                        <label>
-                          Minutos
-                          <input
-                            max="59"
-                            min="0"
-                            onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, worked_minutes: event.target.value })
-                            }
-                            required
-                            type="number"
-                            value={quickStartForm.worked_minutes}
+                            type="text"
+                            value={quickStartForm.worked_duration}
                           />
                         </label>
                       </div>
@@ -3511,38 +3484,22 @@ function App() {
 
                   <div className="form-grid form-grid-three">
                     <label>
-                      Horas trabalhadas
+                      Tempo trabalhado
                       <input
-                        min="0"
-                        name="worked-hours"
+                        inputMode="text"
+                        name="worked-duration"
                         onChange={(event) =>
                           setWorkSessionForm({
                             ...workSessionForm,
-                            worked_hours: event.target.value,
+                            worked_duration: event.target.value,
                           })
                         }
+                        placeholder="8:30"
                         required
-                        type="number"
-                        value={workSessionForm.worked_hours}
+                        type="text"
+                        value={workSessionForm.worked_duration}
                       />
-                    </label>
-
-                    <label>
-                      Minutos trabalhados
-                      <input
-                        max="59"
-                        min="0"
-                        name="worked-minutes"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            worked_minutes: event.target.value,
-                          })
-                        }
-                        required
-                        type="number"
-                        value={workSessionForm.worked_minutes}
-                      />
+                      <small>Ex.: 8:30 ou 8h30.</small>
                     </label>
 
                     <label>

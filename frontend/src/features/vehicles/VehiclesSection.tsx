@@ -352,6 +352,10 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
         <div className="vehicles-layout">
           <form className="auth-form vehicle-form" onSubmit={handleVehicleSubmit}>
             <h3>{editingVehicleId ? "Editar veiculo" : "Cadastrar veiculo"}</h3>
+            <p className="subtle-note">
+              O cadastro básico já permite registrar jornadas. Os custos do veículo podem ser
+              configurados depois, quando você tiver esses dados.
+            </p>
 
             <label>
               Nome
@@ -510,8 +514,8 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
         {selectedCostProfileVehicle ? (
           <form className="auth-form cost-profile-panel" onSubmit={handleCostProfileSubmit}>
             <div className="section-title">
-              <p className="eyebrow">Custo real do veiculo</p>
-              <h3>Custos de {selectedCostProfileVehicle.name}</h3>
+              <p className="eyebrow">Configuração opcional</p>
+              <h3>Perfil de custos de {selectedCostProfileVehicle.name}</h3>
               <p className="subtle-note">
                 Esses valores ajudam o GanhoCerto a estimar custos que nem sempre aparecem como
                 despesas no dia a dia.
