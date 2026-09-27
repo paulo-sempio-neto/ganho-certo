@@ -47,8 +47,9 @@ describe("FinancialSummaryPanel", () => {
       }),
     );
 
-    expect(html).toContain("Quanto realmente esta sobrando?");
-    expect(html).toContain("Nenhum dado no período selecionado.");
+    expect(html).toContain("Quanto sobrou?");
+    expect(html).toContain("Nenhuma movimentação registrada neste período.");
+    expect(html).toContain('href="#hoje"');
   });
 
   it("presents realized, estimated, and projected results in that order", () => {
@@ -77,8 +78,10 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("R$ 80,00");
     expect(html).toContain("R$ 70,00");
     expect(html).toContain("Sobra no caixa: faturamento menos despesas registradas.");
-    expect(html).toContain("Resultado apos custos estruturais estimados do veiculo.");
-    expect(html).toContain("Estimado mais despesas recorrentes previstas para o periodo.");
+    expect(html).toContain("Sobra registrada menos os custos estimados do veículo. Não é saldo em caixa.");
+    expect(html).toContain("Não é previsão de renda.");
+    expect(html).toContain("Gastos ainda não registrados não estão descontados.");
+    expect(html).toContain('result-primary" data-result-kind="realized"');
     expect(html).toContain("Desempenho registrado");
     expect(html).toContain("Sobra no caixa dividida pelas horas registradas.");
     expect(html).toContain("Custos estruturais estimados");
@@ -106,7 +109,34 @@ describe("FinancialSummaryPanel", () => {
     );
 
     expect(html).toContain("Dados insuficientes para o resultado estimado");
-    expect(html).toContain("Dados insuficientes para o projetado");
-    expect(html).toContain("nenhum custo estrutural foi configurado");
+    expect(html).toContain("Sem despesas recorrentes previstas a descontar neste período.");
+    expect(html).toContain("Nenhum custo estrutural estimado neste período.");
+    expect(html).toContain("Sem custos estimados neste período. Confira o perfil do veículo.");
+  });
+
+  it("keeps intermediate result sections before optional details without removing metrics", () => {
+    const html = renderToStaticMarkup(createElement(FinancialSummaryPanel, {
+      summary: emptySummary,
+      getExpenseCategoryLabel: () => "Combustivel",
+      children: createElement("section", { id: "comparison-slot" }, "Comparacoes"),
+    }));
+
+    expect(html.indexOf('data-result-kind="realized"')).toBeLessThan(html.indexOf('id="comparison-slot"'));
+    expect(html.indexOf('id="comparison-slot"')).toBeLessThan(html.indexOf('id="detalhes-resultado"'));
+    expect(html).toContain('<details class="result-details" id="detalhes-resultado">');
+    expect(html).toContain("Desempenho registrado");
+    expect(html).toContain("Evolução diária");
+    expect(html).toContain("Despesas recorrentes previstas");
+  });
+
+  it.each(["0.00", "-250.00", "9999999.99"])("preserves the registered amount %s", (amount) => {
+    const html = renderToStaticMarkup(createElement(FinancialSummaryPanel, {
+      summary: { ...emptySummary, estimated_net_profit: amount },
+      getExpenseCategoryLabel: () => "Combustivel",
+    }));
+    const primary = html.split('data-result-kind="realized">')[1].split("</article>")[0];
+    expect(primary).toContain(amount === "0.00" ? "R$ 0,00" : amount === "-250.00" ? "R$ -250,00" : "R$ 9.999.999,99");
+    expect(primary).toContain("Realizado");
+    if (amount.startsWith("-")) expect(html).toContain("metric-negative result-primary");
   });
 });

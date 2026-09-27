@@ -14,8 +14,9 @@ import { getHistoryComparisonScopeMessage } from "./HistoricalPerformanceSection
 
 describe("retention guidance messages", () => {
   it("explains what more history unlocks", () => {
-    expect(getHistoryEmptyStateMessage()).toContain("Registre mais dias");
-    expect(getHistoryComparisonUnavailableMessage()).toContain("periodo anterior");
+    expect(getHistoryEmptyStateMessage()).toContain("Registre jornadas e gastos ou ajuste o período");
+    expect(getHistoryComparisonUnavailableMessage()).toContain("período anterior equivalente");
+    expect(getHistoryComparisonUnavailableMessage()).toContain("dados nos dois períodos");
     expect(getHistoryComparisonScopeMessage()).toContain("nao aponta a causa");
     expect(getWorkPatternsEmptyStateMessage()).toContain("comparacoes por dia da semana");
   });

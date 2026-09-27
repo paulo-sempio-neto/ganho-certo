@@ -2525,7 +2525,7 @@ function App() {
                 <div className="daily-entry-result">
                   <div className="section-title">
                     <p className="eyebrow">Resultado parcial de hoje</p>
-                    <h3>Quanto sobrou ate agora</h3>
+                    <h3>Quanto sobrou?</h3>
                     <p className="subtle-note">
                       Este valor considera os gastos de hoje que ja foram registrados. Adicione
                       combustivel, recarga ou outros custos para aproximar o resultado real.
@@ -2533,23 +2533,25 @@ function App() {
                   </div>
 
                   <div className="metric-grid daily-entry-metrics daily-entry-primary-metrics">
-                    <article className="metric-card metric-profit">
-                      <span>Faturamento</span>
-                      <strong>{formatCents(quickDailyEntryResult.grossRevenueCents)}</strong>
-                    </article>
-                    <article className="metric-card metric-expense">
-                      <span>Gastos registrados hoje</span>
-                      <strong>{formatCents(quickDailyExpenseTotalCents)}</strong>
-                    </article>
                     <article
                       className={
                         quickDailyRemainingCents < 0n
-                          ? "metric-card metric-negative"
-                          : "metric-card metric-profit"
+                          ? "metric-card metric-negative result-primary"
+                          : "metric-card metric-profit result-primary"
                       }
+                      data-result-kind="realized"
                     >
-                      <span>Sobra após gastos</span>
+                      <span>Realizado · Sobra após gastos</span>
                       <strong>{formatCents(quickDailyRemainingCents)}</strong>
+                      <small>Resultado parcial de hoje. Gastos ainda não registrados não estão descontados.</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Faturamento</span>
+                      <strong>{formatCents(quickDailyEntryResult.grossRevenueCents)}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Gastos registrados hoje</span>
+                      <strong>{formatCents(quickDailyExpenseTotalCents)}</strong>
                     </article>
                   </div>
 

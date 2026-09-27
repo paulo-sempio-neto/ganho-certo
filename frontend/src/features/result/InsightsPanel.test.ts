@@ -81,6 +81,8 @@ describe("InsightsPanel", () => {
     );
 
     expect(html).toContain("Ainda não há dados suficientes para gerar insights deste período.");
+    expect(html).toContain("Registre jornadas e gastos em outros dias");
+    expect(html).toContain("dados nos dois períodos");
   });
 
   it("puts comparison and weekly insights before performance and expense details", () => {

@@ -93,6 +93,8 @@ export function InsightsPanel({ insights, isLoading, error, onRetry }: InsightsP
         ) : (
           <p className="empty-state compact-empty-state">
             Ainda não há dados suficientes para gerar insights deste período.
+            {" "}Registre jornadas e gastos em outros dias para acompanhar padrões e, quando houver
+            dados nos dois períodos, comparar resultados.
           </p>
         )
       ) : null}

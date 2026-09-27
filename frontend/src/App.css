@@ -742,9 +742,37 @@ textarea:focus {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.daily-entry-primary-metrics,
-.result-summary-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.metric-grid.daily-entry-primary-metrics,
+.metric-grid.result-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.result-primary {
+  grid-column: 1 / -1;
+}
+
+.metric-card.result-primary > strong {
+  font-size: var(--text-3xl);
+}
+
+.result-details {
+  border-block: 1px solid var(--color-border);
+  padding-block: var(--space-4);
+}
+
+.result-details > summary {
+  min-height: var(--control-height-compact);
+  padding-block: var(--space-3);
+  color: var(--color-heading);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.result-details-content {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-6);
+  padding-top: var(--space-4);
 }
 
 .secondary-metrics {
@@ -972,10 +1000,7 @@ textarea:focus {
 .economic-panel {
   display: grid;
   gap: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-surface);
-  background: var(--color-surface);
-  padding: var(--space-5);
+  padding-block: var(--space-4);
 }
 
 .economic-flow {
@@ -2170,8 +2195,8 @@ textarea:focus {
   .daily-time-grid,
   .daily-entry-metrics,
   .daily-entry-actions,
-  .daily-entry-primary-metrics,
-  .result-summary-grid,
+  .metric-grid.daily-entry-primary-metrics,
+  .metric-grid.result-summary-grid,
   .quick-action-grid,
   .action-prompt,
   .quick-start-progress,

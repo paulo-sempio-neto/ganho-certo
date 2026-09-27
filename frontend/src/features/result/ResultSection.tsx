@@ -114,14 +114,6 @@ export function ResultSection({
         </p>
       </div>
 
-      <div className="result-context-nav" aria-label="Áreas de resultado">
-        <a href="#resultado">Visão geral</a>
-        <a href="#metas">Metas</a>
-        <a href="#insights">Insights</a>
-        <a href="#evolucao">Evolução</a>
-        <a href="#padroes">Padrões</a>
-      </div>
-
       <div className="dashboard-filters">
         <label>
           Período
@@ -196,32 +188,41 @@ export function ResultSection({
             summary={summary}
             getExpenseCategoryLabel={getExpenseCategoryLabel}
             resultRef={resultRef}
-          />
+          >
+            <HistoricalPerformanceSection
+              history={history}
+              isLoading={isHistoryLoading}
+              error={historyError}
+              vehicles={vehicles}
+              period={historyFilters.period}
+              startDate={historyFilters.startDate}
+              endDate={historyFilters.endDate}
+              grouping={historyFilters.grouping}
+              vehicleId={historyFilters.vehicleId}
+              onPeriodChange={historyFilters.onPeriodChange}
+              onDateChange={historyFilters.onDateChange}
+              onGroupingChange={historyFilters.onGroupingChange}
+              onVehicleChange={historyFilters.onVehicleChange}
+              onRetry={onHistoryRetry}
+              getVehicleLabel={getVehicleLabel}
+            />
 
-          <InsightsPanel
-            insights={insights}
-            isLoading={isInsightsLoading}
-            error={insightsError}
-            onRetry={onInsightsRetry}
-          />
+            <nav className="result-context-nav" aria-label="Áreas de resultado">
+              <a href="#resultado">Visão geral</a>
+              <a href="#metas">Metas</a>
+              <a href="#insights">Insights</a>
+              <a href="#evolucao">Evolução</a>
+              <a href="#detalhes-resultado">Detalhes</a>
+              <a href="#padroes">Padrões</a>
+            </nav>
 
-          <HistoricalPerformanceSection
-            history={history}
-            isLoading={isHistoryLoading}
-            error={historyError}
-            vehicles={vehicles}
-            period={historyFilters.period}
-            startDate={historyFilters.startDate}
-            endDate={historyFilters.endDate}
-            grouping={historyFilters.grouping}
-            vehicleId={historyFilters.vehicleId}
-            onPeriodChange={historyFilters.onPeriodChange}
-            onDateChange={historyFilters.onDateChange}
-            onGroupingChange={historyFilters.onGroupingChange}
-            onVehicleChange={historyFilters.onVehicleChange}
-            onRetry={onHistoryRetry}
-            getVehicleLabel={getVehicleLabel}
-          />
+            <InsightsPanel
+              insights={insights}
+              isLoading={isInsightsLoading}
+              error={insightsError}
+              onRetry={onInsightsRetry}
+            />
+          </FinancialSummaryPanel>
 
           <WorkPatternsSection
             vehicles={vehicles}
@@ -234,7 +235,9 @@ export function ResultSection({
 
       {!isSummaryLoading && !summary && !summaryError ? (
         <p className="empty-state">
-          Ainda nao ha dados para montar o resultado. Registre seu dia em Hoje ou ajuste o periodo.
+          Ainda não há registros para montar o resultado neste período. Registre faturamento,
+          quilômetros e tempo trabalhado em Hoje, ou escolha um período com registros.{" "}
+          <a href="#hoje">Registrar meu dia</a>
         </p>
       ) : null}
     </section>

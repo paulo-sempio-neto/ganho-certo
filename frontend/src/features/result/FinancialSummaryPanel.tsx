@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import type { ExpenseCategory } from "../../types/domain";
 import type { FinancialStructuralCosts, FinancialSummary } from "../../types/financial";
 import { formatDistance, formatWorkTime, formatDate } from "../../utils/formatters";
@@ -19,6 +19,7 @@ type FinancialSummaryPanelProps = {
   summary: FinancialSummary;
   getExpenseCategoryLabel: (category: ExpenseCategory) => string;
   resultRef?: Ref<HTMLDivElement>;
+  children?: ReactNode;
 };
 
 function getMetricValue(value: string | null, formatter: (metric: string) => string): string {
@@ -73,291 +74,309 @@ export function FinancialSummaryPanel({
   summary,
   getExpenseCategoryLabel,
   resultRef,
+  children,
 }: FinancialSummaryPanelProps) {
   return (
     <>
       <div className="economic-panel" ref={resultRef}>
         <div className="section-title">
-          <p className="eyebrow">Resultado</p>
-          <h3>Quanto realmente esta sobrando?</h3>
+          <h3>Quanto sobrou?</h3>
           <p className="subtle-note">
-            Comece pelo que aconteceu de fato. Depois, veja o impacto dos custos do veiculo e das
-            despesas futuras configuradas.
+            No período e veículo selecionados, considerando apenas os valores registrados.
           </p>
         </div>
 
         <div className="metric-grid result-summary-grid">
-          <article className={getResultCardClass(summary.estimated_net_profit)} data-result-kind="realized">
+          <article className={`${getResultCardClass(summary.estimated_net_profit)} result-primary`} data-result-kind="realized">
             <span>Realizado</span>
             <strong>{formatMoney(summary.estimated_net_profit)}</strong>
             <small>Sobra no caixa: faturamento menos despesas registradas.</small>
+            <small>Gastos ainda não registrados não estão descontados.</small>
           </article>
           <article className={getResultCardClass(summary.estimated_economic_result)} data-result-kind="estimated">
             <span>Estimado</span>
             <strong>{formatMoney(summary.estimated_economic_result)}</strong>
-            <small>Resultado apos custos estruturais estimados do veiculo.</small>
+            <small>Sobra registrada menos os custos estimados do veículo. Não é saldo em caixa.</small>
+            {!isPositiveMoney(summary.estimated_structural_costs) ? (
+              <small>Sem custos estimados neste período. Confira o perfil do veículo.</small>
+            ) : null}
           </article>
           <article className={getResultCardClass(summary.projected_economic_result)} data-result-kind="projected">
             <span>Projetado</span>
             <strong>{formatMoney(summary.projected_economic_result)}</strong>
-            <small>Estimado mais despesas recorrentes previstas para o periodo.</small>
+            <small>Resultado estimado descontando também as despesas recorrentes previstas. Não é previsão de renda.</small>
             {isNegativeMoney(summary.projected_economic_result) ? (
               <small>Os custos projetados estao acima do faturamento registrado.</small>
             ) : null}
           </article>
         </div>
 
-        <details className="calculation-details">
-          <summary>Ver como cada resultado e formado</summary>
-
-          <div className="dashboard-layers">
-            <article className="dashboard-layer">
-              <p className="eyebrow">Realizado</p>
-              <dl>
-                <div>
-                  <dt>Faturamento</dt>
-                  <dd>{formatMoney(summary.gross_revenue)}</dd>
-                </div>
-                <div>
-                  <dt>Despesas registradas</dt>
-                  <dd>{formatMoney(summary.total_expenses)}</dd>
-                </div>
-                <div>
-                  <dt>Sobra apos despesas</dt>
-                  <dd>{formatMoney(summary.estimated_net_profit)}</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article className="dashboard-layer">
-              <p className="eyebrow">Estimado</p>
-              <dl>
-                <div>
-                  <dt>Custos estruturais estimados</dt>
-                  <dd>{formatMoney(summary.estimated_structural_costs)}</dd>
-                </div>
-                <div>
-                  <dt>Resultado economico estimado</dt>
-                  <dd>{formatMoney(summary.estimated_economic_result)}</dd>
-                </div>
-                <div>
-                  <dt>O que entra aqui</dt>
-                  <dd>Custos do veiculo configurados</dd>
-                </div>
-              </dl>
-            </article>
-
-            <article className="dashboard-layer dashboard-layer-projected">
-              <p className="eyebrow">Projetado</p>
-              <dl>
-                <div>
-                  <dt>Despesas recorrentes previstas</dt>
-                  <dd>{formatMoney(summary.recurring_expenses_total)}</dd>
-                </div>
-                <div>
-                  <dt>Custos projetados totais</dt>
-                  <dd>{formatMoney(summary.projected_economic_costs)}</dd>
-                </div>
-                <div>
-                  <dt>Resultado projetado apos recorrencias</dt>
-                  <dd>{formatMoney(summary.projected_economic_result)}</dd>
-                </div>
-                <div>
-                  <dt>O que entra aqui</dt>
-                  <dd>Despesas recorrentes previstas</dd>
-                </div>
-              </dl>
-            </article>
-          </div>
-
-          {!isPositiveMoney(summary.estimated_structural_costs) ? (
-            <p className="empty-state">
-              Dados insuficientes para o resultado estimado: configure os custos do veiculo para
-              uma leitura economica mais completa.{" "}
-              <a href="#veiculos">Ir para Veiculos</a>
-            </p>
-          ) : null}
-        </details>
-      </div>
-
-      <div className="recurring-projection">
-        <div className="list-header">
-          <h3>Despesas recorrentes previstas</h3>
-        </div>
-        <p className="subtle-note">
-          Projetado usa despesas recorrentes configuradas. Quando uma despesa real equivalente ja
-          esta registrada, o GanhoCerto evita contar o mesmo custo duas vezes.
-        </p>
-
-        {isPositiveMoney(summary.recurring_expenses_total) ? (
-          <>
-            <div className="recurring-projection-list">
-              {getRecurringProjectionItems(summary).map((item) => (
-                <article className="structural-item" key={item.category}>
-                  <div>
-                    <strong>{getExpenseCategoryLabel(item.category)}</strong>
-                    <span>Previsto no periodo</span>
-                  </div>
-                  <strong>{formatMoney(item.amount)}</strong>
-                </article>
-              ))}
-            </div>
-            <article className="recurring-projection-total">
-              <span>Total previsto no periodo</span>
-              <strong>{formatMoney(summary.recurring_expenses_total)}</strong>
-            </article>
-          </>
-        ) : (
-          <p className="empty-state compact-empty-state">
-            Dados insuficientes para o projetado: nenhuma despesa recorrente foi configurada neste
-            periodo.{" "}
-            <a href="#despesas-recorrentes">Configurar despesas recorrentes</a>
-          </p>
-        )}
-      </div>
-
-      <div className="structural-breakdown">
-        <div className="list-header">
-          <div>
-            <h3>Custos estruturais estimados</h3>
-            <p className="subtle-note">
-              Estimativas baseadas nos custos do veiculo configurados. Elas nao representam,
-              necessariamente, despesas pagas neste periodo.
-            </p>
-          </div>
-        </div>
-
-        {getStructuralCostItems(summary).length === 0 ? (
-          <p className="empty-state">
-            Dados insuficientes: nenhum custo estrutural foi configurado para este periodo.
-          </p>
-        ) : (
-          <div className="structural-list">
-            {getStructuralCostItems(summary).map((item) => (
-              <article className="structural-item" key={item.key}>
-                <div>
-                  <strong>{item.label}</strong>
-                  <span>
-                    {item.percentage === null
-                      ? "Participacao indisponivel"
-                      : `${item.percentage}% dos custos estruturais`}
-                  </span>
-                </div>
-                <strong>{formatMoney(item.value)}</strong>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="list-header">
-        <div>
-          <h3>Desempenho registrado</h3>
-          <p className="subtle-note">
-            Estas metricas descrevem os registros deste periodo e nao indicam a causa de uma
-            mudanca.
-          </p>
-        </div>
-      </div>
-
-      <div className="metric-grid">
-        <article className="metric-card">
-          <span>Resultado bruto por hora</span>
-          <strong>{getMetricValue(summary.gross_per_hour, formatMoney)}</strong>
-          <small>Faturamento dividido pelas horas registradas.</small>
-        </article>
-        <article className="metric-card">
-          <span>Resultado apos despesas por hora</span>
-          <strong>{getMetricValue(summary.net_per_hour, formatMoney)}</strong>
-          <small>Sobra no caixa dividida pelas horas registradas.</small>
-        </article>
-        <article className="metric-card">
-          <span>Resultado bruto por km</span>
-          <strong>{getMetricValue(summary.gross_per_km, formatMoney)}</strong>
-          <small>Faturamento dividido pelos km registrados.</small>
-        </article>
-        <article className="metric-card">
-          <span>Resultado apos despesas por km</span>
-          <strong>{getMetricValue(summary.net_per_km, formatMoney)}</strong>
-          <small>Sobra no caixa dividida pelos km registrados.</small>
-        </article>
-        <article className="metric-card">
-          <span>Custo registrado por km</span>
-          <strong>{getMetricValue(summary.expense_per_km, formatMoney)}</strong>
-          <small>Despesas registradas divididas pelos km.</small>
-        </article>
-        <article className="metric-card">
-          <span>Ticket médio</span>
-          <strong>{getMetricValue(summary.average_ticket, formatMoney)}</strong>
-          <small>Faturamento dividido pelas corridas registradas.</small>
-        </article>
-        <article className="metric-card">
-          <span>Corridas registradas</span>
-          <strong>{summary.total_trip_count}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Horas registradas</span>
-          <strong>{formatWorkTime(summary.total_worked_minutes)}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Km registrados</span>
-          <strong>{formatDistance(summary.total_distance_km)} km</strong>
-        </article>
-      </div>
-
-      <div className="daily-breakdown">
-        <div className="list-header">
-          <h3>Evolução diária</h3>
-        </div>
-
         {summary.daily.length === 0 ? (
-          <p className="empty-state">Nenhum dado no período selecionado.</p>
-        ) : (
-          summary.daily.map((dailyItem) => {
-            const chartMax = getChartMax(summary);
-            return (
-              <article className="daily-row" key={dailyItem.date}>
-                <h4>{formatDate(dailyItem.date)}</h4>
-                <div className="bar-line">
-                  <span>Faturamento</span>
-                  <div>
-                    <i
-                      style={{
-                        width: `${(getChartValue(dailyItem.gross_revenue) / chartMax) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <strong>{formatMoney(dailyItem.gross_revenue)}</strong>
-                </div>
-                <div className="bar-line expense-bar">
-                  <span>Despesas</span>
-                  <div>
-                    <i
-                      style={{
-                        width: `${(getChartValue(dailyItem.expenses) / chartMax) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <strong>{formatMoney(dailyItem.expenses)}</strong>
-                </div>
-                <div className="bar-line profit-bar">
-                  <span>Resultado est.</span>
-                  <div>
-                    <i
-                      style={{
-                        width: `${
-                          (getChartValue(dailyItem.estimated_net_profit) / chartMax) * 100
-                        }%`,
-                      }}
-                    />
-                  </div>
-                  <strong>{formatMoney(dailyItem.estimated_net_profit)}</strong>
-                </div>
-              </article>
-            );
-          })
-        )}
+          <p className="empty-state compact-empty-state">
+            Nenhuma movimentação registrada neste período. Registre seu dia ou selecione um período
+            com registros para acompanhar o resultado. <a href="#hoje">Registrar meu dia</a>
+          </p>
+        ) : null}
       </div>
+
+      {children}
+
+      <details className="result-details" id="detalhes-resultado">
+        <summary>Detalhes do resultado: custos, desempenho e registros</summary>
+        <div className="result-details-content">
+          <details className="calculation-details">
+            <summary>Ver como cada resultado é formado</summary>
+
+            <div className="dashboard-layers">
+              <article className="dashboard-layer">
+                <p className="eyebrow">Realizado</p>
+                <dl>
+                  <div>
+                    <dt>Faturamento</dt>
+                    <dd>{formatMoney(summary.gross_revenue)}</dd>
+                  </div>
+                  <div>
+                    <dt>Despesas registradas</dt>
+                    <dd>{formatMoney(summary.total_expenses)}</dd>
+                  </div>
+                  <div>
+                    <dt>Sobra apos despesas</dt>
+                    <dd>{formatMoney(summary.estimated_net_profit)}</dd>
+                  </div>
+                </dl>
+              </article>
+
+              <article className="dashboard-layer">
+                <p className="eyebrow">Estimado</p>
+                <dl>
+                  <div>
+                    <dt>Custos estruturais estimados</dt>
+                    <dd>{formatMoney(summary.estimated_structural_costs)}</dd>
+                  </div>
+                  <div>
+                    <dt>Resultado economico estimado</dt>
+                    <dd>{formatMoney(summary.estimated_economic_result)}</dd>
+                  </div>
+                  <div>
+                    <dt>O que entra aqui</dt>
+                    <dd>Custos do veiculo configurados</dd>
+                  </div>
+                </dl>
+              </article>
+
+              <article className="dashboard-layer dashboard-layer-projected">
+                <p className="eyebrow">Projetado</p>
+                <dl>
+                  <div>
+                    <dt>Despesas recorrentes previstas</dt>
+                    <dd>{formatMoney(summary.recurring_expenses_total)}</dd>
+                  </div>
+                  <div>
+                    <dt>Custos projetados totais</dt>
+                    <dd>{formatMoney(summary.projected_economic_costs)}</dd>
+                  </div>
+                  <div>
+                    <dt>Resultado projetado apos recorrencias</dt>
+                    <dd>{formatMoney(summary.projected_economic_result)}</dd>
+                  </div>
+                  <div>
+                    <dt>O que entra aqui</dt>
+                    <dd>Despesas recorrentes previstas</dd>
+                  </div>
+                </dl>
+              </article>
+            </div>
+
+            {!isPositiveMoney(summary.estimated_structural_costs) ? (
+              <p className="empty-state">
+                Dados insuficientes para o resultado estimado: configure os custos do veiculo para
+                uma leitura economica mais completa.{" "}
+                <a href="#veiculos">Ir para Veiculos</a>
+              </p>
+            ) : null}
+          </details>
+
+          <div className="recurring-projection">
+            <div className="list-header">
+              <h3>Despesas recorrentes previstas</h3>
+            </div>
+            <p className="subtle-note">
+              Projetado usa despesas recorrentes configuradas. Quando uma despesa real equivalente ja
+              esta registrada, o GanhoCerto evita contar o mesmo custo duas vezes.
+            </p>
+
+            {isPositiveMoney(summary.recurring_expenses_total) ? (
+              <>
+                <div className="recurring-projection-list">
+                  {getRecurringProjectionItems(summary).map((item) => (
+                    <article className="structural-item" key={item.category}>
+                      <div>
+                        <strong>{getExpenseCategoryLabel(item.category)}</strong>
+                        <span>Previsto no periodo</span>
+                      </div>
+                      <strong>{formatMoney(item.amount)}</strong>
+                    </article>
+                  ))}
+                </div>
+                <article className="recurring-projection-total">
+                  <span>Total previsto no periodo</span>
+                  <strong>{formatMoney(summary.recurring_expenses_total)}</strong>
+                </article>
+              </>
+            ) : (
+              <p className="empty-state compact-empty-state">
+                Sem despesas recorrentes previstas a descontar neste período. Confira as recorrências
+                configuradas e os gastos já registrados.{" "}
+                <a href="#despesas-recorrentes">Configurar despesas recorrentes</a>
+              </p>
+            )}
+          </div>
+
+          <div className="structural-breakdown">
+            <div className="list-header">
+              <div>
+                <h3>Custos estruturais estimados</h3>
+                <p className="subtle-note">
+                  Estimativas baseadas nos custos do veiculo configurados. Elas nao representam,
+                  necessariamente, despesas pagas neste periodo.
+                </p>
+              </div>
+            </div>
+
+            {getStructuralCostItems(summary).length === 0 ? (
+              <p className="empty-state">
+                Nenhum custo estrutural estimado neste período. Confira os custos do veículo e os
+                registros do período para entender esta estimativa.
+              </p>
+            ) : (
+              <div className="structural-list">
+                {getStructuralCostItems(summary).map((item) => (
+                  <article className="structural-item" key={item.key}>
+                    <div>
+                      <strong>{item.label}</strong>
+                      <span>
+                        {item.percentage === null
+                          ? "Participacao indisponivel"
+                          : `${item.percentage}% dos custos estruturais`}
+                      </span>
+                    </div>
+                    <strong>{formatMoney(item.value)}</strong>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="list-header">
+            <div>
+              <h3>Desempenho registrado</h3>
+              <p className="subtle-note">
+                Estas metricas descrevem os registros deste periodo e nao indicam a causa de uma
+                mudanca.
+              </p>
+            </div>
+          </div>
+
+          <div className="metric-grid">
+            <article className="metric-card">
+              <span>Resultado bruto por hora</span>
+              <strong>{getMetricValue(summary.gross_per_hour, formatMoney)}</strong>
+              <small>Faturamento dividido pelas horas registradas.</small>
+            </article>
+            <article className="metric-card">
+              <span>Resultado apos despesas por hora</span>
+              <strong>{getMetricValue(summary.net_per_hour, formatMoney)}</strong>
+              <small>Sobra no caixa dividida pelas horas registradas.</small>
+            </article>
+            <article className="metric-card">
+              <span>Resultado bruto por km</span>
+              <strong>{getMetricValue(summary.gross_per_km, formatMoney)}</strong>
+              <small>Faturamento dividido pelos km registrados.</small>
+            </article>
+            <article className="metric-card">
+              <span>Resultado apos despesas por km</span>
+              <strong>{getMetricValue(summary.net_per_km, formatMoney)}</strong>
+              <small>Sobra no caixa dividida pelos km registrados.</small>
+            </article>
+            <article className="metric-card">
+              <span>Custo registrado por km</span>
+              <strong>{getMetricValue(summary.expense_per_km, formatMoney)}</strong>
+              <small>Despesas registradas divididas pelos km.</small>
+            </article>
+            <article className="metric-card">
+              <span>Ticket médio</span>
+              <strong>{getMetricValue(summary.average_ticket, formatMoney)}</strong>
+              <small>Faturamento dividido pelas corridas registradas.</small>
+            </article>
+            <article className="metric-card">
+              <span>Corridas registradas</span>
+              <strong>{summary.total_trip_count}</strong>
+            </article>
+            <article className="metric-card">
+              <span>Horas registradas</span>
+              <strong>{formatWorkTime(summary.total_worked_minutes)}</strong>
+            </article>
+            <article className="metric-card">
+              <span>Km registrados</span>
+              <strong>{formatDistance(summary.total_distance_km)} km</strong>
+            </article>
+          </div>
+
+          <div className="daily-breakdown">
+            <div className="list-header">
+              <h3>Evolução diária</h3>
+            </div>
+
+            {summary.daily.length === 0 ? (
+              <p className="empty-state">Nenhuma movimentação neste período. Registre jornadas e gastos para acompanhar a evolução diária.</p>
+            ) : (
+              summary.daily.map((dailyItem) => {
+                const chartMax = getChartMax(summary);
+                return (
+                  <article className="daily-row" key={dailyItem.date}>
+                    <h4>{formatDate(dailyItem.date)}</h4>
+                    <div className="bar-line">
+                      <span>Faturamento</span>
+                      <div>
+                        <i
+                          style={{
+                            width: `${(getChartValue(dailyItem.gross_revenue) / chartMax) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <strong>{formatMoney(dailyItem.gross_revenue)}</strong>
+                    </div>
+                    <div className="bar-line expense-bar">
+                      <span>Despesas</span>
+                      <div>
+                        <i
+                          style={{
+                            width: `${(getChartValue(dailyItem.expenses) / chartMax) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <strong>{formatMoney(dailyItem.expenses)}</strong>
+                    </div>
+                    <div className="bar-line profit-bar">
+                      <span>Sobra registrada</span>
+                      <div>
+                        <i
+                          style={{
+                            width: `${
+                              (getChartValue(dailyItem.estimated_net_profit) / chartMax) * 100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <strong>{formatMoney(dailyItem.estimated_net_profit)}</strong>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </details>
     </>
   );
 }

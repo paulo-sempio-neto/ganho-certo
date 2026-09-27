@@ -160,7 +160,7 @@ function hasPreviousComparisonData(history: FinancialHistoryResponse): boolean {
 }
 
 export function getHistoryComparisonUnavailableMessage(): string {
-  return "Voce ja tem registros neste periodo. A comparacao fica disponivel quando houver dados no periodo anterior tambem.";
+  return "Você já tem registros neste período. Para comparar, são necessários registros também no período anterior equivalente. Continue registrando jornadas e gastos ou selecione um intervalo com dados nos dois períodos.";
 }
 
 export function getHistoryComparisonScopeMessage(): string {
@@ -168,7 +168,7 @@ export function getHistoryComparisonScopeMessage(): string {
 }
 
 export function getHistoryEmptyStateMessage(): string {
-  return "Ainda nao ha dados suficientes neste periodo para acompanhar sua evolucao. Registre mais dias para comparar periodos.";
+  return "Não há movimentação registrada no intervalo selecionado. Registre jornadas e gastos ou ajuste o período. Registros no período atual e no anterior permitem comparar sua evolução.";
 }
 
 function getComparisonDirectionLabel(comparison: FinancialHistoryMetricComparison): string {
@@ -527,7 +527,7 @@ export function HistoricalPerformanceSection({
         ) : (
           <div className="empty-state history-empty-state">
             <p>{getHistoryEmptyStateMessage()}</p>
-            <a className="button button-primary" href="#quick-start">
+            <a className="button button-primary" href="#hoje">
               Registrar meu dia
             </a>
           </div>
