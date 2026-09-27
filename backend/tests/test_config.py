@@ -19,9 +19,10 @@ def test_local_app_keeps_api_docs_enabled() -> None:
     assert response.status_code == 200
 
 
-def test_production_app_disables_public_api_docs() -> None:
+@pytest.mark.parametrize("environment", ["production", "prod"])
+def test_production_app_enables_public_api_docs(environment: str) -> None:
     application = create_app(Settings(
-        app_env="production", jwt_secret_key=STRONG_SECRET,
+        app_env=environment, jwt_secret_key=STRONG_SECRET,
         database_url="postgresql+psycopg://example:example@db.example.com/app",
         cors_allowed_origins="https://app.example.com",
         frontend_base_url="https://app.example.com",
@@ -35,9 +36,12 @@ def test_production_app_disables_public_api_docs() -> None:
         openapi_response = client.get("/openapi.json")
         health_response = client.get("/health")
 
-    assert docs_response.status_code == 404
-    assert redoc_response.status_code == 404
-    assert openapi_response.status_code == 404
+    assert docs_response.status_code == 200
+    assert "/openapi.json" in docs_response.text
+    assert redoc_response.status_code == 200
+    assert openapi_response.status_code == 200
+    assert "post" in openapi_response.json()["paths"]["/auth/register"]
+    assert "post" in openapi_response.json()["paths"]["/auth/login"]
     assert health_response.status_code == 200
 
 

@@ -183,7 +183,8 @@ If any step fails:
 
 - Public frontend and backend use HTTPS.
 - `APP_ENV=production` is set on the backend.
-- API docs are not public in production.
+- `/docs` and `/openapi.json` are available in production; protected API routes
+  still require authentication.
 - `JWT_SECRET` is strong, unique and not reused from examples.
 - `CORS_ALLOWED_ORIGINS` contains only the real HTTPS frontend origin.
 - `ALLOWED_HOSTS` contains only real backend and health-check hostnames.

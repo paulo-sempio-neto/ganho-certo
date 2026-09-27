@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
+from sqlalchemy import false, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -25,6 +25,7 @@ from app.financial_insights import router as financial_insights_router
 from app.financial_summary import router as financial_summary_router
 from app.import_profiles import router as import_profiles_router
 from app.maintenance import router as maintenance_router
+from app.models import Feature, Plan, PlanFeature, ProductEvent, User
 from app.observability import (
     configure_logging,
     log_exception,
@@ -40,19 +41,14 @@ from app.work_session_imports import router as work_session_imports_router
 from app.work_sessions import router as work_sessions_router
 
 
-def docs_enabled(settings: Settings) -> bool:
-    return settings.app_env.lower() not in {"production", "prod"}
-
-
 def create_app(settings: Settings | None = None) -> FastAPI:
     app_settings = settings or get_settings()
     configure_logging()
-    enable_docs = docs_enabled(app_settings)
     application = FastAPI(
         title=app_settings.app_name,
-        docs_url="/docs" if enable_docs else None,
-        redoc_url="/redoc" if enable_docs else None,
-        openapi_url="/openapi.json" if enable_docs else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
     )
     application.state.settings = app_settings
     application.middleware("http")(safe_errors_middleware)
@@ -110,7 +106,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @application.get("/ready")
     def ready(request: Request, db: Annotated[Session, Depends(get_db)]) -> JSONResponse:
         try:
-            db.execute(text("SELECT 1"))
+            # Validate registration tables and columns without reading user data.
+            for model in (User, Plan, Feature, PlanFeature, ProductEvent):
+                db.execute(select(model).where(false()))
         except SQLAlchemyError as error:
             log_exception(request, error)
             return JSONResponse({"status": "unavailable"}, status_code=503)

@@ -174,7 +174,8 @@ bash scripts/render-start.sh
 O script versionado `backend/scripts/render-start.sh` executa:
 
 ```bash
-alembic upgrade head
+python -m alembic upgrade head
+python -m alembic current
 python -m app.server
 ```
 
@@ -182,7 +183,8 @@ No plano Free do Render, onde Pre-Deploy Command nao fica disponivel, mantenha
 esse Start command. O servidor so inicia se o Alembic terminar com sucesso.
 Veja as [etapas de deploy do Render](https://render.com/docs/deploys).
 
-Configure o health check como `/ready`, que testa a conexao com PostgreSQL;
+Configure o health check como `/ready`, que testa a conexao e as tabelas/colunas
+usadas no cadastro (`users`, `plans`, `features`, `plan_features`, `product_events`);
 `/health` confirma apenas que o processo esta respondendo. Inclua o hostname
 publico do servico e os dominios personalizados usados nos checks em
 `ALLOWED_HOSTS`, sem esquema, porta ou caminho.
@@ -241,8 +243,9 @@ Nao cadastre `POSTGRES_*` do Docker Compose no Web Service: ele usa `DATABASE_UR
 Nao e necessario cadastrar `HOST`, `APP_HOST`, `PORT` ou `APP_PORT`: o servidor
 escuta em `0.0.0.0` e usa o `PORT` fornecido pelo Render.
 
-O `APP_ENV=production` e obrigatorio em deploy publico: nesse modo a API desabilita
-Swagger/ReDoc/OpenAPI publicos e rejeita `JWT_SECRET` conhecido, curto ou fraco.
+O `APP_ENV=production` e obrigatorio em deploy publico: nesse modo a API rejeita
+`JWT_SECRET` conhecido, curto ou fraco. Swagger (`/docs`), ReDoc (`/redoc`) e
+OpenAPI (`/openapi.json`) ficam habilitados, inclusive em producao.
 O `PORT` e fornecido pelo Render automaticamente. Nao versionar segredos reais.
 
 No Render, `CORS_ALLOWED_ORIGINS` pode ficar vazio ou ausente enquanto o frontend
@@ -331,9 +334,9 @@ ou `npm run preview` como servidor de producao. Referencia:
    ```
 
    Espere HTTP 200 com `{"status":"ok"}` e `{"status":"ready"}`,
-   respectivamente. `/ready` verifica conexao, mas nao a versao do schema;
-   confirme a revisao do banco no passo anterior. `/docs`, `/redoc` e
-   `/openapi.json` retornam 404 em producao por configuracao intencional.
+   respectivamente. `/ready` verifica conexao e tabelas/colunas do cadastro;
+   confirme tambem a revisao do banco no passo anterior. `/docs`, `/redoc` e
+   `/openapi.json` devem retornar HTTP 200, inclusive em producao.
 
 7. Configure `VITE_API_BASE_URL` com a URL HTTPS do backend (sem barra final) e
    publique o frontend. No backend, defina `CORS_ALLOWED_ORIGINS` com a origem
@@ -342,8 +345,8 @@ ou `npm run preview` como servidor de producao. Referencia:
    email real de recuperacao, incluindo abertura direta de `/reset-password`.
 
 Riscos da primeira inicializacao: variaveis obrigatorias invalidas bloqueiam
-tanto Alembic quanto a API; banco sem migrations pode responder `/ready` mas
-falhar nas rotas de negocio; host incorreto em `ALLOWED_HOSTS` rejeita os checks;
+tanto Alembic quanto a API; banco sem tabelas/colunas do cadastro retorna 503 em
+`/ready`; host incorreto em `ALLOWED_HOSTS` rejeita os checks;
 SMTP bloqueado impede recuperacao de senha. A verificacao local nao comprova
 conectividade, credenciais, migrations ou envio de email no servico publicado.
 

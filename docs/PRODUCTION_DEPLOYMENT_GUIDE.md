@@ -155,8 +155,8 @@ Expected current head:
 20260926_0021
 ```
 
-`/ready` checks database connectivity, not migration status. Migration success
-must be confirmed from the release command logs.
+`/ready` checks database connectivity and the tables/columns used by registration,
+not the Alembic revision. Migration success must be confirmed from startup logs.
 
 ### Step 5: Deploy the backend
 
@@ -164,7 +164,7 @@ must be confirmed from the release command logs.
 2. Confirm the process starts without configuration errors.
 3. Confirm logs do not print secrets.
 4. Confirm the backend public URL.
-5. Keep API docs disabled in production (`APP_ENV=production` does this).
+5. Confirm `/docs` and `/openapi.json` return HTTP 200 in production.
 
 ### Step 6: Configure frontend environment variables
 

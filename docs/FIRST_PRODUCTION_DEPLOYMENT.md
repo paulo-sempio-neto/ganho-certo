@@ -187,9 +187,9 @@ Expected current migration head:
 20260926_0021
 ```
 
-`/ready` checks database connectivity with `SELECT 1`, but it does not verify
-that migrations have reached the latest head. Confirm migration logs before
-inviting real users.
+`/ready` checks database connectivity and the tables/columns used by registration
+without reading user records. It does not verify that migrations have reached
+the latest head. Confirm migration logs before inviting real users.
 
 ### Step 5: Deploy and validate the backend
 
@@ -219,14 +219,14 @@ Expected response:
 {"status":"ready"}
 ```
 
-3. Confirm production docs are disabled:
+3. Confirm production docs are available:
 
 ```text
 https://<render-backend-host>/docs
 https://<render-backend-host>/openapi.json
 ```
 
-These should not expose public API docs when `APP_ENV=production`.
+Both endpoints should return HTTP 200, including when `APP_ENV=production`.
 
 4. Confirm logs do not print secrets.
 5. Capture the final backend HTTPS origin for Vercel.
@@ -337,7 +337,7 @@ Backend:
 
 - [ ] `GET /health` returns `{"status":"ok"}`.
 - [ ] `GET /ready` returns `{"status":"ready"}`.
-- [ ] Production API docs are not public.
+- [ ] `/docs` and `/openapi.json` return HTTP 200 in production.
 - [ ] Render logs include request IDs and no secrets.
 
 Frontend/product flow:

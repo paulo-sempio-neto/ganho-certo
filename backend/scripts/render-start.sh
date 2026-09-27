@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-alembic upgrade head
+python -m alembic upgrade head
+python -m alembic current
 exec python -m app.server

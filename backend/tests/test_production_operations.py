@@ -9,14 +9,14 @@ import pytest
 from fastapi import Request
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.types import Message
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import Settings
-from app.database import get_db
+from app.database import Base, get_db
 from app.main import create_app
 from app.observability import JsonLogFormatter
 from app.rate_limit import InMemoryRateLimiter, get_client_ip
@@ -107,6 +107,7 @@ def test_readiness(healthy: bool, caplog: pytest.LogCaptureFixture) -> None:
 
     def database() -> Generator[Session, None, None]:
         with Session(engine) as session:
+            Base.metadata.create_all(session.connection())
             if not healthy:
                 session.execute = MagicMock(  # type: ignore[method-assign]
                     side_effect=OperationalError("private SQL", {}, Exception("private URL")),
@@ -121,6 +122,36 @@ def test_readiness(healthy: bool, caplog: pytest.LogCaptureFixture) -> None:
     assert response.status_code == (200 if healthy else 503)
     assert response.json() == {"status": "ready" if healthy else "unavailable"}
     assert "private" not in response.text + caplog.text
+
+
+@pytest.mark.parametrize("schema_change", [
+    "DROP TABLE users",
+    "ALTER TABLE users DROP COLUMN auth_version",
+    "DROP TABLE plans",
+    "DROP TABLE features",
+    "DROP TABLE plan_features",
+    "DROP TABLE product_events",
+])
+def test_readiness_rejects_incomplete_registration_schema(schema_change: str) -> None:
+    application = create_app(production_settings())
+    engine = create_engine("sqlite://")
+
+    def database() -> Generator[Session, None, None]:
+        with Session(engine) as session:
+            Base.metadata.create_all(session.connection())
+            session.execute(text(schema_change))
+            # Connectivity alone still succeeds with an incomplete schema.
+            assert session.scalar(text("SELECT 1")) == 1
+            yield session
+
+    application.dependency_overrides[get_db] = database
+    with TestClient(application) as client:
+        response = client.get("/ready")
+        assert client.get("/health").status_code == 200
+    engine.dispose()
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}
 
 
 @pytest.mark.parametrize("origins", [
