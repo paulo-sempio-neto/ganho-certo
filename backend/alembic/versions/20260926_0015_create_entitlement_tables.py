@@ -140,8 +140,8 @@ def upgrade() -> None:
         ],
     )
 
-    plan_ids = dict(bind.execute(sa.select(plans_table.c.code, plans_table.c.id)).all())
-    feature_ids = dict(bind.execute(sa.select(features_table.c.code, features_table.c.id)).all())
+    plan_ids: dict[str, int] = dict(bind.execute(sa.select(plans_table.c.code, plans_table.c.id)).all())  # type: ignore[arg-type]
+    feature_ids: dict[str, int] = dict(bind.execute(sa.select(features_table.c.code, features_table.c.id)).all())  # type: ignore[arg-type]
     bind.execute(
         plan_features_table.insert(),
         [

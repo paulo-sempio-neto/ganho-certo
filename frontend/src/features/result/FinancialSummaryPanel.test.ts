@@ -69,6 +69,12 @@ describe("FinancialSummaryPanel", () => {
     );
 
     expect(html).toContain("Realizado");
+    expect(html).toContain('<h4 class="result-label">Sobra após gastos registrados</h4>');
+    expect(html).toContain('<h4 class="result-label">Resultado estimado</h4>');
+    expect(html).toContain('<h4 class="result-label">Resultado projetado</h4>');
+    expect(html).toContain("Usa o mesmo faturamento registrado.");
+    expect(html).toContain("os custos do perfil podem substituir");
+    expect(html).not.toMatch(/lucro definitivo|Sobra no caixa/);
     expect(html).toContain("Estimado");
     expect(html).toContain("Projetado");
     expect(html).toContain('data-result-kind="realized"');
@@ -77,14 +83,14 @@ describe("FinancialSummaryPanel", () => {
     expect(html).toContain("R$ 120,00");
     expect(html).toContain("R$ 80,00");
     expect(html).toContain("R$ 70,00");
-    expect(html).toContain("Sobra no caixa: faturamento menos despesas registradas.");
-    expect(html).toContain("Sobra registrada menos os custos estimados do veículo. Não é saldo em caixa.");
+    expect(html).toContain("Faturamento menos os gastos que você já lançou.");
+    expect(html).toContain("Custos equivalentes não são contados duas vezes. Não é saldo disponível.");
     expect(html).toContain("Não é previsão de renda.");
-    expect(html).toContain("Gastos ainda não registrados não estão descontados.");
+    expect(html).toContain("Esta sobra é parcial: despesas ainda não lançadas não foram descontadas.");
     expect(html).toContain('result-primary" data-result-kind="realized"');
     expect(html).toContain("Desempenho registrado");
-    expect(html).toContain("Sobra no caixa dividida pelas horas registradas.");
-    expect(html).toContain("Custos estruturais estimados");
+    expect(html).toContain("Sobra após gastos registrados dividida pelas horas registradas.");
+    expect(html).toContain("Custos estimados do veículo");
     expect(html.indexOf("Realizado")).toBeLessThan(html.indexOf("Estimado"));
     expect(html.indexOf("Estimado")).toBeLessThan(html.indexOf("Projetado"));
   });
@@ -108,7 +114,8 @@ describe("FinancialSummaryPanel", () => {
       }),
     );
 
-    expect(html).toContain("Dados insuficientes para o resultado estimado");
+    expect(html).not.toContain("Dados insuficientes para o resultado estimado");
+    expect(html).toContain("Sem custos estimados neste período. Confira os custos do veículo e os registros");
     expect(html).toContain("Sem despesas recorrentes previstas a descontar neste período.");
     expect(html).toContain("Nenhum custo estrutural estimado neste período.");
     expect(html).toContain("Sem custos estimados neste período. Confira o perfil do veículo.");
@@ -124,6 +131,8 @@ describe("FinancialSummaryPanel", () => {
     expect(html.indexOf('data-result-kind="realized"')).toBeLessThan(html.indexOf('id="comparison-slot"'));
     expect(html.indexOf('id="comparison-slot"')).toBeLessThan(html.indexOf('id="detalhes-resultado"'));
     expect(html).toContain('<details class="result-details" id="detalhes-resultado">');
+    expect(html).toContain('href="#detalhes-resultado">Ver detalhes do cálculo</a>');
+    expect(html).toContain("Ver como cada resultado é formado");
     expect(html).toContain("Desempenho registrado");
     expect(html).toContain("Evolução diária");
     expect(html).toContain("Despesas recorrentes previstas");

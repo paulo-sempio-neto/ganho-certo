@@ -1,4 +1,6 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
+import { ErrorMessage } from "../../components/ErrorMessage";
+import { useFormValidation } from "../../utils/formValidation";
 import {
   forwardRef,
   type FormEvent,
@@ -151,6 +153,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
     ref,
   ) {
     const [vehicleForm, setVehicleForm] = useState<VehicleForm>(emptyVehicleForm);
+    const vehicleValidation = useFormValidation();
     const [costProfileForm, setCostProfileForm] =
       useState<VehicleCostProfileForm>(emptyCostProfileForm);
     const [editingVehicleId, setEditingVehicleId] = useState<number | null>(null);
@@ -334,6 +337,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
         );
         setCostProfileForm(costProfileToForm(profile));
         setSuccessMessage("Perfil de custos salvo com sucesso.");
+        await refreshDashboardData();
       } catch (error) {
         if (error instanceof Error && error.message.includes("Sessao")) {
           endSession(error.message);
@@ -358,7 +362,7 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
         </div>
 
         <div className="vehicles-layout">
-          <form className="auth-form vehicle-form" onSubmit={handleVehicleSubmit}>
+          <form className="auth-form vehicle-form" onSubmit={handleVehicleSubmit} onInvalid={vehicleValidation.handleInvalid}>
             <h3>{editingVehicleId ? "Editar veiculo" : "Cadastrar veiculo"}</h3>
             <p className="subtle-note">
               O cadastro básico já permite registrar jornadas. Os custos do veículo podem ser
@@ -368,77 +372,105 @@ export const VehiclesSection = forwardRef<VehiclesSectionHandle, VehiclesSection
             <label>
               Nome
               <input
-                name="vehicle-name"
+                name="name"
                 onChange={(event) => setVehicleForm({ ...vehicleForm, name: event.target.value })}
                 required
                 type="text"
                 value={vehicleForm.name}
+                aria-invalid={!!vehicleValidation.errors.name}
+                aria-describedby={vehicleValidation.errors.name ? "vehicle-name-error" : undefined}
+                className={vehicleValidation.errors.name ? "field-error" : ""}
               />
             </label>
+            <ErrorMessage id="vehicle-name-error" message={vehicleValidation.errors.name} />
 
             <div className="form-grid">
-              <label>
-                Marca
-                <input
-                  name="brand"
-                  onChange={(event) =>
-                    setVehicleForm({ ...vehicleForm, brand: event.target.value })
-                  }
-                  required
-                  type="text"
-                  value={vehicleForm.brand}
-                />
-              </label>
+              <div>
+                <label>
+                  Marca
+                  <input
+                    name="brand"
+                    onChange={(event) =>
+                      setVehicleForm({ ...vehicleForm, brand: event.target.value })
+                    }
+                    required
+                    type="text"
+                    value={vehicleForm.brand}
+                    aria-invalid={!!vehicleValidation.errors.brand}
+                    aria-describedby={vehicleValidation.errors.brand ? "vehicle-brand-error" : undefined}
+                    className={vehicleValidation.errors.brand ? "field-error" : ""}
+                  />
+                </label>
+                <ErrorMessage id="vehicle-brand-error" message={vehicleValidation.errors.brand} />
+              </div>
 
-              <label>
-                Modelo
-                <input
-                  name="model"
-                  onChange={(event) =>
-                    setVehicleForm({ ...vehicleForm, model: event.target.value })
-                  }
-                  required
-                  type="text"
-                  value={vehicleForm.model}
-                />
-              </label>
+              <div>
+                <label>
+                  Modelo
+                  <input
+                    name="model"
+                    onChange={(event) =>
+                      setVehicleForm({ ...vehicleForm, model: event.target.value })
+                    }
+                    required
+                    type="text"
+                    value={vehicleForm.model}
+                    aria-invalid={!!vehicleValidation.errors.model}
+                    aria-describedby={vehicleValidation.errors.model ? "vehicle-model-error" : undefined}
+                    className={vehicleValidation.errors.model ? "field-error" : ""}
+                  />
+                </label>
+                <ErrorMessage id="vehicle-model-error" message={vehicleValidation.errors.model} />
+              </div>
             </div>
 
             <div className="form-grid">
-              <label>
-                Ano
-                <input
-                  max="2100"
-                  min="1900"
-                  name="year"
-                  onChange={(event) =>
-                    setVehicleForm({ ...vehicleForm, year: event.target.value })
-                  }
-                  required
-                  type="number"
-                  value={vehicleForm.year}
-                />
-              </label>
+              <div>
+                <label>
+                  Ano
+                  <input
+                    max="2100"
+                    min="1900"
+                    name="year"
+                    onChange={(event) =>
+                      setVehicleForm({ ...vehicleForm, year: event.target.value })
+                    }
+                    required
+                    type="number"
+                    value={vehicleForm.year}
+                    aria-invalid={!!vehicleValidation.errors.year}
+                    aria-describedby={vehicleValidation.errors.year ? "vehicle-year-error" : undefined}
+                    className={vehicleValidation.errors.year ? "field-error" : ""}
+                  />
+                </label>
+                <ErrorMessage id="vehicle-year-error" message={vehicleValidation.errors.year} />
+              </div>
 
-              <label>
-                Combustivel
-                <select
-                  name="fuel-type"
-                  onChange={(event) =>
-                    setVehicleForm({
-                      ...vehicleForm,
-                      fuel_type: event.target.value as FuelType,
-                    })
-                  }
-                  value={vehicleForm.fuel_type}
-                >
-                  {fuelOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div>
+                <label>
+                  Combustivel
+                  <select
+                    name="fuel_type"
+                    onChange={(event) =>
+                      setVehicleForm({
+                        ...vehicleForm,
+                        fuel_type: event.target.value as FuelType,
+                      })
+                    }
+                    value={vehicleForm.fuel_type}
+                    aria-invalid={!!vehicleValidation.errors.fuel_type}
+                    aria-describedby={vehicleValidation.errors.fuel_type ? "vehicle-fuel_type-error" : undefined}
+                    className={vehicleValidation.errors.fuel_type ? "field-error" : ""}
+                  >
+                    {fuelOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <ErrorMessage id="vehicle-fuel_type-error" message={vehicleValidation.errors.fuel_type} />
+              </div>
             </div>
 
             <div className="form-actions">

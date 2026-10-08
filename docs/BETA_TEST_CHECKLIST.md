@@ -29,6 +29,8 @@ o tester. Este checklist e para quem acompanha a sessao e revisa sinais internos
 - [ ] Confirmar que o app nao pede informacoes excessivas para comecar.
 - [ ] Registrar o primeiro dia em `Registrar meu dia`.
 - [ ] Confirmar que o resultado parcial aparece apos salvar.
+- [ ] Confirmar que o cadastro basico permite continuar a jornada sem configurar
+      custos avancados. Registrar qualquer necessidade de ajuda do observador.
 - [ ] Ler o resultado e confirmar que fica claro quanto sobrou depois dos gastos.
 - [ ] Confirmar que a orientacao convida a salvar um segundo dia para formar
       uma base de comparacao.
@@ -37,6 +39,8 @@ o tester. Este checklist e para quem acompanha a sessao e revisa sinais internos
 
 ## Uso diario
 
+- [ ] Reabrir o app: confirmar data atual, veiculo sugerido quando disponivel e
+      faturamento/km/duracao em branco. Nenhum valor financeiro deve ser inferido.
 - [ ] Registrar mais um dia com data diferente.
 - [ ] Confirmar que a orientacao muda para revisar tendencias depois de mais de um registro.
 - [ ] Abrir historico, comparacoes e padroes para verificar o que ficou
@@ -93,13 +97,16 @@ o tester. Este checklist e para quem acompanha a sessao e revisa sinais internos
   - `first_vehicle_created`
   - `first_financial_entry`
   - `first_workday_completed` apos a primeira jornada salva
-  - `first_result_viewed` somente apos abrir o resultado com jornada em aba visivel
+  - `first_result_viewed` apos exibir o resumo completo com jornada em aba visivel;
+    ver apenas o resultado parcial logo apos salvar nao dispara esse evento
   - `checkout_started`, se houve checkout
   - `subscription_activated`, se houve webhook aprovado
   - `feedback_sent`
 - [ ] Confirmar que eventos nao armazenam valores financeiros, senha, token ou email.
 - [ ] Confirmar que carregar `/financial-summary` em segundo plano nao cria
   `first_result_viewed` nem novos eventos `dashboard_viewed`.
+- [ ] Registrar separadamente se o tester entendeu o resultado parcial e se abriu
+  o resumo completo; nao inferir compreensao ou retorno pelo contador de eventos.
 
 ## Quando parar o teste
 

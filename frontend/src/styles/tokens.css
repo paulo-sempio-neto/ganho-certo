@@ -1,33 +1,53 @@
 :root {
   color-scheme: light;
 
-  --color-canvas: #f5f6f8;
+  /* ── Canvas & Surfaces ── */
+  --color-canvas: #f7f8fa;
   --color-surface: #ffffff;
-  --color-surface-subtle: #f1f3f5;
-  --color-text: #202a35;
-  --color-heading: #16212c;
-  --color-text-muted: #52606d;
-  --color-border: #dce1e6;
+  --color-surface-subtle: #f0f2f5;
+  --color-surface-raised: #ffffff;
+
+  /* ── Typography palette ── */
+  --color-text: #1a2332;
+  --color-heading: #0f1923;
+  --color-text-muted: #5a6a7a;
+  --color-text-soft: #8494a7;
+
+  /* ── Borders ── */
+  --color-border: #e2e6eb;
   --color-border-strong: #a6b0bb;
   --color-control-border: #84919f;
-  --color-brand: #176443;
-  --color-brand-hover: #104a32;
+
+  /* ── Brand ── */
+  --color-brand: #147a4a;
+  --color-brand-hover: #0e5c37;
+  --color-brand-subtle: #e8f5ee;
   --color-on-brand: #ffffff;
 
-  --color-success: #176443;
-  --color-success-surface: #eef7f1;
-  --color-success-border: #8ebba0;
-  --color-info: #205b87;
-  --color-info-surface: #eef5fb;
-  --color-info-border: #8aafca;
-  --color-warning: #785309;
-  --color-warning-surface: #fff8e6;
-  --color-warning-border: #c6a552;
+  /* ── Semantic: success ── */
+  --color-success: #147a4a;
+  --color-success-surface: #eaf6ef;
+  --color-success-border: #82c49e;
+
+  /* ── Semantic: info ── */
+  --color-info: #1a5f8a;
+  --color-info-surface: #edf5fb;
+  --color-info-border: #82b3d1;
+
+  /* ── Semantic: warning ── */
+  --color-warning: #7a5a0a;
+  --color-warning-surface: #fef8e8;
+  --color-warning-border: #c9aa52;
+
+  /* ── Semantic: danger ── */
   --color-danger: #a12d3d;
-  --color-danger-surface: #fff1f3;
+  --color-danger-surface: #fdf0f2;
   --color-danger-border: #d99aa5;
+
+  /* ── Focus ── */
   --color-focus: #1261a0;
 
+  /* ── Result-kind aliases ── */
   --color-realized: var(--color-success);
   --color-realized-surface: var(--color-success-surface);
   --color-estimated: var(--color-info);
@@ -35,24 +55,38 @@
   --color-projected: var(--color-warning);
   --color-projected-surface: var(--color-warning-surface);
 
-  --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
+  /* ── Typography ── */
+  --font-display: "Clash Display", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-family: "Satoshi", "Inter", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "Segoe UI Mono",
+    monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
   --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 2rem;
-  --text-display: 3.5rem;
-  --text-display-compact: 2.75rem;
+  --text-2xl: 1.625rem;
+  --text-3xl: 2.125rem;
+  --text-display: 3.25rem;
+  --text-display-compact: 2.5rem;
+
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
   --weight-bold: 700;
-  --leading-tight: 1.2;
-  --leading-label: 1.4;
-  --leading-body: 1.5;
+  --weight-extrabold: 800;
 
+  --leading-tight: 1.15;
+  --leading-label: 1.35;
+  --leading-body: 1.55;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: -0.01em;
+  --tracking-wide: 0.06em;
+
+  /* ── Spacing (4px scale) ── */
   --space-half: 2px;
   --space-1: 4px;
   --space-2: 8px;
@@ -66,19 +100,37 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
 
+  /* ── Radii ── */
   --radius-sm: 4px;
-  --radius-control: 6px;
-  --radius-surface: 8px;
+  --radius-control: 8px;
+  --radius-surface: 12px;
+  --radius-card: 16px;
   --radius-pill: 999px;
-  --shadow-sm: 0 1px 3px rgb(22 33 44 / 8%);
-  --shadow-panel: 0 4px 16px rgb(22 33 44 / 6%);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px rgb(15 25 35 / 5%);
+  --shadow-panel: 0 2px 8px rgb(15 25 35 / 4%), 0 0 1px rgb(15 25 35 / 8%);
+  --shadow-card: 0 4px 16px rgb(15 25 35 / 5%), 0 0 1px rgb(15 25 35 / 10%);
+  --shadow-elevated: 0 8px 32px rgb(15 25 35 / 8%), 0 0 1px rgb(15 25 35 / 12%);
+
+  /* ── Controls ── */
   --control-height: 48px;
-  --control-height-compact: 44px;
+  --control-height-compact: 40px;
   --control-height-large: 56px;
-  --control-height-prominent: 60px;
-  --focus-width: 3px;
+  --control-height-prominent: 56px;
+
+  /* ── Focus ring ── */
+  --focus-width: 2px;
   --focus-offset: 3px;
-  --duration-fast: 120ms;
+
+  /* ── Motion ── */
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
   --duration-loading: 900ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 }

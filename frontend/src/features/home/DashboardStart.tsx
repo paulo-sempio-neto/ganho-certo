@@ -34,7 +34,7 @@ export function DashboardStart({ nextStep, hasWorkdays, isLoading, onRegister }:
           <a className="dashboard-result-link" href="#resultado">Ver resultado</a>
         ) : !isLoading ? (
           <p className="subtle-note" id="primeiro-resultado" tabIndex={-1}>
-            Seu resultado aparece logo abaixo do registro, depois de salvar.
+            Depois de salvar, acompanhe a sobra no resumo de Hoje.
           </p>
         ) : null}
       </div>

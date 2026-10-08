@@ -84,12 +84,15 @@ ativacao, segunda jornada, duvidas e interesse no PRO por lote. Entregue
 - O app coleta feedback autenticado em `/feedback`, gravado em `beta_feedback`
   com usuario, categoria, mensagem, caminho da tela e user agent resumido.
 - Feedbacks possuem `priority`, `status` e `resolved_at` para triagem simples.
-  Valores monetarios explicitos no texto (`R$ ...`) sao removidos antes de salvar.
+  Existe um filtro parcial de valores monetarios no texto; ele nao garante
+  remocao de todos os formatos, dados pessoais ou credenciais. Nao solicitar
+  valores financeiros no feedback e restringir o acesso interno aos relatos.
 - O app registra eventos internos em `product_events` sem valores financeiros,
   senhas, tokens, email ou payload livre. Eventos de marco usam dedupe por usuario.
 - `first_financial_entry` inclui jornada ou despesa; para ativacao, use
   `first_workday_completed` (primeira jornada salva) e `first_result_viewed`
-  (resultado com jornada exibido em uma aba visivel). O endpoint de visualizacao
+  (resumo completo com jornada exibido em uma aba visivel, nao o resultado parcial
+  logo apos salvar). O endpoint de visualizacao
   exige autenticacao, jornada do proprio usuario e corpo vazio.
 - `dashboard_viewed` e legado: leituras automaticas de `/financial-summary`
   nao geram mais esse evento. Registros antigos permanecem no banco.
@@ -189,7 +192,8 @@ ativacao, segunda jornada, duvidas e interesse no PRO por lote. Entregue
 
 ## Itens deixados para depois desta fase
 
-- Recuperação de senha.
+- Melhorias adicionais na recuperação de senha. O fluxo atual já existe e o envio
+  SMTP e a abertura do link publicado devem ser testados antes dos convites.
 - Redesign global de paginação.
 - Migração para cookies `HttpOnly`.
 - Lint tooling no frontend.

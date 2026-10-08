@@ -21,7 +21,7 @@ describe("DashboardStart", () => {
     expect(html).toContain("Registre seu primeiro dia");
     expect(html.match(/Registrar meu dia/g)).toHaveLength(1);
     expect(html).toContain('id="primeiro-resultado"');
-    expect(html).toContain("Seu resultado aparece logo abaixo do registro, depois de salvar.");
+    expect(html).toContain("Depois de salvar, acompanhe a sobra no resumo de Hoje.");
     expect(html).not.toContain('href="#resultado"');
     expect(html).not.toContain("#quick-start");
   });

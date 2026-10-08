@@ -1,5 +1,5 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getWorkPatterns } from "../../api/financial";
 import type { Vehicle } from "../../types/domain";
@@ -11,6 +11,7 @@ import type {
 import { addDays, toDateInputValue } from "../../utils/dates";
 import { formatDistance, formatWorkTime } from "../../utils/formatters";
 import { formatMoney, formatMoneyPerKm } from "../../utils/money";
+import { createLatestRequest } from "../../utils/latestRequest";
 
 type PatternPeriodPreset = "last30" | "last60" | "last90" | "custom";
 type PatternChartMetric =
@@ -19,6 +20,8 @@ type PatternChartMetric =
   | "estimated_result_per_km";
 
 type WorkPatternsSectionProps = {
+  enabled?: boolean;
+  refreshVersion?: number;
   vehicles: Vehicle[];
   getAuthHeaders: () => Record<string, string>;
   endSession: (message: string) => void;
@@ -202,6 +205,8 @@ function getChartMetricLabel(metric: PatternChartMetric): string {
 }
 
 export function WorkPatternsSection({
+  enabled = true,
+  refreshVersion = 0,
   vehicles,
   getAuthHeaders,
   endSession,
@@ -218,40 +223,70 @@ export function WorkPatternsSection({
   const [patterns, setPatterns] = useState<WorkPatternsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const patternsRequest = useRef(createLatestRequest());
+  const lastAttemptedKey = useRef<string | null>(null);
 
   const effectiveRange = getPatternPeriodDates(period, startDate, endDate);
+  const authHeaders = getAuthHeaders();
+  const queryKey = JSON.stringify([
+    authHeaders.Authorization,
+    effectiveRange.startDate,
+    effectiveRange.endDate,
+    vehicleId,
+    refreshVersion,
+  ]);
+  const latestQueryKey = useRef(queryKey);
+  latestQueryKey.current = queryKey;
 
-  async function loadPatterns() {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      const response = await getWorkPatterns(getAuthHeaders(), {
-        startDate: effectiveRange.startDate,
-        endDate: effectiveRange.endDate,
-        vehicleId,
-      });
-      setPatterns(response);
-    } catch (requestError) {
-      if (requestError instanceof Error && requestError.message.includes("Sessao")) {
-        endSession(requestError.message);
-      } else {
-        setPatterns(null);
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Não foi possível carregar seus padrões agora.",
-        );
-      }
-    } finally {
-      setIsLoading(false);
+  async function loadPatterns(retry = false) {
+    if (!enabled) return;
+    if (retry) {
+      patternsRequest.current.invalidate();
+      lastAttemptedKey.current = null;
     }
+    if (lastAttemptedKey.current === queryKey) return;
+    lastAttemptedKey.current = queryKey;
+
+    await patternsRequest.current.run(queryKey, async (isCurrent) => {
+      const canApply = () => isCurrent() && latestQueryKey.current === queryKey;
+      if (!canApply()) return;
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const response = await getWorkPatterns(authHeaders, {
+          startDate: effectiveRange.startDate,
+          endDate: effectiveRange.endDate,
+          vehicleId,
+        });
+        if (canApply()) setPatterns(response);
+      } catch (requestError) {
+        if (!canApply()) return;
+        if (requestError instanceof Error && requestError.message.includes("Sessao")) {
+          endSession(requestError.message);
+        } else {
+          setPatterns(null);
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Não foi possível carregar seus padrões agora.",
+          );
+        }
+      } finally {
+        if (canApply()) setIsLoading(false);
+      }
+    });
   }
 
   useEffect(() => {
     void loadPatterns();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, startDate, endDate, vehicleId]);
+  }, [enabled, queryKey]);
+
+  useEffect(() => () => {
+    patternsRequest.current.invalidate();
+    lastAttemptedKey.current = null;
+  }, []);
 
   function handlePeriodChange(nextPeriod: PatternPeriodPreset) {
     const nextRange = getPatternPeriodDates(nextPeriod, startDate, endDate);
@@ -362,7 +397,7 @@ export function WorkPatternsSection({
       {error ? (
         <div className="history-error">
           <FeedbackMessage kind="error" compact>{error}</FeedbackMessage>
-          <button className="text-button" type="button" onClick={() => void loadPatterns()}>
+          <button className="text-button" type="button" onClick={() => void loadPatterns(true)}>
             Tentar novamente
           </button>
         </div>

@@ -56,5 +56,5 @@ export function getGoalProgressStatusMessage(
 export function getGoalUpdatedAfterWorkMessage(hasActiveGoals: boolean): string {
   return hasActiveGoals
     ? "Dia registrado. As metas ativas foram atualizadas com os registros deste periodo."
-    : "Dia registrado. Veja a sobra apos gastos abaixo.";
+    : "Dia registrado. Veja a sobra no resumo de Hoje.";
 }

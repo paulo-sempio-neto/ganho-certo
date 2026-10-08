@@ -364,7 +364,7 @@ function formatCents(value: bigint): string {
 function App() {
   const initialHistoryRange = getHistoryPeriodDates("last30", "", "");
   const vehiclesSectionRef = useRef<VehiclesSectionHandle>(null);
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>("register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

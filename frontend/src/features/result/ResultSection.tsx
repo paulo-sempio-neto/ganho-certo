@@ -42,6 +42,8 @@ type HistoryFilters = {
 };
 
 type ResultSectionProps = {
+  isActive?: boolean;
+  refreshVersion?: number;
   vehicles: Vehicle[];
   dashboardFilters: DashboardFilters;
   historyFilters: HistoryFilters;
@@ -65,6 +67,8 @@ type ResultSectionProps = {
 };
 
 export function ResultSection({
+  isActive = true,
+  refreshVersion = 0,
   vehicles,
   dashboardFilters,
   historyFilters,
@@ -223,15 +227,19 @@ export function ResultSection({
               onRetry={onInsightsRetry}
             />
           </FinancialSummaryPanel>
-
-          <WorkPatternsSection
-            vehicles={vehicles}
-            getAuthHeaders={getAuthHeaders}
-            endSession={endSession}
-            getVehicleLabel={getVehicleLabel}
-          />
         </>
       ) : null}
+
+      <div hidden={isSummaryLoading || !summary}>
+        <WorkPatternsSection
+          enabled={isActive && !isSummaryLoading && summary !== null}
+          refreshVersion={refreshVersion}
+          vehicles={vehicles}
+          getAuthHeaders={getAuthHeaders}
+          endSession={endSession}
+          getVehicleLabel={getVehicleLabel}
+        />
+      </div>
 
       {!isSummaryLoading && !summary && !summaryError ? (
         <p className="empty-state">
