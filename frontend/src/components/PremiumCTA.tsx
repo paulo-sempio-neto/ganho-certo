@@ -17,22 +17,22 @@ export function PremiumCTA({ children, disabled, type = "submit", onClick }: Pre
       onClick={onClick}
       strength={0.25}
       className="
-        group relative w-full mt-4 py-4 px-8
-        rounded-2xl overflow-hidden
+        group relative w-full mt-4 py-3.5 px-8
+        rounded-lg overflow-hidden
         font-semibold text-base
-        text-emerald-950
+        text-white
         disabled:opacity-50 disabled:cursor-not-allowed
         cursor-pointer
       "
     >
       {/* Multi-layer gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-green-400 to-emerald-500 transition-all duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-700 transition-all duration-500" />
       
       {/* Ambient glow */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-r from-emerald-300 via-green-300 to-emerald-400" />
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-r from-emerald-500 to-emerald-600" />
       
-      {/* Outer glow shadow */}
-      <div className="absolute -inset-1 rounded-2xl opacity-40 group-hover:opacity-70 transition-opacity duration-500 bg-gradient-to-r from-emerald-400 to-green-500 blur-xl -z-10" />
+      {/* Outer glow shadow (subtle) */}
+      <div className="absolute -inset-1 rounded-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500 bg-emerald-500 blur-lg -z-10" />
       
       {/* Sweep shine effect */}
       <motion.div

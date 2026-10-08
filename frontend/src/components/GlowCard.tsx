@@ -39,7 +39,7 @@ export function GlowCard({ children, className = "" }: GlowCardProps) {
     ([latestX, latestY]: number[]) => {
       const px = ((latestX as number) + 0.5) * 100;
       const py = ((latestY as number) + 0.5) * 100;
-      return `radial-gradient(600px circle at ${px}% ${py}%, rgba(52, 211, 153, 0.12), transparent 50%)`;
+      return `radial-gradient(600px circle at ${px}% ${py}%, rgba(255, 255, 255, 0.04), transparent 50%)`;
     }
   );
 
@@ -48,7 +48,7 @@ export function GlowCard({ children, className = "" }: GlowCardProps) {
     ([latestX, latestY]: number[]) => {
       const px = ((latestX as number) + 0.5) * 100;
       const py = ((latestY as number) + 0.5) * 100;
-      return `radial-gradient(400px circle at ${px}% ${py}%, rgba(52, 211, 153, 0.3), rgba(255,255,255,0.06) 50%, transparent 80%)`;
+      return `radial-gradient(400px circle at ${px}% ${py}%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 50%, transparent 80%)`;
     }
   );
 
