@@ -43,6 +43,27 @@ a {
   min-width: 0;
 }
 
+@keyframes text-gradient {
+  0% { background-position: 0% center; }
+  100% { background-position: -200% center; }
+}
+
+.animate-text-gradient {
+  animation: text-gradient 6s linear infinite;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
 :where(.metric-card strong, .session-metrics dd, .dashboard-layer dd,
   .goal-progress-main strong, .recurring-projection-total strong, .weekday-card dd) {
   font-variant-numeric: tabular-nums lining-nums;

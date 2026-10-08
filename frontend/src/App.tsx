@@ -1,5 +1,9 @@
 import { FeedbackMessage } from "./components/FeedbackMessage";
 import { DashboardStart } from "./features/home/DashboardStart";
+import { TodaySummary } from "./features/home/TodaySummary";
+import { useTodaySummary } from "./features/home/useTodaySummary";
+import { selectTodayGoal } from "./features/home/todayGoal";
+import { DashboardNavigation, useDashboardNavigation } from "./features/navigation/DashboardNavigation";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { getAccountPlan, type AccountPlanResponse } from "./api/account";
@@ -23,15 +27,10 @@ import { LazyCsvImportSection as CsvImportSection } from "./features/imports/Laz
 import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
 import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
+import { AuthScreen } from "./features/auth/AuthScreen";
 import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
-import {
-  getGoalCurrentValueLabel,
-  getGoalProgressScopeMessage,
-  getGoalProgressStatusMessage,
-  getGoalRequiredPaceMessage,
-  getGoalUpdatedAfterWorkMessage,
-  getMatchingNetGoal,
-} from "./features/goals/goalMessages";
+import { getGoalUpdatedAfterWorkMessage } from "./features/goals/goalMessages";
+import { FinancialGoalsSection } from "./features/goals/FinancialGoalsSection";
 import {
   VehiclesSection,
   type VehiclesSectionHandle,
@@ -41,7 +40,6 @@ import type {
   DashboardPeriod,
   Expense,
   ExpenseCategory,
-  FinancialGoalType,
   FinancialHistoryGrouping,
   HistoryPeriodPreset,
   MaintenanceCategory,
@@ -64,14 +62,15 @@ import type {
   FinancialInsight,
   FinancialSummary,
 } from "./types/financial";
+import { createLatestRequest } from "./utils/latestRequest";
 import { getBetaActivationNextStep } from "./utils/activation";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
 import { getDailyEntryDate, getDefaultDailyVehicleId, readLastDailyVehicle, writeLastDailyVehicle } from "./utils/dailyEntry";
+import { useFormValidation } from "./utils/formValidation";
 import {
   formatDate,
   formatDistance,
   formatWorkTime,
-  getProgressWidth,
 } from "./utils/formatters";
 import {
   formatMoney,
@@ -79,13 +78,13 @@ import {
   formatOptionalMoneyForInput,
   moneyInputToApi,
   moneyInputToCents,
-  moneyValueToCents,
   normalizeDecimalInput,
   optionalDecimalInputToApi,
   optionalMoneyInputToApi,
   parseNonNegativeDecimal,
 } from "./utils/money";
 import { formatDurationInput, parseDurationToMinutes } from "./utils/duration";
+import { ErrorMessage } from "./components/ErrorMessage";
 
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 const RESET_PASSWORD_PATH = "/reset-password";
@@ -122,14 +121,6 @@ type RecurringExpenseForm = {
   vehicle_id: string;
   description: string;
   active: boolean;
-};
-
-type FinancialGoalForm = {
-  goal_type: FinancialGoalType;
-  target_amount: string;
-  start_date: string;
-  end_date: string;
-  vehicle_id: string;
 };
 
 type MaintenancePlanForm = {
@@ -228,11 +219,6 @@ const recurringFrequencyOptions: Array<{ label: string; value: RecurringExpenseF
   { label: "Anual", value: "yearly" },
 ];
 
-const financialGoalTypeOptions: Array<{ label: string; value: FinancialGoalType }> = [
-  { label: "Meta de sobra apos despesas", value: "net" },
-  { label: "Meta de resultado projetado", value: "projected" },
-];
-
 const maintenanceCategoryOptions: Array<{ label: string; value: MaintenanceCategory }> = [
   { label: "Oleo", value: "oil" },
   { label: "Pneus", value: "tires" },
@@ -272,14 +258,6 @@ const emptyRecurringExpenseForm: RecurringExpenseForm = {
   vehicle_id: "",
   description: "",
   active: true,
-};
-
-const emptyFinancialGoalForm: FinancialGoalForm = {
-  goal_type: "net",
-  target_amount: "",
-  start_date: toDateInputValue(new Date()),
-  end_date: toDateInputValue(new Date()),
-  vehicle_id: "",
 };
 
 const emptyMaintenancePlanForm: MaintenancePlanForm = {
@@ -333,10 +311,6 @@ function getRecurringFrequencyLabel(value: RecurringExpenseFrequency): string {
   return recurringFrequencyOptions.find((option) => option.value === value)?.label ?? value;
 }
 
-function getFinancialGoalTypeLabel(value: FinancialGoalType): string {
-  return financialGoalTypeOptions.find((option) => option.value === value)?.label ?? value;
-}
-
 function getMaintenanceCategoryLabel(value: MaintenanceCategory): string {
   return maintenanceCategoryOptions.find((option) => option.value === value)?.label ?? value;
 }
@@ -363,23 +337,6 @@ function getMaintenanceStatusClass(value: MaintenanceStatusType): string {
   }
 
   return "status-pill status-active";
-}
-
-function formatPercent(value: string | null): string {
-  if (value === null) {
-    return "—";
-  }
-
-  const normalized = value.replace(".", ",");
-  return normalized.endsWith(",00") ? `${normalized.slice(0, -3)}%` : `${normalized}%`;
-}
-
-function formatHours(value: string | null): string {
-  if (value === null) {
-    return "—";
-  }
-
-  return `${value.replace(".", ",")} h`;
 }
 
 function divideAndRound(numerator: bigint, denominator: bigint): bigint {
@@ -417,8 +374,15 @@ function App() {
   );
   const [resetPasswordToken, setResetPasswordToken] = useState(getResetPasswordTokenFromUrl);
   const [user, setUser] = useState<User | null>(null);
+  const { activeArea, target: navigationTarget, navigateTo, handleNavigationClick } = useDashboardNavigation(user !== null);
+  const todaySummary = useTodaySummary(user ? token : null, endSession);
+  const [coreReady, setCoreReady] = useState(false);
+  const [hasOpenedResult, setHasOpenedResult] = useState(false);
+  const [financialRevision, setFinancialRevision] = useState(0);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
+  const [workSessionsLoaded, setWorkSessionsLoaded] = useState(false);
+  const [workSessionsError, setWorkSessionsError] = useState("");
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
@@ -441,8 +405,6 @@ function App() {
   const [expenseForm, setExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
   const [recurringExpenseForm, setRecurringExpenseForm] =
     useState<RecurringExpenseForm>(emptyRecurringExpenseForm);
-  const [financialGoalForm, setFinancialGoalForm] =
-    useState<FinancialGoalForm>(emptyFinancialGoalForm);
   const [maintenancePlanForm, setMaintenancePlanForm] =
     useState<MaintenancePlanForm>(emptyMaintenancePlanForm);
   const [maintenanceRecordForm, setMaintenanceRecordForm] =
@@ -453,12 +415,19 @@ function App() {
   const [quickStartVisible, setQuickStartVisible] = useState(false);
   const [quickDailyEntryForm, setQuickDailyEntryForm] =
     useState<QuickDailyEntryForm>(emptyQuickDailyEntryForm);
+  const dailyEntryValidation = useFormValidation();
   const [quickDailyEntryResult, setQuickDailyEntryResult] =
     useState<QuickDailyEntryResult | null>(null);
   const [lastSelectedVehicleId, setLastSelectedVehicleId] = useState("");
   const [quickDailyEntryShowDate, setQuickDailyEntryShowDate] = useState(false);
   const [pendingQuickDailyEntry, setPendingQuickDailyEntry] = useState(false);
   const [dailyExpenseForm, setDailyExpenseForm] = useState<ExpenseForm>(emptyExpenseForm);
+  const dailyExpenseValidation = useFormValidation();
+  const expenseValidation = useFormValidation();
+  const recurringExpenseValidation = useFormValidation();
+  const maintenancePlanValidation = useFormValidation();
+  const maintenanceRecordValidation = useFormValidation();
+  const workSessionValidation = useFormValidation();
   const [dailyExpenseVisible, setDailyExpenseVisible] = useState(false);
   const [isChangePasswordVisible, setIsChangePasswordVisible] = useState(false);
   const [isFeedbackVisible, setIsFeedbackVisible] = useState(false);
@@ -471,7 +440,6 @@ function App() {
   const [editingWorkSessionId, setEditingWorkSessionId] = useState<number | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
   const [editingRecurringExpenseId, setEditingRecurringExpenseId] = useState<number | null>(null);
-  const [editingFinancialGoalId, setEditingFinancialGoalId] = useState<number | null>(null);
   const [editingMaintenancePlanId, setEditingMaintenancePlanId] = useState<number | null>(null);
   const [dashboardPeriod, setDashboardPeriod] = useState<DashboardPeriod>("last7");
   const [dashboardVehicleId, setDashboardVehicleId] = useState("");
@@ -506,13 +474,50 @@ function App() {
   const [isWorkSessionSaving, setIsWorkSessionSaving] = useState(false);
   const [isExpenseSaving, setIsExpenseSaving] = useState(false);
   const [isRecurringExpenseSaving, setIsRecurringExpenseSaving] = useState(false);
-  const [isFinancialGoalSaving, setIsFinancialGoalSaving] = useState(false);
   const [isMaintenanceSaving, setIsMaintenanceSaving] = useState(false);
   const [isMaintenanceRecordSaving, setIsMaintenanceRecordSaving] = useState(false);
   const [isQuickDailyEntrySaving, setIsQuickDailyEntrySaving] = useState(false);
   const [isDailyExpenseSaving, setIsDailyExpenseSaving] = useState(false);
   const [isBillingCheckoutLoading, setIsBillingCheckoutLoading] = useState(false);
   const [isFeedbackSaving, setIsFeedbackSaving] = useState(false);
+
+  const requests = useRef({
+    session: createLatestRequest(),
+    vehicles: createLatestRequest(),
+    workSessions: createLatestRequest(),
+    expenses: createLatestRequest(),
+    recurring: createLatestRequest(),
+    goals: createLatestRequest(),
+    maintenance: createLatestRequest(),
+    account: createLatestRequest(),
+    summary: createLatestRequest(),
+    insights: createLatestRequest(),
+    history: createLatestRequest(),
+  });
+  // Remember attempted loads as well as successes so errors wait for an explicit retry.
+  const attempted = useRef<Partial<Record<keyof typeof requests.current, string>>>({});
+  const sessionToken = useRef(token);
+  sessionToken.current = token;
+  const currentArea = useRef(activeArea);
+  currentArea.current = activeArea;
+  const revision = useRef(financialRevision);
+  const query = useRef({ dashboardPeriod, customStartDate, customEndDate, dashboardVehicleId,
+    historyStartDate, historyEndDate, historyGrouping, historyVehicleId });
+  query.current = { dashboardPeriod, customStartDate, customEndDate, dashboardVehicleId,
+    historyStartDate, historyEndDate, historyGrouping, historyVehicleId };
+  const currentVehicles = useRef(vehicles);
+  currentVehicles.current = vehicles;
+  const currentDate = useRef(todaySummary.date);
+  currentDate.current = todaySummary.date;
+  const goalCache = useRef<{ date: string; goals: FinancialGoal[]; progress: Record<number, FinancialGoalProgress> } | null>(null);
+
+  function resultRequestKey(kind: "summary" | "insights" | "history", currentToken = token) {
+    const filters = query.current;
+    return JSON.stringify([currentToken, revision.current, currentDate.current, kind === "history"
+      ? [filters.historyStartDate, filters.historyEndDate, filters.historyGrouping, filters.historyVehicleId]
+      : [filters.dashboardPeriod, filters.customStartDate, filters.customEndDate, filters.dashboardVehicleId]]);
+  }
+
   const submitLocksRef = useRef<Partial<Record<SubmitLockKey, boolean>>>({});
 
   function beginSubmitLock(key: SubmitLockKey): boolean {
@@ -529,12 +534,30 @@ function App() {
   }
 
   function endSession(nextMessage = "") {
+    sessionToken.current = null;
+    Object.values(requests.current).forEach((request) => request.invalidate());
+    attempted.current = {};
+    goalCache.current = null;
+    setCoreReady(false);
+    setHasOpenedResult(false);
+    setIsVehiclesLoading(false);
+    setIsWorkSessionsLoading(false);
+    setIsExpensesLoading(false);
+    setIsRecurringExpensesLoading(false);
+    setIsFinancialGoalsLoading(false);
+    setIsMaintenanceLoading(false);
+    setIsDashboardLoading(false);
+    setIsFinancialInsightsLoading(false);
+    setIsFinancialHistoryLoading(false);
+    setIsAccountPlanLoading(false);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
     setVehicles([]);
     setLastSelectedVehicleId("");
     setWorkSessions([]);
+    setWorkSessionsLoaded(false);
+    setWorkSessionsError("");
     setExpenses([]);
     setRecurringExpenses([]);
     setFinancialGoals([]);
@@ -549,12 +572,10 @@ function App() {
     setEditingWorkSessionId(null);
     setEditingExpenseId(null);
     setEditingRecurringExpenseId(null);
-    setEditingFinancialGoalId(null);
     setEditingMaintenancePlanId(null);
     setWorkSessionForm(emptyWorkSessionForm);
     setExpenseForm(emptyExpenseForm);
     setRecurringExpenseForm(emptyRecurringExpenseForm);
-    setFinancialGoalForm(emptyFinancialGoalForm);
     setMaintenancePlanForm(emptyMaintenancePlanForm);
     setMaintenanceRecordForm(emptyMaintenanceRecordForm);
     setRecordingMaintenancePlanId(null);
@@ -629,97 +650,120 @@ function App() {
     if (user) writeLastDailyVehicle(user.id, vehicleId);
   }
 
-  async function loadVehicles(currentToken = token, accountId = user?.id) {
-    if (!currentToken) {
+  async function loadVehicles(currentToken = token, accountId = user?.id, refresh = false) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsVehiclesLoading(true);
-    try {
-      const nextVehicles = await listVehicles(getAuthHeaders(currentToken));
-      setVehicles(nextVehicles);
-      const availableVehicleIds = nextVehicles.map((vehicle) => vehicle.id);
-      const defaultVehicleId = getDefaultDailyVehicleId(
-        availableVehicleIds,
-        "",
-        (accountId === user?.id ? lastSelectedVehicleId : "") ||
-          (accountId === undefined ? "" : readLastDailyVehicle(accountId)),
-      );
-      setLastSelectedVehicleId(defaultVehicleId);
-      setWorkSessionForm((currentForm) => ({
-        ...currentForm,
-        vehicle_id: getDefaultDailyVehicleId(
+    if (refresh) requests.current.vehicles.invalidate();
+    const key = currentToken;
+    attempted.current.vehicles = key;
+    await requests.current.vehicles.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsVehiclesLoading(true);
+      try {
+        const nextVehicles = await listVehicles(getAuthHeaders(currentToken));
+        if (!isCurrent()) return;
+        currentVehicles.current = nextVehicles;
+        setVehicles(nextVehicles);
+        const availableVehicleIds = nextVehicles.map((vehicle) => vehicle.id);
+        const defaultVehicleId = getDefaultDailyVehicleId(
           availableVehicleIds,
-          currentForm.vehicle_id,
-          defaultVehicleId,
-        ),
-      }));
-      setQuickDailyEntryForm((currentForm) => ({
-        ...currentForm,
-        vehicle_id: getDefaultDailyVehicleId(
-          availableVehicleIds,
-          currentForm.vehicle_id,
-          defaultVehicleId,
-        ),
-      }));
-      setDailyExpenseForm((currentForm) => ({
-        ...currentForm,
-        vehicle_id: getDefaultDailyVehicleId(
-          availableVehicleIds,
-          currentForm.vehicle_id,
-          defaultVehicleId,
-        ),
-      }));
-      setMaintenancePlanForm((currentForm) => ({
-        ...currentForm,
-        vehicle_id:
-          currentForm.vehicle_id ||
-          (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
-      }));
-      setHistoryVehicleId((currentVehicleId) => {
-        if (nextVehicles.length === 1) {
-          return String(nextVehicles[0].id);
-        }
+          "",
+          (accountId === user?.id ? lastSelectedVehicleId : "") ||
+            (accountId === undefined ? "" : readLastDailyVehicle(accountId)),
+        );
+        setLastSelectedVehicleId(defaultVehicleId);
+        setWorkSessionForm((currentForm) => ({
+          ...currentForm,
+          vehicle_id: getDefaultDailyVehicleId(
+            availableVehicleIds,
+            currentForm.vehicle_id,
+            defaultVehicleId,
+          ),
+        }));
+        setQuickDailyEntryForm((currentForm) => ({
+          ...currentForm,
+          vehicle_id: getDefaultDailyVehicleId(
+            availableVehicleIds,
+            currentForm.vehicle_id,
+            defaultVehicleId,
+          ),
+        }));
+        setDailyExpenseForm((currentForm) => ({
+          ...currentForm,
+          vehicle_id: getDefaultDailyVehicleId(
+            availableVehicleIds,
+            currentForm.vehicle_id,
+            defaultVehicleId,
+          ),
+        }));
+        setMaintenancePlanForm((currentForm) => ({
+          ...currentForm,
+          vehicle_id:
+            currentForm.vehicle_id ||
+            (nextVehicles.length === 1 ? String(nextVehicles[0].id) : ""),
+        }));
+        setHistoryVehicleId((currentVehicleId) => {
+          if (nextVehicles.length === 1) {
+            return String(nextVehicles[0].id);
+          }
 
-        if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
-          return currentVehicleId;
-        }
+          if (nextVehicles.some((vehicle) => String(vehicle.id) === currentVehicleId)) {
+            return currentVehicleId;
+          }
 
-        return "";
-      });
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao carregar veiculos.");
+          return "";
+        });
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setMessage(error instanceof Error ? error.message : "Erro ao carregar veiculos.");
+        }
+      } finally {
+        if (isCurrent()) setIsVehiclesLoading(false);
       }
-    } finally {
-      setIsVehiclesLoading(false);
-    }
+    });
   }
 
   async function loadAccountPlan(currentToken = token) {
-    if (!currentToken) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsAccountPlanLoading(true);
-    setAccountPlanError("");
-    try {
-      const nextAccountPlan = await getAccountPlan(getAuthHeaders(currentToken));
-      setAccountPlan(nextAccountPlan);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setAccountPlan(null);
-        setAccountPlanError(
-          error instanceof Error ? error.message : "Nao foi possivel carregar seu plano.",
-        );
-      }
-    } finally {
-      setIsAccountPlanLoading(false);
+    if (currentArea.current !== "mais") {
+      delete attempted.current.account;
+      requests.current.account.invalidate();
+      return;
     }
+    const key = currentToken;
+    attempted.current.account = key;
+    await requests.current.account.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsAccountPlanLoading(true);
+      setAccountPlanError("");
+      try {
+        const nextAccountPlan = await getAccountPlan(getAuthHeaders(currentToken));
+        if (!isCurrent()) return;
+        setAccountPlan(nextAccountPlan);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setAccountPlan(null);
+          setAccountPlanError(
+            error instanceof Error ? error.message : "Nao foi possivel carregar seu plano.",
+          );
+        }
+      } finally {
+        if (isCurrent()) setIsAccountPlanLoading(false);
+      }
+    });
   }
 
   async function handleCheckoutPro() {
@@ -780,241 +824,368 @@ function App() {
     }
   }
 
-  async function loadWorkSessions(currentToken = token) {
-    if (!currentToken) {
+  async function loadWorkSessions(currentToken = token, refresh = false) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsWorkSessionsLoading(true);
-    try {
-      const nextWorkSessions = await requestApi<WorkSession[]>("/work-sessions", {
-        headers: getAuthHeaders(currentToken),
-      });
-      setWorkSessions(nextWorkSessions);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao carregar jornadas.");
+    if (refresh) requests.current.workSessions.invalidate();
+    const key = currentToken;
+    attempted.current.workSessions = key;
+    await requests.current.workSessions.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsWorkSessionsLoading(true);
+      setWorkSessionsError("");
+      try {
+        const nextWorkSessions = await requestApi<WorkSession[]>("/work-sessions", {
+          headers: getAuthHeaders(currentToken),
+        });
+        if (!isCurrent()) return;
+        setWorkSessions(nextWorkSessions);
+        setWorkSessionsLoaded(true);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          const errorMessage = error instanceof Error ? error.message : "Erro ao carregar jornadas.";
+          setWorkSessionsError(errorMessage);
+          setMessage(errorMessage);
+        }
+      } finally {
+        if (isCurrent()) setIsWorkSessionsLoading(false);
       }
-    } finally {
-      setIsWorkSessionsLoading(false);
-    }
+    });
   }
 
-  async function loadExpenses(currentToken = token) {
-    if (!currentToken) {
+  async function loadExpenses(currentToken = token, refresh = false) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsExpensesLoading(true);
-    try {
-      const nextExpenses = await listExpenses(getAuthHeaders(currentToken));
-      setExpenses(nextExpenses);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao carregar despesas.");
-      }
-    } finally {
-      setIsExpensesLoading(false);
+    if (currentArea.current !== "custos") {
+      delete attempted.current.expenses;
+      requests.current.expenses.invalidate();
+      return;
     }
+    if (refresh) requests.current.expenses.invalidate();
+    const key = currentToken;
+    attempted.current.expenses = key;
+    await requests.current.expenses.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsExpensesLoading(true);
+      try {
+        const nextExpenses = await listExpenses(getAuthHeaders(currentToken));
+        if (!isCurrent()) return;
+        setExpenses(nextExpenses);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setMessage(error instanceof Error ? error.message : "Erro ao carregar despesas.");
+        }
+      } finally {
+        if (isCurrent()) setIsExpensesLoading(false);
+      }
+    });
   }
 
-  async function loadRecurringExpenses(currentToken = token) {
-    if (!currentToken) {
+  async function loadRecurringExpenses(currentToken = token, refresh = false) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsRecurringExpensesLoading(true);
-    try {
-      const nextRecurringExpenses = await listRecurringExpenses(getAuthHeaders(currentToken));
-      setRecurringExpenses(nextRecurringExpenses);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(
-          error instanceof Error ? error.message : "Erro ao carregar despesas recorrentes.",
+    if (currentArea.current !== "custos") {
+      delete attempted.current.recurring;
+      requests.current.recurring.invalidate();
+      return;
+    }
+    if (refresh) requests.current.recurring.invalidate();
+    const key = currentToken;
+    attempted.current.recurring = key;
+    await requests.current.recurring.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsRecurringExpensesLoading(true);
+      try {
+        const nextRecurringExpenses = await listRecurringExpenses(getAuthHeaders(currentToken));
+        if (!isCurrent()) return;
+        setRecurringExpenses(nextRecurringExpenses);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setMessage(
+            error instanceof Error ? error.message : "Erro ao carregar despesas recorrentes.",
+          );
+        }
+      } finally {
+        if (isCurrent()) setIsRecurringExpensesLoading(false);
+      }
+    });
+  }
+
+  function goalRequestKey(currentToken = token) {
+    return JSON.stringify([currentToken, currentDate.current, revision.current,
+      currentArea.current === "resultado" ? "all" : currentVehicles.current.map((vehicle) => vehicle.id)]);
+  }
+
+  async function loadFinancialGoals(currentToken = token, refresh = true) {
+    if (!currentToken || sessionToken.current !== currentToken) return;
+    if (refresh || (goalCache.current && goalCache.current.date !== currentDate.current)) {
+      goalCache.current = null;
+      requests.current.goals.invalidate();
+    }
+    const date = currentDate.current;
+    const key = goalRequestKey(currentToken);
+    attempted.current.goals = key;
+    await requests.current.goals.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken && currentDate.current === date;
+      if (!isCurrent()) return;
+      setIsFinancialGoalsLoading(true);
+      try {
+        const goals = goalCache.current?.goals ?? await requestApi<FinancialGoal[]>("/financial-goals", {
+          headers: getAuthHeaders(currentToken),
+        });
+        if (!isCurrent()) return;
+        const progress = { ...goalCache.current?.progress };
+        const selected = selectTodayGoal(goals, date, currentVehicles.current.map((vehicle) => vehicle.id));
+        const needed = currentArea.current === "resultado" ? goals : selected ? [selected] : [];
+        const entries = await Promise.all(needed.filter((goal) => !progress[goal.id]).map(async (goal) => {
+          const value = await requestApi<FinancialGoalProgress>(`/financial-goals/${goal.id}/progress`, {
+            headers: getAuthHeaders(currentToken),
+          });
+          return [goal.id, value] as const;
+        }));
+        if (!isCurrent()) return;
+        Object.assign(progress, Object.fromEntries(entries));
+        goalCache.current = { date, goals, progress };
+        setFinancialGoals(goals);
+        setFinancialGoalProgressById(progress);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) endSession(error.message);
+        else {
+          setFinancialGoalProgressById({});
+          setMessage(error instanceof Error ? error.message : "Erro ao carregar metas.");
+        }
+      } finally {
+        if (isLatest() && sessionToken.current === currentToken) setIsFinancialGoalsLoading(false);
+      }
+    });
+  }
+
+  async function loadMaintenancePlans(currentToken = token, refresh = false) {
+    if (!currentToken || sessionToken.current !== currentToken) {
+      return;
+    }
+
+    if (currentArea.current !== "custos") {
+      delete attempted.current.maintenance;
+      requests.current.maintenance.invalidate();
+      return;
+    }
+    if (refresh) requests.current.maintenance.invalidate();
+    const key = currentToken;
+    attempted.current.maintenance = key;
+    await requests.current.maintenance.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken;
+      if (!isCurrent()) return;
+      setIsMaintenanceLoading(true);
+      try {
+        const nextPlans = await requestApi<MaintenancePlan[]>("/maintenance-plans", {
+          headers: getAuthHeaders(currentToken),
+        });
+        if (!isCurrent()) return;
+        const statusEntries = await Promise.all(
+          nextPlans.map(async (plan) => {
+            const statusResponse = await requestApi<MaintenancePlanStatus>(
+              `/maintenance-plans/${plan.id}/status`,
+              {
+                headers: getAuthHeaders(currentToken),
+              },
+            );
+            return [plan.id, statusResponse] as const;
+          }),
         );
+        if (!isCurrent()) return;
+        const recordEntries = await Promise.all(
+          nextPlans.map(async (plan) => {
+            const records = await requestApi<MaintenanceRecord[]>(
+              `/maintenance-plans/${plan.id}/records`,
+              {
+                headers: getAuthHeaders(currentToken),
+              },
+            );
+            return [plan.id, records] as const;
+          }),
+        );
+        if (!isCurrent()) return;
+        setMaintenancePlans(nextPlans);
+        setMaintenanceStatusesById(Object.fromEntries(statusEntries));
+        setMaintenanceRecordsByPlanId(Object.fromEntries(recordEntries));
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setMessage(error instanceof Error ? error.message : "Erro ao carregar manutencoes.");
+        }
+      } finally {
+        if (isCurrent()) setIsMaintenanceLoading(false);
       }
-    } finally {
-      setIsRecurringExpensesLoading(false);
-    }
-  }
-
-  async function loadFinancialGoals(currentToken = token) {
-    if (!currentToken) {
-      return;
-    }
-
-    setIsFinancialGoalsLoading(true);
-    try {
-      const nextFinancialGoals = await requestApi<FinancialGoal[]>("/financial-goals", {
-        headers: getAuthHeaders(currentToken),
-      });
-      const progressEntries = await Promise.all(
-        nextFinancialGoals.map(async (goal) => {
-          const progress = await requestApi<FinancialGoalProgress>(
-            `/financial-goals/${goal.id}/progress`,
-            {
-              headers: getAuthHeaders(currentToken),
-            },
-          );
-          return [goal.id, progress] as const;
-        }),
-      );
-      setFinancialGoals(nextFinancialGoals);
-      setFinancialGoalProgressById(Object.fromEntries(progressEntries));
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao carregar metas.");
-      }
-    } finally {
-      setIsFinancialGoalsLoading(false);
-    }
-  }
-
-  async function loadMaintenancePlans(currentToken = token) {
-    if (!currentToken) {
-      return;
-    }
-
-    setIsMaintenanceLoading(true);
-    try {
-      const nextPlans = await requestApi<MaintenancePlan[]>("/maintenance-plans", {
-        headers: getAuthHeaders(currentToken),
-      });
-      const statusEntries = await Promise.all(
-        nextPlans.map(async (plan) => {
-          const statusResponse = await requestApi<MaintenancePlanStatus>(
-            `/maintenance-plans/${plan.id}/status`,
-            {
-              headers: getAuthHeaders(currentToken),
-            },
-          );
-          return [plan.id, statusResponse] as const;
-        }),
-      );
-      const recordEntries = await Promise.all(
-        nextPlans.map(async (plan) => {
-          const records = await requestApi<MaintenanceRecord[]>(
-            `/maintenance-plans/${plan.id}/records`,
-            {
-              headers: getAuthHeaders(currentToken),
-            },
-          );
-          return [plan.id, records] as const;
-        }),
-      );
-      setMaintenancePlans(nextPlans);
-      setMaintenanceStatusesById(Object.fromEntries(statusEntries));
-      setMaintenanceRecordsByPlanId(Object.fromEntries(recordEntries));
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao carregar manutencoes.");
-      }
-    } finally {
-      setIsMaintenanceLoading(false);
-    }
+    });
   }
 
   async function loadFinancialSummary(currentToken = token) {
-    if (!currentToken) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsDashboardLoading(true);
-    setDashboardError("");
-    try {
-      const summary = await getFinancialSummary(getAuthHeaders(currentToken), {
-        period: dashboardPeriod,
-        customStartDate,
-        customEndDate,
-        vehicleId: dashboardVehicleId,
-      });
-      setFinancialSummary(summary);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setDashboardError(
-          error instanceof Error ? error.message : "Erro ao carregar resumo financeiro.",
-        );
-      }
-    } finally {
-      setIsDashboardLoading(false);
+    if (currentArea.current !== "resultado") {
+      delete attempted.current.summary;
+      requests.current.summary.invalidate();
+      return;
     }
+    const key = resultRequestKey("summary", currentToken);
+    attempted.current.summary = key;
+    await requests.current.summary.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken && key === resultRequestKey("summary", currentToken);
+      if (!isCurrent()) return;
+      const filters = { ...query.current };
+      setIsDashboardLoading(true);
+      setDashboardError("");
+      try {
+        const summary = await getFinancialSummary(getAuthHeaders(currentToken), {
+          period: filters.dashboardPeriod,
+          customStartDate: filters.customStartDate,
+          customEndDate: filters.customEndDate,
+          vehicleId: filters.dashboardVehicleId,
+        });
+        if (!isCurrent()) return;
+        setFinancialSummary(summary);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setFinancialSummary(null);
+          setDashboardError(
+            error instanceof Error ? error.message : "Erro ao carregar resumo financeiro.",
+          );
+        }
+      } finally {
+        if (isCurrent()) setIsDashboardLoading(false);
+      }
+    });
   }
 
   async function loadFinancialInsights(currentToken = token) {
-    if (!currentToken) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsFinancialInsightsLoading(true);
-    setFinancialInsightsError("");
-    try {
-      const response = await getFinancialInsights(getAuthHeaders(currentToken), {
-        period: dashboardPeriod,
-        customStartDate,
-        customEndDate,
-        vehicleId: dashboardVehicleId,
-      });
-      setFinancialInsights(response.insights);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setFinancialInsights([]);
-        setFinancialInsightsError(
-          error instanceof Error ? error.message : "Nao foi possivel carregar os insights agora.",
-        );
-      }
-    } finally {
-      setIsFinancialInsightsLoading(false);
+    if (currentArea.current !== "resultado") {
+      delete attempted.current.insights;
+      requests.current.insights.invalidate();
+      return;
     }
+    const key = resultRequestKey("insights", currentToken);
+    attempted.current.insights = key;
+    await requests.current.insights.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken && key === resultRequestKey("insights", currentToken);
+      if (!isCurrent()) return;
+      const filters = { ...query.current };
+      setIsFinancialInsightsLoading(true);
+      setFinancialInsightsError("");
+      try {
+        const response = await getFinancialInsights(getAuthHeaders(currentToken), {
+          period: filters.dashboardPeriod,
+          customStartDate: filters.customStartDate,
+          customEndDate: filters.customEndDate,
+          vehicleId: filters.dashboardVehicleId,
+        });
+        if (!isCurrent()) return;
+        setFinancialInsights(response.insights);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setFinancialInsights([]);
+          setFinancialInsightsError(
+            error instanceof Error ? error.message : "Nao foi possivel carregar os insights agora.",
+          );
+        }
+      } finally {
+        if (isCurrent()) setIsFinancialInsightsLoading(false);
+      }
+    });
   }
 
   async function loadFinancialHistory(currentToken = token) {
-    if (!currentToken) {
+    if (!currentToken || sessionToken.current !== currentToken) {
       return;
     }
 
-    setIsFinancialHistoryLoading(true);
-    setFinancialHistoryError("");
-    try {
-      const history = await getFinancialHistory(getAuthHeaders(currentToken), {
-        startDate: historyStartDate,
-        endDate: historyEndDate,
-        grouping: historyGrouping,
-        vehicleId: historyVehicleId,
-      });
-      setFinancialHistory(history);
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setFinancialHistory(null);
-        setFinancialHistoryError(
-          error instanceof Error ? error.message : "Nao foi possivel carregar sua evolucao agora.",
-        );
-      }
-    } finally {
-      setIsFinancialHistoryLoading(false);
+    if (currentArea.current !== "resultado") {
+      delete attempted.current.history;
+      requests.current.history.invalidate();
+      return;
     }
+    const key = resultRequestKey("history", currentToken);
+    attempted.current.history = key;
+    await requests.current.history.run(key, async (isLatest) => {
+      const isCurrent = () => isLatest() && sessionToken.current === currentToken && key === resultRequestKey("history", currentToken);
+      if (!isCurrent()) return;
+      const filters = { ...query.current };
+      setIsFinancialHistoryLoading(true);
+      setFinancialHistoryError("");
+      try {
+        const history = await getFinancialHistory(getAuthHeaders(currentToken), {
+          startDate: filters.historyStartDate,
+          endDate: filters.historyEndDate,
+          grouping: filters.historyGrouping,
+          vehicleId: filters.historyVehicleId,
+        });
+        if (!isCurrent()) return;
+        setFinancialHistory(history);
+      } catch (error) {
+        if (!isCurrent()) return;
+        if (error instanceof Error && error.message.includes("Sessao")) {
+          endSession(error.message);
+        } else {
+          setFinancialHistory(null);
+          setFinancialHistoryError(
+            error instanceof Error ? error.message : "Nao foi possivel carregar sua evolucao agora.",
+          );
+        }
+      } finally {
+        if (isCurrent()) setIsFinancialHistoryLoading(false);
+      }
+    });
   }
 
   async function refreshDashboardData(currentToken = token) {
+    if (!currentToken || sessionToken.current !== currentToken) return;
+    // Hidden areas refresh on their next visit; pending pre-save responses are obsolete.
+    revision.current += 1;
+    setFinancialRevision(revision.current);
+    setMaintenanceStatusesById({});
+    for (const kind of ["summary", "insights", "history", "maintenance"] as const) {
+      requests.current[kind].invalidate();
+      delete attempted.current[kind];
+    }
     await Promise.all([
-      loadFinancialSummary(currentToken),
-      loadFinancialInsights(currentToken),
-      loadFinancialHistory(currentToken),
+      todaySummary.reload(),
+      loadFinancialGoals(currentToken),
+      ...(currentArea.current === "resultado" ? [loadFinancialSummary(currentToken),
+        loadFinancialInsights(currentToken), loadFinancialHistory(currentToken)] : []),
+      ...(currentArea.current === "custos" ? [loadMaintenancePlans(currentToken)] : []),
     ]);
   }
 
@@ -1050,33 +1221,32 @@ function App() {
       return;
     }
 
-    async function loadSession() {
-      try {
-        const currentUser = await requestApi<User>("/auth/me", {
-          headers: getAuthHeaders(token),
-        });
-        setUser(currentUser);
-        setMessage("");
-        await Promise.all([loadAccountPlan(token), loadVehicles(token, currentUser.id)]);
-        await Promise.all([
-          loadWorkSessions(token),
-          loadExpenses(token),
-          loadRecurringExpenses(token),
-          loadFinancialGoals(token),
-          loadMaintenancePlans(token),
-          refreshDashboardData(token),
-        ]);
-      } catch (error) {
-        if (error instanceof Error && error.message.includes("Sessao")) {
-          endSession(error.message);
-        } else {
-          setUser(null);
-          setMessage(error instanceof Error ? error.message : NETWORK_ERROR_MESSAGE);
+    let disposed = false;
+    void Promise.resolve().then(async () => {
+      if (disposed) return;
+      await requests.current.session.run(token, async (isLatest) => {
+        const isCurrent = () => !disposed && isLatest() && sessionToken.current === token;
+        try {
+          const currentUser = await requestApi<User>("/auth/me", { headers: getAuthHeaders(token) });
+          if (!isCurrent()) return;
+          setUser(currentUser);
+          setMessage("");
+          await Promise.all([loadVehicles(token, currentUser.id), loadWorkSessions(token)]);
+          if (isCurrent()) setCoreReady(true);
+        } catch (error) {
+          if (!isCurrent()) return;
+          if (error instanceof Error && error.message.includes("Sessao")) endSession(error.message);
+          else {
+            setUser(null);
+            setMessage(error instanceof Error ? error.message : NETWORK_ERROR_MESSAGE);
+          }
         }
-      }
-    }
-
-    void loadSession();
+      });
+    });
+    return () => {
+      disposed = true;
+      Object.values(requests.current).forEach((request) => request.invalidate());
+    };
   }, [token, isResetPasswordRoute]);
 
   useEffect(() => {
@@ -1105,25 +1275,34 @@ function App() {
     window.history.replaceState(
       null,
       "",
-      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`,
+      `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash}`,
     );
   }, [token, isResetPasswordRoute]);
 
   useEffect(() => {
-    if (!token || !user) {
-      return;
+    if (!token || !user || !coreReady) return;
+    if (activeArea === "resultado") {
+      setHasOpenedResult(true);
+      if (workSessions.length > 0) {
+        if (attempted.current.summary !== resultRequestKey("summary")) void loadFinancialSummary();
+        if (attempted.current.insights !== resultRequestKey("insights")) void loadFinancialInsights();
+        if (attempted.current.history !== resultRequestKey("history")) void loadFinancialHistory();
+      }
     }
-
-    void Promise.all([loadFinancialSummary(token), loadFinancialInsights(token)]);
-  }, [dashboardPeriod, dashboardVehicleId, customStartDate, customEndDate]);
+    if (activeArea === "custos") {
+      if (!attempted.current.expenses) void loadExpenses();
+      if (!attempted.current.recurring) void loadRecurringExpenses();
+      if (!attempted.current.maintenance) void loadMaintenancePlans();
+    }
+    if (activeArea === "mais" && !attempted.current.account) void loadAccountPlan();
+  }, [token, user?.id, coreReady, activeArea, dashboardPeriod, dashboardVehicleId, customStartDate,
+    customEndDate, historyStartDate, historyEndDate, historyGrouping, historyVehicleId, financialRevision,
+    todaySummary.date, workSessions.length]);
 
   useEffect(() => {
-    if (!token || !user) {
-      return;
-    }
-
-    void loadFinancialHistory(token);
-  }, [historyPeriod, historyStartDate, historyEndDate, historyGrouping, historyVehicleId]);
+    if (!token || !user || !coreReady || isFinancialGoalsLoading) return;
+    if (attempted.current.goals !== goalRequestKey()) void loadFinancialGoals(token, false);
+  }, [token, user?.id, coreReady, activeArea, todaySummary.date, financialRevision, isFinancialGoalsLoading, vehicles]);
 
   function resetForm(nextMode: AuthMode) {
     setMode(nextMode);
@@ -1349,13 +1528,10 @@ function App() {
       vehicle_id: String(vehicle.id),
     });
     setQuickDailyEntryShowDate(false);
-    await loadWorkSessions();
-    await loadFinancialGoals();
+    await loadWorkSessions(token, true);
     await refreshDashboardData();
     setSuccessMessage(getGoalUpdatedAfterWorkMessage(financialGoals.some((goal) => goal.active)));
-    requestAnimationFrame(() =>
-      document.getElementById("daily-entry-result")?.focus(),
-    );
+    navigateTo("daily-entry-result");
   }
 
   async function handleQuickDailyEntrySubmit(event: FormEvent<HTMLFormElement>) {
@@ -1377,7 +1553,7 @@ function App() {
         setMessage(
           "Dados mantidos. Cadastre seu veiculo para salvar este dia e ver quanto sobrou.",
         );
-        document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+        navigateTo("veiculos");
         return;
       }
 
@@ -1403,20 +1579,22 @@ function App() {
       setCustomEndDate(quickDailyEntryResult.workDate);
     }
 
-    requestAnimationFrame(() =>
-      document.getElementById("resultado")?.scrollIntoView({ behavior: "smooth" }),
-    );
+    navigateTo("resultado");
   }
 
-  function openDailyExpenseShortcut() {
-    const vehicle = quickDailyEntryResult?.vehicle ?? getQuickDailyVehicle();
+  function openDailyExpenseShortcut(result?: QuickDailyEntryResult) {
+    const vehicle = result?.vehicle ?? getQuickDailyVehicle();
+    const expenseDate = result?.workDate ?? todaySummary.date;
 
-    setDailyExpenseForm({
-      ...emptyExpenseForm,
-      expense_date: quickDailyEntryResult?.workDate ?? toDateInputValue(new Date()),
-      vehicle_id: vehicle ? String(vehicle.id) : "",
-    });
+    if (!dailyExpenseVisible || dailyExpenseForm.expense_date !== expenseDate) {
+      setDailyExpenseForm({
+        ...emptyExpenseForm,
+        expense_date: expenseDate,
+        vehicle_id: vehicle ? String(vehicle.id) : "",
+      });
+    }
     setDailyExpenseVisible(true);
+    navigateTo("daily-expense-form");
   }
 
   async function handleDailyExpenseSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1444,10 +1622,10 @@ function App() {
 
       setDailyExpenseVisible(false);
       setDailyExpenseForm(emptyExpenseForm);
-      setSuccessMessage("Gasto de hoje adicionado com sucesso.");
-      await loadExpenses();
-      await loadFinancialGoals();
+      setSuccessMessage(`Gasto de ${formatDate(dailyExpenseForm.expense_date)} adicionado com sucesso.`);
+      await loadExpenses(token, true);
       await refreshDashboardData();
+      navigateTo(hasWorkdays ? "today-summary" : "hoje");
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1477,7 +1655,7 @@ function App() {
     if (!vehicle) {
       setPendingQuickStartAction("configure");
       setMessage("Cadastre seu veículo primeiro. Seus dados da simulação foram mantidos.");
-      document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+      navigateTo("veiculos");
       return;
     }
 
@@ -1489,7 +1667,7 @@ function App() {
       financing_monthly:
         quickStartForm.ownership_type === "financed" ? quickStartForm.financing_monthly : "",
     });
-    document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+    navigateTo("veiculos");
   }
 
   async function registerQuickStartDay(vehicle: Vehicle) {
@@ -1519,11 +1697,10 @@ function App() {
 
     setPendingQuickStartAction(null);
     setSuccessMessage("Seu primeiro dia foi registrado com os dados da simulação.");
-    await loadWorkSessions();
-    await loadFinancialGoals();
-    await loadExpenses();
+    await loadWorkSessions(token, true);
+    await loadExpenses(token, true);
     await refreshDashboardData();
-    document.getElementById("mais")?.scrollIntoView({ behavior: "smooth" });
+    navigateTo("lista-jornadas");
   }
 
   async function handleQuickStartRegister() {
@@ -1540,7 +1717,7 @@ function App() {
       setPendingQuickStartAction("register");
       releaseSubmitLock("quickStartRegister");
       setMessage("Cadastre seu veículo para registrar o dia. Seus dados da simulação foram mantidos.");
-      document.getElementById("veiculos")?.scrollIntoView({ behavior: "smooth" });
+      navigateTo("veiculos");
       return;
     }
 
@@ -1627,8 +1804,7 @@ function App() {
 
       rememberDailyVehicle(workSessionForm.vehicle_id);
       resetWorkSessionForm();
-      await loadWorkSessions();
-      await loadFinancialGoals();
+      await loadWorkSessions(token, true);
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1657,8 +1833,7 @@ function App() {
         headers: getAuthHeaders(),
       });
       setSuccessMessage("Jornada excluida com sucesso.");
-      await loadWorkSessions();
-      await loadFinancialGoals();
+      await loadWorkSessions(token, true);
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1715,8 +1890,7 @@ function App() {
       }
 
       resetExpenseForm();
-      await loadExpenses();
-      await loadFinancialGoals();
+      await loadExpenses(token, true);
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1742,8 +1916,7 @@ function App() {
     try {
       await deleteExpense(getAuthHeaders(), expense.id);
       setSuccessMessage("Despesa excluida com sucesso.");
-      await loadExpenses();
-      await loadFinancialGoals();
+      await loadExpenses(token, true);
       await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
@@ -1806,8 +1979,8 @@ function App() {
       }
 
       resetRecurringExpenseForm();
-      await loadRecurringExpenses();
-      await loadFinancialGoals();
+      await loadRecurringExpenses(token, true);
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1841,8 +2014,8 @@ function App() {
           ? "Despesa recorrente desativada."
           : "Despesa recorrente ativada.",
       );
-      await loadRecurringExpenses();
-      await loadFinancialGoals();
+      await loadRecurringExpenses(token, true);
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1868,8 +2041,8 @@ function App() {
     try {
       await deleteRecurringExpense(getAuthHeaders(), recurringExpense.id);
       setSuccessMessage("Despesa recorrente excluida com sucesso.");
-      await loadRecurringExpenses();
-      await loadFinancialGoals();
+      await loadRecurringExpenses(token, true);
+      await refreshDashboardData();
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -1877,127 +2050,6 @@ function App() {
         setMessage(
           error instanceof Error ? error.message : "Erro ao excluir despesa recorrente.",
         );
-      }
-    }
-  }
-
-  function resetFinancialGoalForm() {
-    setEditingFinancialGoalId(null);
-    setFinancialGoalForm(emptyFinancialGoalForm);
-  }
-
-  function handleEditFinancialGoal(goal: FinancialGoal) {
-    setEditingFinancialGoalId(goal.id);
-    setFinancialGoalForm({
-      goal_type: goal.goal_type,
-      target_amount: formatMoney(goal.target_amount).replace("R$ ", ""),
-      start_date: goal.start_date,
-      end_date: goal.end_date,
-      vehicle_id: goal.vehicle_id ? String(goal.vehicle_id) : "",
-    });
-    setMessage("");
-    setSuccessMessage("");
-  }
-
-  function buildFinancialGoalPayload(form: FinancialGoalForm, active = true) {
-    return {
-      goal_type: form.goal_type,
-      target_amount: moneyInputToApi(form.target_amount),
-      start_date: form.start_date,
-      end_date: form.end_date,
-      active,
-      ...(form.vehicle_id ? { vehicle_id: Number(form.vehicle_id) } : {}),
-    };
-  }
-
-  async function handleFinancialGoalSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsFinancialGoalSaving(true);
-    setMessage("");
-    setSuccessMessage("");
-
-    try {
-      const currentGoal = financialGoals.find((goal) => goal.id === editingFinancialGoalId);
-      const payload = buildFinancialGoalPayload(financialGoalForm, currentGoal?.active ?? true);
-
-      if (editingFinancialGoalId) {
-        await requestApi<FinancialGoal>(`/financial-goals/${editingFinancialGoalId}`, {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
-        setSuccessMessage("Meta atualizada com sucesso.");
-      } else {
-        await requestApi<FinancialGoal>("/financial-goals", {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload),
-        });
-        setSuccessMessage("Meta cadastrada com sucesso.");
-      }
-
-      resetFinancialGoalForm();
-      await loadFinancialGoals();
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao salvar meta.");
-      }
-    } finally {
-      setIsFinancialGoalSaving(false);
-    }
-  }
-
-  async function handleToggleFinancialGoal(goal: FinancialGoal) {
-    setMessage("");
-    setSuccessMessage("");
-
-    try {
-      await requestApi<FinancialGoal>(`/financial-goals/${goal.id}`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          goal_type: goal.goal_type,
-          target_amount: goal.target_amount,
-          start_date: goal.start_date,
-          end_date: goal.end_date,
-          active: !goal.active,
-          ...(goal.vehicle_id ? { vehicle_id: goal.vehicle_id } : {}),
-        }),
-      });
-      setSuccessMessage(goal.active ? "Meta desativada." : "Meta ativada.");
-      await loadFinancialGoals();
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao alterar meta.");
-      }
-    }
-  }
-
-  async function handleDeleteFinancialGoal(goal: FinancialGoal) {
-    const shouldDelete = window.confirm(`Excluir a meta de ${formatMoney(goal.target_amount)}?`);
-    if (!shouldDelete) {
-      return;
-    }
-
-    setMessage("");
-    setSuccessMessage("");
-
-    try {
-      await requestApi<void>(`/financial-goals/${goal.id}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      setSuccessMessage("Meta excluida com sucesso.");
-      await loadFinancialGoals();
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("Sessao")) {
-        endSession(error.message);
-      } else {
-        setMessage(error instanceof Error ? error.message : "Erro ao excluir meta.");
       }
     }
   }
@@ -2067,7 +2119,7 @@ function App() {
       }
 
       resetMaintenancePlanForm();
-      await loadMaintenancePlans();
+      await loadMaintenancePlans(token, true);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2094,7 +2146,7 @@ function App() {
         headers: getAuthHeaders(),
       });
       setSuccessMessage("Plano de manutencao excluido com sucesso.");
-      await loadMaintenancePlans();
+      await loadMaintenancePlans(token, true);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2136,7 +2188,7 @@ function App() {
       setSuccessMessage("Manutencao registrada com sucesso.");
       setRecordingMaintenancePlanId(null);
       setMaintenanceRecordForm(emptyMaintenanceRecordForm);
-      await loadMaintenancePlans();
+      await loadMaintenancePlans(token, true);
     } catch (error) {
       if (error instanceof Error && error.message.includes("Sessao")) {
         endSession(error.message);
@@ -2161,16 +2213,6 @@ function App() {
     return groups;
   }, [maintenancePlans, maintenanceStatusesById]);
 
-  const quickDailyExpenseTotalCents = useMemo(() => {
-    if (!quickDailyEntryResult) return 0n;
-    return expenses.reduce((total, expense) => {
-      return expense.expense_date === quickDailyEntryResult.workDate &&
-        expense.vehicle_id === quickDailyEntryResult.vehicle.id
-        ? total + moneyValueToCents(expense.amount)
-        : total;
-    }, 0n);
-  }, [expenses, quickDailyEntryResult]);
-
   function getPrimaryMaintenanceAlert(): { plan: MaintenancePlan; status: MaintenancePlanStatus } | null {
     for (const plan of maintenancePlans) {
       const status = maintenanceStatusesById[plan.id];
@@ -2182,20 +2224,13 @@ function App() {
     return null;
   }
 
-  const isQuickStartVisible = workSessions.length === 0 || quickStartVisible;
-  const quickDailyRemainingCents = quickDailyEntryResult
-    ? quickDailyEntryResult.grossRevenueCents - quickDailyExpenseTotalCents
-    : 0n;
-  const quickDailyGoal = quickDailyEntryResult
-    ? getMatchingNetGoal(
-        financialGoals,
-        quickDailyEntryResult.workDate,
-        quickDailyEntryResult.vehicle.id,
-      )
-    : null;
-  const quickDailyGoalProgress = quickDailyGoal
-    ? financialGoalProgressById[quickDailyGoal.id]
-    : null;
+  const isQuickStartVisible = (workSessionsLoaded && workSessions.length === 0) || quickStartVisible ||
+    (activeArea === "hoje" && window.location.hash === "#quick-start");
+  const hasWorkdays = workSessions.length > 0;
+  const isDailyEntryVisible = navigationTarget === "daily-revenue" || (workSessionsLoaded && !hasWorkdays);
+  const isDailyExpenseVisible = navigationTarget === "daily-expense-form";
+  const todayGoal = selectTodayGoal(financialGoals, todaySummary.date, vehicles.map((vehicle) => vehicle.id));
+  const todayGoalProgress = todayGoal ? financialGoalProgressById[todayGoal.id] : null;
   const maintenanceAlert = getPrimaryMaintenanceAlert();
   const shouldShowCostPrecisionPrompt =
     vehicles.length > 0 &&
@@ -2206,6 +2241,35 @@ function App() {
     vehicleCount: vehicles.length,
     workSessionCount: workSessions.length,
   });
+
+  if (!user && !isResetPasswordRoute && mode !== "forgot-password") {
+    return (
+      <AuthScreen
+        mode={mode as "login" | "register"}
+        setMode={(m) => {
+          setMode(m);
+          setMessage("");
+          setSuccessMessage("");
+        }}
+        name={name}
+        setName={setName}
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        isLoading={isLoading}
+        message={message}
+        successMessage={successMessage}
+        onSubmit={handleSubmit}
+        onForgotPassword={() => {
+          setMode("forgot-password");
+          setMessage("");
+          setSuccessMessage("");
+          setPassword("");
+        }}
+      />
+    );
+  }
 
   return (
     <main className={user ? "page page-dashboard" : "page"}>
@@ -2219,14 +2283,1795 @@ function App() {
 
       <section className={user ? "auth-panel vehicle-panel" : "auth-panel"}>
         {user ? (
-          <div className="session">
+          <div className="session" onClick={handleNavigationClick}>
             <div className="session-header">
               <div>
                 <p className="eyebrow">GanhoCerto</p>
                 <h1 className="dashboard-greeting">Olá, {user.name}.</h1>
               </div>
-              <details className="account-menu" id="mais">
-                <summary>Mais</summary>
+              <a className="button button-ghost" href="#conta">Minha conta</a>
+            </div>
+
+            {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
+            {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
+
+            <DashboardNavigation activeArea={activeArea} />
+
+            <section className="dashboard-area" id="area-hoje" aria-label="Hoje" hidden={activeArea !== "hoje"} tabIndex={-1}>
+              {hasWorkdays ? (
+                <TodaySummary
+                  date={todaySummary.date}
+                  daily={todaySummary.daily}
+                  isLoading={todaySummary.isLoading}
+                  error={todaySummary.error}
+                  onRetry={() => void todaySummary.reload()}
+                  onRegister={() => navigateTo("daily-revenue")}
+                  onAddExpense={() => openDailyExpenseShortcut()}
+                  isRegisterOpen={isDailyEntryVisible}
+                  isExpenseOpen={isDailyExpenseVisible}
+                  isGoalLoading={isFinancialGoalsLoading}
+                  goal={todayGoal && todayGoalProgress ? {
+                    goal: todayGoal,
+                    progress: todayGoalProgress,
+                    vehicleLabel: todayGoal.vehicle_id === null ? null : getVehicleLabel(todayGoal.vehicle_id),
+                  } : null}
+                />
+              ) : workSessionsError ? (
+                <div>
+                  <FeedbackMessage kind="error">{workSessionsError}</FeedbackMessage>
+                  <button className="text-button" type="button" onClick={() => void loadWorkSessions()}>Tentar novamente</button>
+                </div>
+              ) : (
+                <DashboardStart
+                  nextStep={betaNextStep}
+                  hasWorkdays={false}
+                  isLoading={!workSessionsLoaded || isVehiclesLoading || isWorkSessionsLoading}
+                  onRegister={() => navigateTo("daily-revenue")}
+                />
+              )}
+
+              <section className="daily-entry" id="daily-entry-panel" hidden={!isDailyEntryVisible}>
+                <div className="section-title">
+                  <h2>Registro do dia</h2>
+                  <p className="subtle-note">
+                    Preencha os valores do seu trabalho. Os gastos podem ser adicionados depois.
+                  </p>
+                </div>
+
+                <div className="daily-entry-tools" aria-label="Outras ações do dia">
+                  <button className="text-button" type="button" onClick={() => openDailyExpenseShortcut()}>
+                    Adicionar gasto
+                  </button>
+                  {workSessions.length === 0 ? (
+                    vehicles.length === 0 ? (
+                      <a href="#veiculos">Cadastrar veículo</a>
+                    ) : (
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => {
+                          setQuickStartVisible(true);
+                          navigateTo("quick-start");
+                        }}
+                      >
+                        Simular sem salvar
+                      </button>
+                    )
+                  ) : null}
+                </div>
+
+                {shouldShowCostPrecisionPrompt ? (
+                  <div className="action-prompt">
+                    <div>
+                      <strong>Melhore a precisão do seu GanhoCerto</strong>
+                      <p>Configure os principais custos do veículo para obter uma estimativa mais completa.</p>
+                    </div>
+                    <a className="button button-ghost" href="#veiculos">
+                      Configurar custos
+                    </a>
+                  </div>
+                ) : null}
+
+                {maintenanceAlert ? (
+                  <div className="action-prompt maintenance-prompt">
+                    <div>
+                      <strong>Próxima manutenção</strong>
+                      <p>
+                        {maintenanceAlert.plan.name}
+                        {maintenanceAlert.status.km_remaining
+                          ? ` - faltam aproximadamente ${formatDistance(maintenanceAlert.status.km_remaining)} km`
+                          : maintenanceAlert.status.days_remaining !== null
+                            ? ` - faltam ${maintenanceAlert.status.days_remaining} dias`
+                            : " - atenção necessária"}
+                      </p>
+                      {maintenanceAlert.status.recommended_reserve_per_km ? (
+                        <small>
+                          Reserva sugerida:{" "}
+                          {formatMoneyPerKm(maintenanceAlert.status.recommended_reserve_per_km)}
+                        </small>
+                      ) : null}
+                    </div>
+                    <a className="text-button" href="#manutencao">
+                      Ver manutenção
+                    </a>
+                  </div>
+                ) : null}
+
+                  <form className="auth-form daily-entry-form" onInvalid={dailyEntryValidation.handleInvalid} onSubmit={handleQuickDailyEntrySubmit}>
+                    <div className="daily-date-row">
+                      <p>Data: {formatDate(getDailyEntryDate(quickDailyEntryForm.work_date))}</p>
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => setQuickDailyEntryShowDate((currentValue) => !currentValue)}
+                      >
+                        Alterar data
+                      </button>
+                    </div>
+
+                    {quickDailyEntryShowDate ? (
+                      <label className="daily-date-input">
+                        Data do registro
+                        <input
+                          name="work_date"
+                          onChange={(event) => {
+                            dailyEntryValidation.clearError("work_date");
+                            setQuickDailyEntryForm({
+                              ...quickDailyEntryForm,
+                              work_date: event.target.value,
+                            });
+                          }}
+                          type="date"
+                          value={getDailyEntryDate(quickDailyEntryForm.work_date)}
+                          aria-invalid={!!dailyEntryValidation.errors.work_date}
+                          aria-describedby={dailyEntryValidation.errors.work_date ? "daily-entry-work_date-error" : undefined}
+                        />
+                        <ErrorMessage id="daily-entry-work_date-error" message={dailyEntryValidation.errors.work_date} />
+                      </label>
+                    ) : null}
+
+                    <label>
+                      Faturamento
+                      <input
+                        id="daily-revenue"
+                        name="gross_revenue"
+                        inputMode="decimal"
+                        onChange={(event) => {
+                          dailyEntryValidation.clearError("gross_revenue");
+                          setQuickDailyEntryForm({
+                            ...quickDailyEntryForm,
+                            gross_revenue: event.target.value,
+                          });
+                        }}
+                        placeholder="250,50"
+                        required
+                        type="text"
+                        value={quickDailyEntryForm.gross_revenue}
+                        aria-invalid={!!dailyEntryValidation.errors.gross_revenue}
+                        aria-describedby={dailyEntryValidation.errors.gross_revenue ? "daily-entry-gross_revenue-error" : undefined}
+                      />
+                      <ErrorMessage id="daily-entry-gross_revenue-error" message={dailyEntryValidation.errors.gross_revenue} />
+                    </label>
+
+                    <label>
+                      Km rodados
+                      <input
+                        name="distance_km"
+                        inputMode="decimal"
+                        onChange={(event) => {
+                          dailyEntryValidation.clearError("distance_km");
+                          setQuickDailyEntryForm({
+                            ...quickDailyEntryForm,
+                            distance_km: event.target.value,
+                          });
+                        }}
+                        placeholder="87,5"
+                        required
+                        type="text"
+                        value={quickDailyEntryForm.distance_km}
+                        aria-invalid={!!dailyEntryValidation.errors.distance_km}
+                        aria-describedby={dailyEntryValidation.errors.distance_km ? "daily-entry-distance_km-error" : undefined}
+                      />
+                      <ErrorMessage id="daily-entry-distance_km-error" message={dailyEntryValidation.errors.distance_km} />
+                    </label>
+
+                    <label>
+                      Tempo trabalhado
+                      <input
+                        name="worked_duration"
+                        aria-describedby={`daily-duration-help ${dailyEntryValidation.errors.worked_duration ? "daily-entry-worked_duration-error" : ""}`.trim()}
+                        inputMode="text"
+                        onChange={(event) => {
+                          dailyEntryValidation.clearError("worked_duration");
+                          setQuickDailyEntryForm({
+                            ...quickDailyEntryForm,
+                            worked_duration: event.target.value,
+                          });
+                        }}
+                        placeholder="8:30 ou 8h30"
+                        required
+                        type="text"
+                        value={quickDailyEntryForm.worked_duration}
+                        aria-invalid={!!dailyEntryValidation.errors.worked_duration}
+                      />
+                      <ErrorMessage id="daily-entry-worked_duration-error" message={dailyEntryValidation.errors.worked_duration} />
+                      <small id="daily-duration-help">Ex.: 8:30 ou 8h30 para 8 horas e 30 minutos. Apenas 8 significa 8 horas.</small>
+                    </label>
+
+                    <label>
+                      Numero de corridas <span className="optional-label">(opcional)</span>
+                      <input
+                        name="trip_count"
+                        min="0"
+                        onChange={(event) => {
+                          dailyEntryValidation.clearError("trip_count");
+                          setQuickDailyEntryForm({
+                            ...quickDailyEntryForm,
+                            trip_count: event.target.value,
+                          });
+                        }}
+                        type="number"
+                        value={quickDailyEntryForm.trip_count}
+                        aria-invalid={!!dailyEntryValidation.errors.trip_count}
+                        aria-describedby={dailyEntryValidation.errors.trip_count ? "daily-entry-trip_count-error" : undefined}
+                      />
+                      <ErrorMessage id="daily-entry-trip_count-error" message={dailyEntryValidation.errors.trip_count} />
+                    </label>
+
+                  {vehicles.length === 0 ? (
+                    <p className="empty-state daily-entry-note">
+                      Sem veiculo cadastrado. Voce pode preencher o dia agora; ao salvar, seus dados
+                      ficam guardados e o app abre o cadastro do veiculo.
+                    </p>
+                  ) : null}
+
+                  {vehicles.length === 1 ? (
+                    <p className="daily-selected-vehicle">
+                      Veiculo: <strong>{getVehicleLabel(vehicles[0].id)}</strong>
+                    </p>
+                  ) : null}
+
+                  {vehicles.length > 1 ? (
+                    <label>
+                      Veiculo
+                      <select
+                        onChange={(event) => {
+                          rememberDailyVehicle(event.target.value);
+                          setQuickDailyEntryForm({
+                            ...quickDailyEntryForm,
+                            vehicle_id: event.target.value,
+                          });
+                        }}
+                        required
+                        value={quickDailyEntryForm.vehicle_id}
+                      >
+                        <option value="">Selecione</option>
+                        {vehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.id}>
+                            {vehicle.name} - {vehicle.brand} {vehicle.model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  <button
+                    className="button daily-entry-button"
+                    disabled={isQuickDailyEntrySaving}
+                    type="submit"
+                  >
+                    {isQuickDailyEntrySaving
+                      ? "Salvando..."
+                      : vehicles.length === 0
+                        ? "Continuar para cadastrar veiculo"
+                        : "Salvar meu dia"}
+                  </button>
+                </form>
+
+                {hasWorkdays ? (
+                  <button className="text-button" type="button" onClick={() => navigateTo("today-summary")}>Fechar registro</button>
+                ) : null}
+              </section>
+
+              <form className="auth-form daily-expense-form" id="daily-expense-form" tabIndex={-1} hidden={!isDailyExpenseVisible} onSubmit={handleDailyExpenseSubmit} onInvalid={dailyExpenseValidation.handleInvalid}>
+                <div className="section-title">
+                  <p className="eyebrow">Novo gasto</p>
+                  <h3>Adicionar gasto</h3>
+                  <p className="subtle-note">Data {formatDate(dailyExpenseForm.expense_date)}.</p>
+                </div>
+
+                <label>
+                  Categoria
+                  <select
+                    onChange={(event) =>
+                      setDailyExpenseForm({
+                        ...dailyExpenseForm,
+                        category: event.target.value as ExpenseCategory,
+                      })
+                    }
+                    required
+                    value={dailyExpenseForm.category}
+                    name="category"
+                    aria-invalid={!!dailyExpenseValidation.errors.category}
+                    aria-describedby={dailyExpenseValidation.errors.category ? "daily-expense-category-error" : undefined}
+                    className={dailyExpenseValidation.errors.category ? "field-error" : ""}
+                  >
+                    {expenseCategoryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <ErrorMessage id="daily-expense-category-error" message={dailyExpenseValidation.errors.category} />
+
+                {vehicles.length > 0 ? (
+                  <>
+                  <label>
+                    Veículo
+                    <select
+                      onChange={(event) =>
+                        setDailyExpenseForm({
+                          ...dailyExpenseForm,
+                          vehicle_id: event.target.value,
+                        })
+                      }
+                      value={dailyExpenseForm.vehicle_id}
+                      name="vehicle_id"
+                      aria-invalid={!!dailyExpenseValidation.errors.vehicle_id}
+                      aria-describedby={dailyExpenseValidation.errors.vehicle_id ? "daily-expense-vehicle_id-error" : undefined}
+                      className={dailyExpenseValidation.errors.vehicle_id ? "field-error" : ""}
+                    >
+                      <option value="">Gasto geral / sem veículo</option>
+                      {vehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.name} - {vehicle.brand} {vehicle.model}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <ErrorMessage id="daily-expense-vehicle_id-error" message={dailyExpenseValidation.errors.vehicle_id} />
+                  </>
+                ) : null}
+
+                <label>
+                  Valor
+                  <input
+                    inputMode="decimal"
+                    onChange={(event) =>
+                      setDailyExpenseForm({
+                        ...dailyExpenseForm,
+                        amount: event.target.value,
+                      })
+                    }
+                    placeholder="Ex: 89,90"
+                    required
+                    type="text"
+                    value={dailyExpenseForm.amount}
+                    name="amount"
+                    aria-invalid={!!dailyExpenseValidation.errors.amount}
+                    aria-describedby={dailyExpenseValidation.errors.amount ? "daily-expense-amount-error" : undefined}
+                    className={dailyExpenseValidation.errors.amount ? "field-error" : ""}
+                  />
+                </label>
+                <ErrorMessage id="daily-expense-amount-error" message={dailyExpenseValidation.errors.amount} />
+
+                <label>
+                  Descrição <span className="optional-label">(opcional)</span>
+                  <input
+                    maxLength={255}
+                    onChange={(event) =>
+                      setDailyExpenseForm({
+                        ...dailyExpenseForm,
+                        description: event.target.value,
+                      })
+                    }
+                    placeholder="Ex: Combustível"
+                    type="text"
+                    value={dailyExpenseForm.description}
+                    name="description"
+                    aria-invalid={!!dailyExpenseValidation.errors.description}
+                    aria-describedby={dailyExpenseValidation.errors.description ? "daily-expense-description-error" : undefined}
+                    className={dailyExpenseValidation.errors.description ? "field-error" : ""}
+                  />
+                </label>
+                <ErrorMessage id="daily-expense-description-error" message={dailyExpenseValidation.errors.description} />
+
+                <div className="form-actions">
+                  <button className="button" disabled={isDailyExpenseSaving} type="submit">
+                    {isDailyExpenseSaving ? "Salvando..." : "Salvar gasto"}
+                  </button>
+                  <button
+                    className="button button-ghost"
+                    type="button"
+                    onClick={() => { setDailyExpenseVisible(false); navigateTo(hasWorkdays ? "today-summary" : "hoje"); }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+
+              {quickDailyEntryResult ? (
+                <section className="daily-entry-result" id="daily-entry-result" tabIndex={-1} aria-labelledby="daily-result-title">
+                  <div className="section-title">
+                    <h3 id="daily-result-title">Dia registrado</h3>
+                    <p className="subtle-note">Registro de {formatDate(quickDailyEntryResult.workDate)} · {getVehicleLabel(quickDailyEntryResult.vehicle.id)}.</p>
+                  </div>
+                  <div className="daily-entry-actions">
+                    <button className="button button-ghost" type="button" onClick={() => openDailyExpenseShortcut(quickDailyEntryResult)}>Adicionar gasto deste registro</button>
+                    <button className="button button-ghost" type="button" onClick={handleViewCompleteResult}>Ver resultado completo</button>
+                  </div>
+                  <details className="advanced-options">
+                    <summary>Detalhes do registro</summary>
+                    <p>Faturamento: {formatCents(quickDailyEntryResult.grossRevenueCents)} · R$/hora: {quickDailyEntryResult.grossPerHourCents === null ? "—" : formatCents(quickDailyEntryResult.grossPerHourCents)} · R$/km: {quickDailyEntryResult.grossPerKmCents === null ? "—" : formatCents(quickDailyEntryResult.grossPerKmCents)} · Corridas: {quickDailyEntryResult.tripCount}</p>
+                  </details>
+                </section>
+              ) : null}
+
+              {isQuickStartVisible ? (
+                <section className="quick-start" id="quick-start">
+                  <div className="section-title">
+                    <p className="eyebrow">Início rápido</p>
+                    <h3>Descubra seu GanhoCerto</h3>
+                    <p className="subtle-note">
+                      Veja em poucos passos quanto realmente sobrou do seu dia de trabalho.
+                    </p>
+                  </div>
+
+                  <div className="quick-start-progress" aria-label="Progresso da simulação">
+                    <span>1. Quanto você fez hoje?</span>
+                    <span>2. Quanto trabalhou?</span>
+                    <span>3. Quanto gastou?</span>
+                    <span>4. Seu resultado</span>
+                  </div>
+
+                  {!quickStartResult ? (
+                    <form className="auth-form quick-start-form" onSubmit={handleQuickStartSubmit}>
+                      <fieldset className="form-group">
+                        <legend>Quanto você fez hoje?</legend>
+                        <label>
+                          Faturamento do dia
+                          <input
+                            inputMode="decimal"
+                            onChange={(event) =>
+                              setQuickStartForm({ ...quickStartForm, gross_revenue: event.target.value })
+                            }
+                            placeholder="Ex: 250,50"
+                            required
+                            type="text"
+                            value={quickStartForm.gross_revenue}
+                          />
+                        </label>
+                      </fieldset>
+
+                      <fieldset className="form-group">
+                        <legend>Quanto trabalhou?</legend>
+                        <div className="form-grid quick-start-time">
+                          <label>
+                            Km rodados
+                            <input
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setQuickStartForm({ ...quickStartForm, distance_km: event.target.value })
+                              }
+                              placeholder="Ex: 87,5"
+                              required
+                              type="text"
+                              value={quickStartForm.distance_km}
+                            />
+                          </label>
+                          <label>
+                            Tempo trabalhado
+                            <input
+                              inputMode="text"
+                              onChange={(event) =>
+                                setQuickStartForm({
+                                  ...quickStartForm,
+                                  worked_duration: event.target.value,
+                                })
+                              }
+                              placeholder="Ex: 8:30"
+                              required
+                              type="text"
+                              value={quickStartForm.worked_duration}
+                            />
+                          </label>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="form-group">
+                        <legend>Quanto gastou?</legend>
+                        <div className="form-grid">
+                          <label>
+                            Combustível ou recarga
+                            <input
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setQuickStartForm({ ...quickStartForm, fuel_expense: event.target.value })
+                              }
+                              placeholder="Ex: 80,00"
+                              required
+                              type="text"
+                              value={quickStartForm.fuel_expense}
+                            />
+                          </label>
+                          <label>
+                            Tipo de gasto
+                            <select
+                              onChange={(event) =>
+                                setQuickStartForm({
+                                  ...quickStartForm,
+                                  expense_category: event.target.value as "fuel" | "charging",
+                                })
+                              }
+                              value={quickStartForm.expense_category}
+                            >
+                              <option value="fuel">Combustível</option>
+                              <option value="charging">Recarga elétrica</option>
+                            </select>
+                          </label>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="form-group">
+                        <legend>Seu veículo</legend>
+                        <label>
+                          Tipo do veículo
+                          <select
+                            onChange={(event) =>
+                              setQuickStartForm({
+                                ...quickStartForm,
+                                ownership_type: event.target.value as OwnershipType,
+                              })
+                            }
+                            value={quickStartForm.ownership_type}
+                          >
+                            {ownershipOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {quickStartForm.ownership_type === "rented" ? (
+                          <label>
+                            Aluguel mensal <span className="optional-label">(opcional)</span>
+                            <input
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setQuickStartForm({ ...quickStartForm, rental_monthly: event.target.value })
+                              }
+                              placeholder="Ex: 2.200,00"
+                              type="text"
+                              value={quickStartForm.rental_monthly}
+                            />
+                          </label>
+                        ) : null}
+
+                        {quickStartForm.ownership_type === "financed" ? (
+                          <label>
+                            Financiamento mensal <span className="optional-label">(opcional)</span>
+                            <input
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setQuickStartForm({ ...quickStartForm, financing_monthly: event.target.value })
+                              }
+                              placeholder="Ex: 1.800,00"
+                              type="text"
+                              value={quickStartForm.financing_monthly}
+                            />
+                          </label>
+                        ) : null}
+                      </fieldset>
+
+                      <label>
+                        Número de corridas <span className="optional-label">(opcional)</span>
+                        <input
+                          min="0"
+                          onChange={(event) =>
+                            setQuickStartForm({ ...quickStartForm, trip_count: event.target.value })
+                          }
+                          type="number"
+                          value={quickStartForm.trip_count}
+                        />
+                      </label>
+
+                      <button className="button quick-start-button" type="submit">
+                        Ver minha estimativa rápida
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="quick-start-result">
+                      <div className="section-title">
+                        <p className="eyebrow">Resultado inicial</p>
+                        <h3>Sua estimativa rápida</h3>
+                      </div>
+                      <div className="metric-grid quick-start-metrics">
+                        <article className="metric-card">
+                          <span>Faturamento</span>
+                          <strong>{formatCents(quickStartResult.grossRevenueCents)}</strong>
+                        </article>
+                        <article className="metric-card metric-expense">
+                          <span>Gasto informado</span>
+                          <strong>{formatCents(quickStartResult.fuelExpenseCents)}</strong>
+                        </article>
+                        <article className="metric-card metric-profit">
+                          <span>Sobra após gasto</span>
+                          <strong>{formatCents(quickStartResult.remainingCents)}</strong>
+                        </article>
+                        <article className="metric-card">
+                          <span>R$/hora</span>
+                          <strong>
+                            {quickStartResult.remainingPerHourCents === null
+                              ? "—"
+                              : formatCents(quickStartResult.remainingPerHourCents)}
+                          </strong>
+                        </article>
+                        <article className="metric-card">
+                          <span>R$/km</span>
+                          <strong>
+                            {quickStartResult.remainingPerKmCents === null
+                              ? "—"
+                              : formatCents(quickStartResult.remainingPerKmCents)}
+                          </strong>
+                        </article>
+                        {quickStartResult.averageTicketCents !== null ? (
+                          <article className="metric-card">
+                            <span>Ticket médio</span>
+                            <strong>{formatCents(quickStartResult.averageTicketCents)}</strong>
+                          </article>
+                        ) : null}
+                      </div>
+                      <p className="quick-start-disclaimer">
+                        Este é um cálculo inicial. Custos como manutenção, pneus, seguro, IPVA e
+                        depreciação podem reduzir seu resultado real.
+                      </p>
+                      <div className="quick-start-actions">
+                        <p>Quer descobrir quanto realmente sobra considerando todos os custos do seu veículo?</p>
+                        <button className="button" type="button" onClick={() => void handleQuickStartConfigure()}>
+                          Configurar meu GanhoCerto
+                        </button>
+                        <button className="button button-ghost" type="button" onClick={() => void handleQuickStartRegister()}>
+                          Registrar meu primeiro dia
+                        </button>
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => setQuickStartResult(null)}
+                        >
+                          Ajustar dados
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              ) : null}
+            </section>
+
+            <section className="dashboard-area" id="area-resultado" aria-label="Resultado" hidden={activeArea !== "resultado"} tabIndex={-1}>
+              {workSessions.length > 0 && (activeArea === "resultado" || hasOpenedResult) ? (
+                <Suspense fallback={<FeedbackMessage kind="loading">Carregando resultado...</FeedbackMessage>}>
+                  <ResultSection
+                    isActive={activeArea === "resultado"}
+                    refreshVersion={financialRevision}
+                    vehicles={vehicles}
+                    dashboardFilters={{
+                      period: dashboardPeriod,
+                      customStartDate,
+                      customEndDate,
+                      vehicleId: dashboardVehicleId,
+                      onPeriodChange: setDashboardPeriod,
+                      onCustomStartDateChange: setCustomStartDate,
+                      onCustomEndDateChange: setCustomEndDate,
+                      onVehicleChange: setDashboardVehicleId,
+                    }}
+                    historyFilters={{
+                      period: historyPeriod,
+                      startDate: historyStartDate,
+                      endDate: historyEndDate,
+                      grouping: historyGrouping,
+                      vehicleId: historyVehicleId,
+                      onPeriodChange: handleHistoryPeriodChange,
+                      onDateChange: handleHistoryDateChange,
+                      onGroupingChange: setHistoryGrouping,
+                      onVehicleChange: setHistoryVehicleId,
+                    }}
+                    summary={financialSummary}
+                    insights={financialInsights}
+                    history={financialHistory}
+                    isSummaryLoading={isDashboardLoading}
+                    isInsightsLoading={isFinancialInsightsLoading}
+                    isHistoryLoading={isFinancialHistoryLoading}
+                    summaryError={dashboardError}
+                    insightsError={financialInsightsError}
+                    historyError={financialHistoryError}
+                    onSummaryRetry={() => void loadFinancialSummary()}
+                    onInsightsRetry={() => void loadFinancialInsights()}
+                    onHistoryRetry={() => void loadFinancialHistory()}
+                    onFirstResultViewed={() => void recordFirstResultViewed()}
+                    getAuthHeaders={getAuthHeaders}
+                    endSession={endSession}
+                    getVehicleLabel={getVehicleLabel}
+                    getExpenseCategoryLabel={getExpenseCategoryLabel}
+                  />
+                </Suspense>
+              ) : isWorkSessionsLoading ? (
+                <FeedbackMessage kind="loading">Carregando seus registros...</FeedbackMessage>
+              ) : (
+                <div className="section-title">
+                  <h2>Resultado</h2>
+                  <p className="empty-state">Registre seu primeiro dia para acompanhar quanto sobrou.</p>
+                  <button className="button inline-action" type="button" onClick={() => navigateTo("daily-revenue")}>
+                    Registrar meu dia
+                  </button>
+                </div>
+              )}
+
+              <FinancialGoalsSection
+                financialGoals={financialGoals}
+                financialGoalProgressById={financialGoalProgressById}
+                isFinancialGoalsLoading={isFinancialGoalsLoading}
+                vehicles={vehicles}
+                getVehicleLabel={getVehicleLabel}
+                getAuthHeaders={getAuthHeaders}
+                endSession={endSession}
+                setMessage={setMessage}
+                setSuccessMessage={setSuccessMessage}
+                loadFinancialGoals={loadFinancialGoals}
+              />
+            </section>
+
+            <section className="dashboard-area" id="area-custos" aria-label="Custos" hidden={activeArea !== "custos"} tabIndex={-1}>
+              <div className="section-title">
+                <h2>Custos</h2>
+                <p className="subtle-note">Despesas, manutenção e custos do veículo.</p>
+              </div>
+              <nav className="result-context-nav" aria-label="Áreas de custos">
+                <a href="#custos">Despesas</a>
+                <a href="#despesas-recorrentes">Recorrentes</a>
+                <a href="#manutencao">Manutenção</a>
+                <a href="#veiculos">Veículos</a>
+              </nav>
+
+              <section className="manager-section" id="custos">
+                <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
+                  <CsvImportSection
+                    type="expenses"
+                    token={token}
+                    vehicles={vehicles}
+                    getAuthHeaders={getAuthHeaders}
+                    getVehicleLabel={getVehicleLabel}
+                    getExpenseCategoryLabel={getExpenseCategoryLabel}
+                    endSession={endSession}
+                    setMessage={setMessage}
+                    setSuccessMessage={setSuccessMessage}
+                    loadWorkSessions={(currentToken = token) => loadWorkSessions(currentToken, true)}
+                    loadExpenses={(currentToken = token) => loadExpenses(currentToken, true)}
+                    refreshDashboardData={refreshDashboardData}
+                  />
+                </Suspense>
+                <div className="vehicles-layout">
+                  <form className="auth-form vehicle-form" onSubmit={handleExpenseSubmit} onInvalid={expenseValidation.handleInvalid}>
+                    <h3>{editingExpenseId ? "Editar despesa" : "Cadastrar despesa"}</h3>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Data
+                          <input
+                            name="expense_date"
+                            onChange={(event) =>
+                              setExpenseForm({
+                                ...expenseForm,
+                                expense_date: event.target.value,
+                              })
+                            }
+                            required
+                            type="date"
+                            value={expenseForm.expense_date}
+                            aria-invalid={!!expenseValidation.errors.expense_date}
+                            aria-describedby={expenseValidation.errors.expense_date ? "expense-expense_date-error" : undefined}
+                            className={expenseValidation.errors.expense_date ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="expense-expense_date-error" message={expenseValidation.errors.expense_date} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Categoria
+                          <select
+                            name="category"
+                            onChange={(event) =>
+                              setExpenseForm({
+                                ...expenseForm,
+                                category: event.target.value as ExpenseCategory,
+                              })
+                            }
+                            required
+                            value={expenseForm.category}
+                            aria-invalid={!!expenseValidation.errors.category}
+                            aria-describedby={expenseValidation.errors.category ? "expense-category-error" : undefined}
+                            className={expenseValidation.errors.category ? "field-error" : ""}
+                          >
+                            {expenseCategoryOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="expense-category-error" message={expenseValidation.errors.category} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Valor
+                          <input
+                            inputMode="decimal"
+                            name="amount"
+                            onChange={(event) =>
+                              setExpenseForm({
+                                ...expenseForm,
+                                amount: event.target.value,
+                              })
+                            }
+                            placeholder="Ex: 89,90"
+                            required
+                            type="text"
+                            value={expenseForm.amount}
+                            aria-invalid={!!expenseValidation.errors.amount}
+                            aria-describedby={expenseValidation.errors.amount ? "expense-amount-error" : undefined}
+                            className={expenseValidation.errors.amount ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="expense-amount-error" message={expenseValidation.errors.amount} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Veículo
+                          <select
+                            name="vehicle_id"
+                            onChange={(event) =>
+                              setExpenseForm({
+                                ...expenseForm,
+                                vehicle_id: event.target.value,
+                              })
+                            }
+                            value={expenseForm.vehicle_id}
+                            aria-invalid={!!expenseValidation.errors.vehicle_id}
+                            aria-describedby={expenseValidation.errors.vehicle_id ? "expense-vehicle_id-error" : undefined}
+                            className={expenseValidation.errors.vehicle_id ? "field-error" : ""}
+                          >
+                            <option value="">Sem veículo</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="expense-vehicle_id-error" message={expenseValidation.errors.vehicle_id} />
+                      </div>
+                    </div>
+
+                    <label>
+                      Descrição
+                      <input
+                        maxLength={255}
+                        name="description"
+                        onChange={(event) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            description: event.target.value,
+                          })
+                        }
+                        placeholder="Opcional"
+                        type="text"
+                        value={expenseForm.description}
+                        aria-invalid={!!expenseValidation.errors.description}
+                        aria-describedby={expenseValidation.errors.description ? "expense-description-error" : undefined}
+                        className={expenseValidation.errors.description ? "field-error" : ""}
+                      />
+                    </label>
+                    <ErrorMessage id="expense-description-error" message={expenseValidation.errors.description} />
+
+                    <div className="form-actions">
+                      <button className="button" disabled={isExpenseSaving} type="submit">
+                        {isExpenseSaving
+                          ? "Salvando..."
+                          : editingExpenseId
+                            ? "Salvar despesa"
+                            : "Cadastrar despesa"}
+                      </button>
+                      {editingExpenseId ? (
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={resetExpenseForm}
+                        >
+                          Cancelar
+                        </button>
+                      ) : null}
+                    </div>
+                  </form>
+
+                  <div className="vehicles-list" id="lista-despesas" aria-busy={isExpensesLoading}>
+                    <div className="list-header">
+                      <h3>Minhas despesas</h3>
+                      <button
+                        className="text-button"
+                        disabled={isExpensesLoading}
+                        type="button"
+                        onClick={() => void loadExpenses()}
+                      >
+                        Atualizar
+                      </button>
+                    </div>
+
+                    {isExpensesLoading ? <FeedbackMessage kind="loading">Carregando despesas...</FeedbackMessage> : null}
+
+                    {!isExpensesLoading && expenses.length === 0 ? (
+                      <p className="empty-state">
+                        Nenhuma despesa registrada ainda. Adicione combustível, manutenção e outros
+                        custos conforme eles acontecerem.
+                      </p>
+                    ) : null}
+
+                    {expenses.map((expense) => (
+                      <article className="vehicle-card session-card" key={expense.id}>
+                        <div>
+                          <h4>{formatDate(expense.expense_date)}</h4>
+                          <p>{getExpenseCategoryLabel(expense.category)}</p>
+                          <dl className="session-metrics expense-metrics">
+                            <div>
+                              <dt>Valor</dt>
+                              <dd>{formatMoney(expense.amount)}</dd>
+                            </div>
+                            <div>
+                              <dt>Veículo</dt>
+                              <dd>
+                                {expense.vehicle_id
+                                  ? getVehicleLabel(expense.vehicle_id)
+                                  : "Sem veículo"}
+                              </dd>
+                            </div>
+                          </dl>
+                          {expense.description ? (
+                            <p className="expense-description">{expense.description}</p>
+                          ) : null}
+                        </div>
+                        <div className="card-actions">
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => handleEditExpense(expense)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="text-button danger"
+                            type="button"
+                            onClick={() => void handleDeleteExpense(expense)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="manager-section" id="despesas-recorrentes">
+                <div className="section-title">
+                  <p className="eyebrow">Despesas recorrentes</p>
+                  <h3>Custos que se repetem</h3>
+                  <p className="subtle-note">
+                    Cadastre custos que se repetem para não precisar informá-los novamente todos os meses.
+                  </p>
+                  <p className="subtle-note">
+                    Despesas recorrentes entram nas projeções do GanhoCerto, mas não são registradas
+                    automaticamente como despesas já pagas.
+                  </p>
+                </div>
+
+                <div className="vehicles-layout">
+                  <form className="auth-form vehicle-form" onSubmit={handleRecurringExpenseSubmit} onInvalid={recurringExpenseValidation.handleInvalid}>
+                    <h3>
+                      {editingRecurringExpenseId
+                        ? "Editar despesa recorrente"
+                        : "Cadastrar despesa recorrente"}
+                    </h3>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Categoria
+                          <select
+                            name="category"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                category: event.target.value as ExpenseCategory,
+                              })
+                            }
+                            required
+                            value={recurringExpenseForm.category}
+                            aria-invalid={!!recurringExpenseValidation.errors.category}
+                            aria-describedby={recurringExpenseValidation.errors.category ? "recurring-expense-category-error" : undefined}
+                            className={recurringExpenseValidation.errors.category ? "field-error" : ""}
+                          >
+                            {expenseCategoryOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="recurring-expense-category-error" message={recurringExpenseValidation.errors.category} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Frequência
+                          <select
+                            name="frequency"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                frequency: event.target.value as RecurringExpenseFrequency,
+                              })
+                            }
+                            required
+                            value={recurringExpenseForm.frequency}
+                            aria-invalid={!!recurringExpenseValidation.errors.frequency}
+                            aria-describedby={recurringExpenseValidation.errors.frequency ? "recurring-expense-frequency-error" : undefined}
+                            className={recurringExpenseValidation.errors.frequency ? "field-error" : ""}
+                          >
+                            {recurringFrequencyOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="recurring-expense-frequency-error" message={recurringExpenseValidation.errors.frequency} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Valor
+                          <input
+                            inputMode="decimal"
+                            name="amount"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                amount: event.target.value,
+                              })
+                            }
+                            placeholder="Ex: 120,35"
+                            required
+                            type="text"
+                            value={recurringExpenseForm.amount}
+                            aria-invalid={!!recurringExpenseValidation.errors.amount}
+                            aria-describedby={recurringExpenseValidation.errors.amount ? "recurring-expense-amount-error" : undefined}
+                            className={recurringExpenseValidation.errors.amount ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="recurring-expense-amount-error" message={recurringExpenseValidation.errors.amount} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Veículo
+                          <select
+                            name="vehicle_id"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                vehicle_id: event.target.value,
+                              })
+                            }
+                            value={recurringExpenseForm.vehicle_id}
+                            aria-invalid={!!recurringExpenseValidation.errors.vehicle_id}
+                            aria-describedby={recurringExpenseValidation.errors.vehicle_id ? "recurring-expense-vehicle_id-error" : undefined}
+                            className={recurringExpenseValidation.errors.vehicle_id ? "field-error" : ""}
+                          >
+                            <option value="">Todos / sem veículo específico</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="recurring-expense-vehicle_id-error" message={recurringExpenseValidation.errors.vehicle_id} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Data de início
+                          <input
+                            name="start_date"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                start_date: event.target.value,
+                              })
+                            }
+                            required
+                            type="date"
+                            value={recurringExpenseForm.start_date}
+                            aria-invalid={!!recurringExpenseValidation.errors.start_date}
+                            aria-describedby={recurringExpenseValidation.errors.start_date ? "recurring-expense-start_date-error" : undefined}
+                            className={recurringExpenseValidation.errors.start_date ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="recurring-expense-start_date-error" message={recurringExpenseValidation.errors.start_date} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Data de término <span className="optional-label">(opcional)</span>
+                          <input
+                            name="end_date"
+                            onChange={(event) =>
+                              setRecurringExpenseForm({
+                                ...recurringExpenseForm,
+                                end_date: event.target.value,
+                              })
+                            }
+                            type="date"
+                            value={recurringExpenseForm.end_date}
+                            aria-invalid={!!recurringExpenseValidation.errors.end_date}
+                            aria-describedby={recurringExpenseValidation.errors.end_date ? "recurring-expense-end_date-error" : undefined}
+                            className={recurringExpenseValidation.errors.end_date ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="recurring-expense-end_date-error" message={recurringExpenseValidation.errors.end_date} />
+                      </div>
+                    </div>
+
+                    <label>
+                      Descrição <span className="optional-label">(opcional)</span>
+                      <input
+                        maxLength={255}
+                        name="description"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            description: event.target.value,
+                          })
+                        }
+                        placeholder="Ex: Seguro, aluguel, lavagem"
+                        type="text"
+                        value={recurringExpenseForm.description}
+                        aria-invalid={!!recurringExpenseValidation.errors.description}
+                        aria-describedby={recurringExpenseValidation.errors.description ? "recurring-expense-description-error" : undefined}
+                        className={recurringExpenseValidation.errors.description ? "field-error" : ""}
+                      />
+                    </label>
+                    <ErrorMessage id="recurring-expense-description-error" message={recurringExpenseValidation.errors.description} />
+
+                    <label className="toggle-field">
+                      <input
+                        checked={recurringExpenseForm.active}
+                        name="recurring-expense-active"
+                        onChange={(event) =>
+                          setRecurringExpenseForm({
+                            ...recurringExpenseForm,
+                            active: event.target.checked,
+                          })
+                        }
+                        type="checkbox"
+                      />
+                      <span>Despesa recorrente ativa</span>
+                    </label>
+
+                    <div className="form-actions">
+                      <button className="button" disabled={isRecurringExpenseSaving} type="submit">
+                        {isRecurringExpenseSaving
+                          ? "Salvando..."
+                          : editingRecurringExpenseId
+                            ? "Salvar recorrência"
+                            : "Cadastrar recorrência"}
+                      </button>
+                      {editingRecurringExpenseId ? (
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={resetRecurringExpenseForm}
+                        >
+                          Cancelar
+                        </button>
+                      ) : null}
+                    </div>
+                  </form>
+
+                  <div className="vehicles-list" aria-busy={isRecurringExpensesLoading}>
+                    <div className="list-header">
+                      <h3>Minhas recorrências</h3>
+                      <button
+                        className="text-button"
+                        disabled={isRecurringExpensesLoading}
+                        type="button"
+                        onClick={() => void loadRecurringExpenses()}
+                      >
+                        Atualizar
+                      </button>
+                    </div>
+
+                    {isRecurringExpensesLoading ? (
+                      <FeedbackMessage kind="loading">Carregando despesas recorrentes...</FeedbackMessage>
+                    ) : null}
+
+                    {!isRecurringExpensesLoading && recurringExpenses.length === 0 ? (
+                      <p className="empty-state">
+                        Nenhuma despesa recorrente cadastrada ainda. Use esta área para guardar
+                        custos fixos ou frequentes.
+                      </p>
+                    ) : null}
+
+                    {recurringExpenses.map((recurringExpense) => (
+                      <article className="vehicle-card session-card" key={recurringExpense.id}>
+                        <div>
+                          <div className="recurring-card-title">
+                            <h4>{getExpenseCategoryLabel(recurringExpense.category)}</h4>
+                            <span
+                              className={
+                                recurringExpense.active
+                                  ? "status-pill status-active"
+                                  : "status-pill status-inactive"
+                              }
+                            >
+                              {recurringExpense.active ? "Ativa" : "Inativa"}
+                            </span>
+                          </div>
+                          <p>{formatMoney(recurringExpense.amount)}</p>
+                          <dl className="session-metrics recurring-metrics">
+                            <div>
+                              <dt>Frequência</dt>
+                              <dd>{getRecurringFrequencyLabel(recurringExpense.frequency)}</dd>
+                            </div>
+                            <div>
+                              <dt>Veículo</dt>
+                              <dd>
+                                {recurringExpense.vehicle_id
+                                  ? getVehicleLabel(recurringExpense.vehicle_id)
+                                  : "Todos / sem veículo"}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Período</dt>
+                              <dd>
+                                {formatDate(recurringExpense.start_date)} até{" "}
+                                {recurringExpense.end_date
+                                  ? formatDate(recurringExpense.end_date)
+                                  : "sem término"}
+                              </dd>
+                            </div>
+                          </dl>
+                          {recurringExpense.description ? (
+                            <p className="expense-description">{recurringExpense.description}</p>
+                          ) : null}
+                        </div>
+                        <div className="card-actions">
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => handleEditRecurringExpense(recurringExpense)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="text-button"
+                            type="button"
+                            onClick={() => void handleToggleRecurringExpense(recurringExpense)}
+                          >
+                            {recurringExpense.active ? "Desativar" : "Ativar"}
+                          </button>
+                          <button
+                            className="text-button danger"
+                            type="button"
+                            onClick={() => void handleDeleteRecurringExpense(recurringExpense)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="manager-section" id="manutencao">
+                <div className="section-title">
+                  <p className="eyebrow">Manutencao</p>
+                  <h3>Manutencao preventiva</h3>
+                  <p className="subtle-note">
+                    Acompanhe revisoes por tempo ou km trabalhados, sem criar despesas
+                    automaticamente.
+                  </p>
+                </div>
+
+                <div className="vehicles-layout">
+                  <form className="auth-form vehicle-form" onSubmit={handleMaintenancePlanSubmit} onInvalid={maintenancePlanValidation.handleInvalid}>
+                    <h3>{editingMaintenancePlanId ? "Editar manutencao" : "Adicionar manutencao"}</h3>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Nome
+                          <input
+                            maxLength={120}
+                            name="name"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                name: event.target.value,
+                              })
+                            }
+                            placeholder="Troca de oleo"
+                            required
+                            type="text"
+                            value={maintenancePlanForm.name}
+                            aria-invalid={!!maintenancePlanValidation.errors.name}
+                            aria-describedby={maintenancePlanValidation.errors.name ? "maintenance-name-error" : undefined}
+                            className={maintenancePlanValidation.errors.name ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="maintenance-name-error" message={maintenancePlanValidation.errors.name} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Categoria
+                          <select
+                            name="category"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                category: event.target.value as MaintenanceCategory,
+                              })
+                            }
+                            required
+                            value={maintenancePlanForm.category}
+                            aria-invalid={!!maintenancePlanValidation.errors.category}
+                            aria-describedby={maintenancePlanValidation.errors.category ? "maintenance-category-error" : undefined}
+                            className={maintenancePlanValidation.errors.category ? "field-error" : ""}
+                          >
+                            {maintenanceCategoryOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="maintenance-category-error" message={maintenancePlanValidation.errors.category} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Veiculo
+                          <select
+                            name="vehicle_id"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                vehicle_id: event.target.value,
+                              })
+                            }
+                            required
+                            value={maintenancePlanForm.vehicle_id}
+                            aria-invalid={!!maintenancePlanValidation.errors.vehicle_id}
+                            aria-describedby={maintenancePlanValidation.errors.vehicle_id ? "maintenance-vehicle_id-error" : undefined}
+                            className={maintenancePlanValidation.errors.vehicle_id ? "field-error" : ""}
+                          >
+                            <option value="">Selecione</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="maintenance-vehicle_id-error" message={maintenancePlanValidation.errors.vehicle_id} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Custo estimado <span className="optional-label">(opcional)</span>
+                          <input
+                            inputMode="decimal"
+                            name="estimated_cost"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                estimated_cost: event.target.value,
+                              })
+                            }
+                            placeholder="Ex: 280,00"
+                            type="text"
+                            value={maintenancePlanForm.estimated_cost}
+                            aria-invalid={!!maintenancePlanValidation.errors.estimated_cost}
+                            aria-describedby={maintenancePlanValidation.errors.estimated_cost ? "maintenance-estimated_cost-error" : undefined}
+                            className={maintenancePlanValidation.errors.estimated_cost ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="maintenance-estimated_cost-error" message={maintenancePlanValidation.errors.estimated_cost} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Intervalo em km <span className="optional-label">(opcional)</span>
+                          <input
+                            inputMode="decimal"
+                            name="interval_km"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                interval_km: event.target.value,
+                              })
+                            }
+                            placeholder="10000"
+                            type="text"
+                            value={maintenancePlanForm.interval_km}
+                            aria-invalid={!!maintenancePlanValidation.errors.interval_km}
+                            aria-describedby={maintenancePlanValidation.errors.interval_km ? "maintenance-interval_km-error" : undefined}
+                            className={maintenancePlanValidation.errors.interval_km ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="maintenance-interval_km-error" message={maintenancePlanValidation.errors.interval_km} />
+                      </div>
+
+                      <div>
+                        <label>
+                          Intervalo em dias <span className="optional-label">(opcional)</span>
+                          <input
+                            inputMode="numeric"
+                            min="1"
+                            name="interval_days"
+                            onChange={(event) =>
+                              setMaintenancePlanForm({
+                                ...maintenancePlanForm,
+                                interval_days: event.target.value,
+                              })
+                            }
+                            placeholder="180"
+                            type="number"
+                            value={maintenancePlanForm.interval_days}
+                            aria-invalid={!!maintenancePlanValidation.errors.interval_days}
+                            aria-describedby={maintenancePlanValidation.errors.interval_days ? "maintenance-interval_days-error" : undefined}
+                            className={maintenancePlanValidation.errors.interval_days ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="maintenance-interval_days-error" message={maintenancePlanValidation.errors.interval_days} />
+                      </div>
+                    </div>
+
+                    <p className="subtle-note">
+                      Informe pelo menos um intervalo: km ou dias.
+                    </p>
+
+                    <label className="toggle-field">
+                      <input
+                        checked={maintenancePlanForm.active}
+                        name="maintenance-active"
+                        onChange={(event) =>
+                          setMaintenancePlanForm({
+                            ...maintenancePlanForm,
+                            active: event.target.checked,
+                          })
+                        }
+                        type="checkbox"
+                      />
+                      <span>Plano ativo</span>
+                    </label>
+
+                    <div className="form-actions">
+                      <button className="button" disabled={isMaintenanceSaving} type="submit">
+                        {isMaintenanceSaving
+                          ? "Salvando..."
+                          : editingMaintenancePlanId
+                            ? "Salvar manutencao"
+                            : "Adicionar manutencao"}
+                      </button>
+                      {editingMaintenancePlanId ? (
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={resetMaintenancePlanForm}
+                        >
+                          Cancelar
+                        </button>
+                      ) : null}
+                    </div>
+                  </form>
+
+                  <div className="vehicles-list" aria-busy={isMaintenanceLoading}>
+                    <div className="list-header">
+                      <h3>Minhas manutencoes</h3>
+                      <button
+                        className="text-button"
+                        disabled={isMaintenanceLoading}
+                        type="button"
+                        onClick={() => void loadMaintenancePlans()}
+                      >
+                        Atualizar
+                      </button>
+                    </div>
+
+                    {isMaintenanceLoading ? (
+                      <FeedbackMessage kind="loading">Carregando manutencoes...</FeedbackMessage>
+                    ) : null}
+
+                    {!isMaintenanceLoading && maintenancePlans.length === 0 ? (
+                      <p className="empty-state">
+                        Configure suas manutencoes para saber quando revisar o veiculo e quanto reservar.{" "}
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() => navigateTo("manutencao")}
+                        >
+                          Adicionar manutencao
+                        </button>
+                      </p>
+                    ) : null}
+
+                    {(["due", "due_soon", "ok"] as MaintenanceStatusType[]).map((statusValue) => {
+                      const plans = maintenancePlansByStatus[statusValue];
+                      if (plans.length === 0) {
+                        return null;
+                      }
+
+                      return (
+                        <div className="daily-breakdown" key={statusValue}>
+                          <div className="list-header">
+                            <h3>{getMaintenanceStatusLabel(statusValue)}</h3>
+                          </div>
+
+                          {plans.map((plan) => {
+                            const planStatus = maintenanceStatusesById[plan.id];
+                            const records = maintenanceRecordsByPlanId[plan.id] ?? [];
+
+                            return (
+                              <article className="vehicle-card session-card" key={plan.id}>
+                                <div>
+                                  <div className="recurring-card-title">
+                                    <div>
+                                      <h4>{plan.name}</h4>
+                                      <p>
+                                        {getMaintenanceCategoryLabel(plan.category)} ·{" "}
+                                        {getVehicleLabel(plan.vehicle_id)}
+                                      </p>
+                                    </div>
+                                    <span className={getMaintenanceStatusClass(planStatus.status)}>
+                                      {getMaintenanceStatusLabel(planStatus.status)}
+                                    </span>
+                                  </div>
+
+                                  {planStatus.km_remaining !== null && planStatus.status !== "due" ? (
+                                    <p className="subtle-note">
+                                      Faltam aproximadamente {formatDistance(planStatus.km_remaining)} km.
+                                    </p>
+                                  ) : null}
+
+                                  <dl className="session-metrics recurring-metrics">
+                                    <div>
+                                      <dt>Km desde a ultima</dt>
+                                      <dd>
+                                        {planStatus.km_since_last_service
+                                          ? `${formatDistance(planStatus.km_since_last_service)} km`
+                                          : "—"}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt>Km restantes</dt>
+                                      <dd>
+                                        {planStatus.km_remaining
+                                          ? `${formatDistance(planStatus.km_remaining)} km`
+                                          : "—"}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt>Dias desde a ultima</dt>
+                                      <dd>
+                                        {planStatus.days_since_last_service ?? "—"}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt>Dias restantes</dt>
+                                      <dd>{planStatus.days_remaining ?? "—"}</dd>
+                                    </div>
+                                    <div>
+                                      <dt>Custo estimado</dt>
+                                      <dd>
+                                        {planStatus.estimated_cost
+                                          ? formatMoney(planStatus.estimated_cost)
+                                          : "—"}
+                                      </dd>
+                                    </div>
+                                    <div>
+                                      <dt>Reserva sugerida</dt>
+                                      <dd>
+                                        {planStatus.recommended_reserve_per_km
+                                          ? formatMoneyPerKm(planStatus.recommended_reserve_per_km)
+                                          : "—"}
+                                      </dd>
+                                    </div>
+                                  </dl>
+
+                                  <div className="import-preview">
+                                    <div className="list-header">
+                                      <h4>Historico</h4>
+                                    </div>
+                                    {records.length === 0 ? (
+                                      <p className="subtle-note">
+                                        Nenhuma manutencao registrada ainda.
+                                      </p>
+                                    ) : (
+                                      <div className="import-preview-list">
+                                        {records.map((record) => (
+                                          <article className="vehicle-card session-card" key={record.id}>
+                                            <div>
+                                              <h4>{formatDate(record.service_date)}</h4>
+                                              <p>{record.notes ?? "Sem observacao"}</p>
+                                            </div>
+                                          </article>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {recordingMaintenancePlanId === plan.id ? (
+                                      <form
+                                        className="auth-form"
+                                        onSubmit={handleMaintenanceRecordSubmit}
+                                        onInvalid={maintenanceRecordValidation.handleInvalid}
+                                      >
+                                        <div className="form-grid">
+                                          <div>
+                                            <label>
+                                              Data
+                                              <input
+                                                name="service_date"
+                                                onChange={(event) =>
+                                                  setMaintenanceRecordForm({
+                                                    ...maintenanceRecordForm,
+                                                    service_date: event.target.value,
+                                                  })
+                                                }
+                                                required
+                                                type="date"
+                                                value={maintenanceRecordForm.service_date}
+                                                aria-invalid={!!maintenanceRecordValidation.errors.service_date}
+                                                aria-describedby={maintenanceRecordValidation.errors.service_date ? "maintenance-record-service_date-error" : undefined}
+                                                className={maintenanceRecordValidation.errors.service_date ? "field-error" : ""}
+                                              />
+                                            </label>
+                                            <ErrorMessage id="maintenance-record-service_date-error" message={maintenanceRecordValidation.errors.service_date} />
+                                          </div>
+                                          <div>
+                                            <label>
+                                              Observacao <span className="optional-label">(opcional)</span>
+                                              <input
+                                                maxLength={255}
+                                                name="notes"
+                                                onChange={(event) =>
+                                                  setMaintenanceRecordForm({
+                                                    ...maintenanceRecordForm,
+                                                    notes: event.target.value,
+                                                  })
+                                                }
+                                                placeholder="Ex.: troca feita na oficina"
+                                                type="text"
+                                                value={maintenanceRecordForm.notes}
+                                                aria-invalid={!!maintenanceRecordValidation.errors.notes}
+                                                aria-describedby={maintenanceRecordValidation.errors.notes ? "maintenance-record-notes-error" : undefined}
+                                                className={maintenanceRecordValidation.errors.notes ? "field-error" : ""}
+                                              />
+                                            </label>
+                                            <ErrorMessage id="maintenance-record-notes-error" message={maintenanceRecordValidation.errors.notes} />
+                                          </div>
+                                        </div>
+                                        <div className="form-actions">
+                                          <button
+                                            className="button"
+                                            disabled={isMaintenanceRecordSaving}
+                                            type="submit"
+                                          >
+                                            {isMaintenanceRecordSaving
+                                              ? "Registrando..."
+                                              : "Salvar registro"}
+                                          </button>
+                                          <button
+                                            className="button button-ghost"
+                                            type="button"
+                                            onClick={() => setRecordingMaintenancePlanId(null)}
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </form>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                <div className="card-actions">
+                                  <button
+                                    className="text-button"
+                                    type="button"
+                                    onClick={() => handleStartMaintenanceRecord(plan.id)}
+                                  >
+                                    Registrar manutencao realizada
+                                  </button>
+                                  <button
+                                    className="text-button"
+                                    type="button"
+                                    onClick={() => handleEditMaintenancePlan(plan)}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="text-button danger"
+                                    type="button"
+                                    onClick={() => void handleDeleteMaintenancePlan(plan)}
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+
+              <VehiclesSection
+                ref={vehiclesSectionRef}
+                vehicles={vehicles}
+                pendingQuickStartAction={pendingQuickStartAction}
+                isVehiclesLoading={isVehiclesLoading}
+                getAuthHeaders={getAuthHeaders}
+                endSession={endSession}
+                setMessage={setMessage}
+                setSuccessMessage={setSuccessMessage}
+                loadVehicles={() => loadVehicles(token, user?.id, true)}
+                loadWorkSessions={() => loadWorkSessions(token, true)}
+                loadExpenses={() => loadExpenses(token, true)}
+                refreshDashboardData={() => refreshDashboardData()}
+                onVehicleCreated={handleVehicleCreated}
+              />
+            </section>
+
+            <section className="dashboard-area" id="area-mais" aria-label="Mais" hidden={activeArea !== "mais"} tabIndex={-1}>
+              <div className="section-title">
+                <h2>Mais</h2>
+                <p className="subtle-note">Sua conta, importação e histórico de jornadas.</p>
+              </div>
+              <nav className="result-context-nav" aria-label="Outras opções">
+                <a href="#conta">Conta e preferências</a>
+                <a href="#jornadas">Jornadas e importação</a>
+              </nav>
+
+              <details className="account-menu" id="conta">
+                <summary>Conta e preferências</summary>
                 <dl className="user-data compact-user-data">
                   <div>
                     <dt>Nome</dt>
@@ -2326,2266 +4171,279 @@ function App() {
                   Sair
                 </button>
               </details>
-            </div>
 
-            {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
-            {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
-
-            <nav className="dashboard-nav" aria-label="Navegação principal">
-              <a href="#hoje">Hoje</a>
-              <a href={workSessions.length > 0 ? "#resultado" : "#primeiro-resultado"}>Resultado</a>
-              <a href="#custos">Custos</a>
-              <a href="#mais">Mais</a>
-            </nav>
-
-            <DashboardStart
-              nextStep={betaNextStep}
-              hasWorkdays={workSessions.length > 0}
-              isLoading={isVehiclesLoading || isWorkSessionsLoading}
-              onRegister={() => document.getElementById("daily-revenue")?.focus()}
-            />
-
-            <section className="daily-entry" id="hoje">
-              <div className="section-title">
-                <h2>Registro do dia</h2>
-                <p className="subtle-note">
-                  Preencha os valores do seu trabalho. Os gastos podem ser adicionados depois.
-                </p>
-              </div>
-
-              <div className="daily-entry-tools" aria-label="Outras ações do dia">
-                <button className="text-button" type="button" onClick={openDailyExpenseShortcut}>
-                  Adicionar gasto
-                </button>
-                {workSessions.length === 0 ? (
-                  vehicles.length === 0 ? (
-                    <a href="#veiculos">Cadastrar veículo</a>
-                  ) : (
-                    <button
-                      className="text-button"
-                      type="button"
-                      onClick={() => {
-                        setQuickStartVisible(true);
-                        requestAnimationFrame(() =>
-                          document.getElementById("quick-start")?.scrollIntoView({ behavior: "smooth" }),
-                        );
-                      }}
-                    >
-                      Simular sem salvar
-                    </button>
-                  )
-                ) : null}
-              </div>
-
-              {shouldShowCostPrecisionPrompt ? (
-                <div className="action-prompt">
-                  <div>
-                    <strong>Melhore a precisão do seu GanhoCerto</strong>
-                    <p>Configure os principais custos do veículo para obter uma estimativa mais completa.</p>
-                  </div>
-                  <a className="button button-ghost" href="#veiculos">
-                    Configurar custos
-                  </a>
-                </div>
-              ) : null}
-
-              {maintenanceAlert ? (
-                <div className="action-prompt maintenance-prompt">
-                  <div>
-                    <strong>Próxima manutenção</strong>
-                    <p>
-                      {maintenanceAlert.plan.name}
-                      {maintenanceAlert.status.km_remaining
-                        ? ` - faltam aproximadamente ${formatDistance(maintenanceAlert.status.km_remaining)} km`
-                        : maintenanceAlert.status.days_remaining !== null
-                          ? ` - faltam ${maintenanceAlert.status.days_remaining} dias`
-                          : " - atenção necessária"}
-                    </p>
-                    {maintenanceAlert.status.recommended_reserve_per_km ? (
-                      <small>
-                        Reserva sugerida:{" "}
-                        {formatMoneyPerKm(maintenanceAlert.status.recommended_reserve_per_km)}
-                      </small>
-                    ) : null}
-                  </div>
-                  <a className="text-button" href="#manutencao">
-                    Ver manutenção
-                  </a>
-                </div>
-              ) : null}
-
-              <form className="auth-form daily-entry-form" onSubmit={handleQuickDailyEntrySubmit}>
-                <div className="daily-date-row">
-                  <p>Data: {formatDate(getDailyEntryDate(quickDailyEntryForm.work_date))}</p>
-                  <button
-                    className="text-button"
-                    type="button"
-                    onClick={() => setQuickDailyEntryShowDate((currentValue) => !currentValue)}
-                  >
-                    Alterar data
-                  </button>
-                </div>
-
-                {quickDailyEntryShowDate ? (
-                  <label className="daily-date-input">
-                    Data do registro
-                    <input
-                      onChange={(event) =>
-                        setQuickDailyEntryForm({
-                          ...quickDailyEntryForm,
-                          work_date: event.target.value,
-                        })
-                      }
-                      type="date"
-                      value={getDailyEntryDate(quickDailyEntryForm.work_date)}
-                    />
-                  </label>
-                ) : null}
-
-                <label>
-                  Faturamento
-                  <input
-                    id="daily-revenue"
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setQuickDailyEntryForm({
-                        ...quickDailyEntryForm,
-                        gross_revenue: event.target.value,
-                      })
-                    }
-                    placeholder="250,50"
-                    required
-                    type="text"
-                    value={quickDailyEntryForm.gross_revenue}
+              <section className="manager-section" id="jornadas">
+                <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
+                  <CsvImportSection
+                    type="work_sessions"
+                    token={token}
+                    vehicles={vehicles}
+                    getAuthHeaders={getAuthHeaders}
+                    getVehicleLabel={getVehicleLabel}
+                    getExpenseCategoryLabel={getExpenseCategoryLabel}
+                    endSession={endSession}
+                    setMessage={setMessage}
+                    setSuccessMessage={setSuccessMessage}
+                    loadWorkSessions={(currentToken = token) => loadWorkSessions(currentToken, true)}
+                    loadExpenses={(currentToken = token) => loadExpenses(currentToken, true)}
+                    refreshDashboardData={refreshDashboardData}
                   />
-                </label>
+                </Suspense>
+                <div className="vehicles-layout">
+                  <form className="auth-form vehicle-form" onSubmit={handleWorkSessionSubmit} onInvalid={workSessionValidation.handleInvalid}>
+                    <h3>{editingWorkSessionId ? "Editar jornada" : "Cadastrar jornada"}</h3>
 
-                <label>
-                  Km rodados
-                  <input
-                    inputMode="decimal"
-                    onChange={(event) =>
-                      setQuickDailyEntryForm({
-                        ...quickDailyEntryForm,
-                        distance_km: event.target.value,
-                      })
-                    }
-                    placeholder="87,5"
-                    required
-                    type="text"
-                    value={quickDailyEntryForm.distance_km}
-                  />
-                </label>
-
-                <label>
-                  Tempo trabalhado
-                  <input
-                    aria-describedby="daily-duration-help"
-                    inputMode="text"
-                    onChange={(event) =>
-                      setQuickDailyEntryForm({
-                        ...quickDailyEntryForm,
-                        worked_duration: event.target.value,
-                      })
-                    }
-                    placeholder="8:30 ou 8h30"
-                    required
-                    type="text"
-                    value={quickDailyEntryForm.worked_duration}
-                  />
-                  <small id="daily-duration-help">Ex.: 8:30 ou 8h30 para 8 horas e 30 minutos. Apenas 8 significa 8 horas.</small>
-                </label>
-
-                <label>
-                  Numero de corridas <span className="optional-label">(opcional)</span>
-                  <input
-                    min="0"
-                    onChange={(event) =>
-                      setQuickDailyEntryForm({
-                        ...quickDailyEntryForm,
-                        trip_count: event.target.value,
-                      })
-                    }
-                    type="number"
-                    value={quickDailyEntryForm.trip_count}
-                  />
-                </label>
-
-                {vehicles.length === 0 ? (
-                  <p className="empty-state daily-entry-note">
-                    Sem veiculo cadastrado. Voce pode preencher o dia agora; ao salvar, seus dados
-                    ficam guardados e o app abre o cadastro do veiculo.
-                  </p>
-                ) : null}
-
-                {vehicles.length === 1 ? (
-                  <p className="daily-selected-vehicle">
-                    Veiculo: <strong>{getVehicleLabel(vehicles[0].id)}</strong>
-                  </p>
-                ) : null}
-
-                {vehicles.length > 1 ? (
-                  <label>
-                    Veiculo
-                    <select
-                      onChange={(event) => {
-                        rememberDailyVehicle(event.target.value);
-                        setQuickDailyEntryForm({
-                          ...quickDailyEntryForm,
-                          vehicle_id: event.target.value,
-                        });
-                      }}
-                      required
-                      value={quickDailyEntryForm.vehicle_id}
-                    >
-                      <option value="">Selecione</option>
-                      {vehicles.map((vehicle) => (
-                        <option key={vehicle.id} value={vehicle.id}>
-                          {vehicle.name} - {vehicle.brand} {vehicle.model}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
-
-                <button
-                  className="button daily-entry-button"
-                  disabled={isQuickDailyEntrySaving}
-                  type="submit"
-                >
-                  {isQuickDailyEntrySaving
-                    ? "Salvando..."
-                    : vehicles.length === 0
-                      ? "Continuar para cadastrar veiculo"
-                      : "Salvar meu dia"}
-                </button>
-              </form>
-
-              {quickDailyEntryResult ? (
-                <div className="daily-entry-result" id="daily-entry-result" tabIndex={-1} aria-labelledby="daily-result-title">
-                  <div className="section-title">
-                    <p className="eyebrow">Resultado parcial de hoje</p>
-                    <h3 id="daily-result-title">Quanto sobrou?</h3>
-                    <p className="subtle-note">
-                      Este valor considera os gastos de hoje que ja foram registrados. Adicione
-                      combustivel, recarga ou outros custos para aproximar o resultado real.
-                    </p>
-                  </div>
-
-                  <div className="metric-grid daily-entry-metrics daily-entry-primary-metrics">
-                    <article
-                      className={
-                        quickDailyRemainingCents < 0n
-                          ? "metric-card metric-negative result-primary"
-                          : "metric-card metric-profit result-primary"
-                      }
-                      data-result-kind="realized"
-                    >
-                      <span>Realizado · Sobra após gastos</span>
-                      <strong>{formatCents(quickDailyRemainingCents)}</strong>
-                      <small>Resultado parcial de hoje. Gastos ainda não registrados não estão descontados.</small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Faturamento</span>
-                      <strong>{formatCents(quickDailyEntryResult.grossRevenueCents)}</strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>Gastos registrados hoje</span>
-                      <strong>{formatCents(quickDailyExpenseTotalCents)}</strong>
-                    </article>
-                  </div>
-
-                  {quickDailyGoal && quickDailyGoalProgress ? (
-                    <p className="subtle-note">
-                      Meta do periodo: {formatMoney(quickDailyGoalProgress.current_amount)} de{" "}
-                      {formatMoney(quickDailyGoal.target_amount)} em sobra registrada ate agora.{" "}
-                      <a href="#metas">Ver progresso da meta</a>
-                    </p>
-                  ) : null}
-
-                  {quickDailyExpenseTotalCents === 0n ? (
-                    <div className="action-prompt">
+                    <div className="form-grid">
                       <div>
-                        <strong>Você ainda não adicionou gastos de hoje.</strong>
-                        <p>Inclua combustivel, recarga ou outros custos para melhorar a sobra parcial.</p>
+                        <label>
+                          Data
+                          <input
+                            name="work_date"
+                            onChange={(event) =>
+                              setWorkSessionForm({
+                                ...workSessionForm,
+                                work_date: event.target.value,
+                              })
+                            }
+                            required
+                            type="date"
+                            value={workSessionForm.work_date}
+                            aria-invalid={!!workSessionValidation.errors.work_date}
+                            aria-describedby={workSessionValidation.errors.work_date ? "work-session-work_date-error" : undefined}
+                            className={workSessionValidation.errors.work_date ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="work-session-work_date-error" message={workSessionValidation.errors.work_date} />
                       </div>
-                      <button className="button" type="button" onClick={openDailyExpenseShortcut}>
-                        Adicionar gasto de hoje
-                      </button>
+
+                      <div>
+                        <label>
+                          Veículo
+                          <select
+                            name="vehicle_id"
+                            onChange={(event) =>
+                              setWorkSessionForm({
+                                ...workSessionForm,
+                                vehicle_id: event.target.value,
+                              })
+                            }
+                            required
+                            value={workSessionForm.vehicle_id}
+                            aria-invalid={!!workSessionValidation.errors.vehicle_id}
+                            aria-describedby={workSessionValidation.errors.vehicle_id ? "work-session-vehicle_id-error" : undefined}
+                            className={workSessionValidation.errors.vehicle_id ? "field-error" : ""}
+                          >
+                            <option value="">Selecione</option>
+                            {vehicles.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.name} - {vehicle.brand} {vehicle.model}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <ErrorMessage id="work-session-vehicle_id-error" message={workSessionValidation.errors.vehicle_id} />
+                      </div>
                     </div>
-                  ) : null}
 
-                  <div className="metric-grid daily-entry-metrics secondary-metrics">
-                    <article className="metric-card">
-                      <span>R$/hora</span>
-                      <strong>
-                        {quickDailyEntryResult.grossPerHourCents === null
-                          ? "—"
-                          : formatCents(quickDailyEntryResult.grossPerHourCents)}
-                      </strong>
-                    </article>
-                    <article className="metric-card">
-                      <span>R$/km</span>
-                      <strong>
-                        {quickDailyEntryResult.grossPerKmCents === null
-                          ? "—"
-                          : formatCents(quickDailyEntryResult.grossPerKmCents)}
-                      </strong>
-                    </article>
-                    {quickDailyEntryResult.tripCount > 0 ? (
-                      <article className="metric-card">
-                        <span>Corridas</span>
-                        <strong>{quickDailyEntryResult.tripCount}</strong>
-                      </article>
-                    ) : null}
-                  </div>
-
-                  <div className="daily-entry-actions">
-                    <button className="button" type="button" onClick={openDailyExpenseShortcut}>
-                      Adicionar gasto de hoje
-                    </button>
-                    <button className="button button-ghost" type="button" onClick={handleViewCompleteResult}>
-                      Ver resultado completo
-                    </button>
-                  </div>
-
-                  {dailyExpenseVisible ? (
-                    <form className="auth-form daily-expense-form" onSubmit={handleDailyExpenseSubmit}>
-                      <div className="section-title">
-                        <p className="eyebrow">Gasto de hoje</p>
-                        <h3>Adicionar gasto</h3>
-                        <p className="subtle-note">
-                          Data {formatDate(dailyExpenseForm.expense_date)} e veiculo ja preenchidos.
-                        </p>
+                    <div className="form-grid">
+                      <div>
+                        <label>
+                          Faturamento bruto
+                          <input
+                            inputMode="decimal"
+                            name="gross_revenue"
+                            onChange={(event) =>
+                              setWorkSessionForm({
+                                ...workSessionForm,
+                                gross_revenue: event.target.value,
+                              })
+                            }
+                            placeholder="Ex: 250,50"
+                            required
+                            type="text"
+                            value={workSessionForm.gross_revenue}
+                            aria-invalid={!!workSessionValidation.errors.gross_revenue}
+                            aria-describedby={workSessionValidation.errors.gross_revenue ? "work-session-gross_revenue-error" : undefined}
+                            className={workSessionValidation.errors.gross_revenue ? "field-error" : ""}
+                          />
+                        </label>
+                        <ErrorMessage id="work-session-gross_revenue-error" message={workSessionValidation.errors.gross_revenue} />
                       </div>
 
-                      <label>
-                        Categoria
-                        <select
-                          onChange={(event) =>
-                            setDailyExpenseForm({
-                              ...dailyExpenseForm,
-                              category: event.target.value as ExpenseCategory,
-                            })
-                          }
-                          required
-                          value={dailyExpenseForm.category}
-                        >
-                          {expenseCategoryOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label>
-                        Valor
-                        <input
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setDailyExpenseForm({
-                              ...dailyExpenseForm,
-                              amount: event.target.value,
-                            })
-                          }
-                          placeholder="89,90"
-                          required
-                          type="text"
-                          value={dailyExpenseForm.amount}
-                        />
-                      </label>
-
-                      <label>
-                        Descricao <span className="optional-label">(opcional)</span>
-                        <input
-                          maxLength={255}
-                          onChange={(event) =>
-                            setDailyExpenseForm({
-                              ...dailyExpenseForm,
-                              description: event.target.value,
-                            })
-                          }
-                          placeholder="Ex: Combustivel"
-                          type="text"
-                          value={dailyExpenseForm.description}
-                        />
-                      </label>
-
-                      <div className="form-actions">
-                        <button className="button" disabled={isDailyExpenseSaving} type="submit">
-                          {isDailyExpenseSaving ? "Salvando..." : "Salvar gasto"}
-                        </button>
-                        <button
-                          className="button button-ghost"
-                          type="button"
-                          onClick={() => setDailyExpenseVisible(false)}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </form>
-                  ) : null}
-                </div>
-              ) : null}
-
-              {dailyExpenseVisible && !quickDailyEntryResult ? (
-                <form className="auth-form daily-expense-form" onSubmit={handleDailyExpenseSubmit}>
-                  <div className="section-title">
-                    <p className="eyebrow">Gasto de hoje</p>
-                    <h3>Adicionar gasto</h3>
-                    <p className="subtle-note">Data {formatDate(dailyExpenseForm.expense_date)}.</p>
-                  </div>
-
-                  <label>
-                    Categoria
-                    <select
-                      onChange={(event) =>
-                        setDailyExpenseForm({
-                          ...dailyExpenseForm,
-                          category: event.target.value as ExpenseCategory,
-                        })
-                      }
-                      required
-                      value={dailyExpenseForm.category}
-                    >
-                      {expenseCategoryOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  {vehicles.length > 1 ? (
-                    <label>
-                      Veículo
-                      <select
-                        onChange={(event) =>
-                          setDailyExpenseForm({
-                            ...dailyExpenseForm,
-                            vehicle_id: event.target.value,
-                          })
-                        }
-                        value={dailyExpenseForm.vehicle_id}
-                      >
-                        <option value="">Gasto geral / sem veículo</option>
-                        {vehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name} - {vehicle.brand} {vehicle.model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-
-                  <label>
-                    Valor
-                    <input
-                      inputMode="decimal"
-                      onChange={(event) =>
-                        setDailyExpenseForm({
-                          ...dailyExpenseForm,
-                          amount: event.target.value,
-                        })
-                      }
-                      placeholder="89,90"
-                      required
-                      type="text"
-                      value={dailyExpenseForm.amount}
-                    />
-                  </label>
-
-                  <label>
-                    Descricao <span className="optional-label">(opcional)</span>
-                    <input
-                      maxLength={255}
-                      onChange={(event) =>
-                        setDailyExpenseForm({
-                          ...dailyExpenseForm,
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder="Ex: Combustivel"
-                      type="text"
-                      value={dailyExpenseForm.description}
-                    />
-                  </label>
-
-                  <div className="form-actions">
-                    <button className="button" disabled={isDailyExpenseSaving} type="submit">
-                      {isDailyExpenseSaving ? "Salvando..." : "Salvar gasto"}
-                    </button>
-                    <button
-                      className="button button-ghost"
-                      type="button"
-                      onClick={() => setDailyExpenseVisible(false)}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              ) : null}
-            </section>
-
-            {isQuickStartVisible ? (
-              <section className="quick-start" id="quick-start">
-                <div className="section-title">
-                  <p className="eyebrow">Início rápido</p>
-                  <h3>Descubra seu GanhoCerto</h3>
-                  <p className="subtle-note">
-                    Veja em poucos passos quanto realmente sobrou do seu dia de trabalho.
-                  </p>
-                </div>
-
-                <div className="quick-start-progress" aria-label="Progresso da simulação">
-                  <span>1. Quanto você fez hoje?</span>
-                  <span>2. Quanto trabalhou?</span>
-                  <span>3. Quanto gastou?</span>
-                  <span>4. Seu resultado</span>
-                </div>
-
-                {!quickStartResult ? (
-                  <form className="auth-form quick-start-form" onSubmit={handleQuickStartSubmit}>
-                    <fieldset className="form-group">
-                      <legend>Quanto você fez hoje?</legend>
-                      <label>
-                        Faturamento do dia
-                        <input
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setQuickStartForm({ ...quickStartForm, gross_revenue: event.target.value })
-                          }
-                          placeholder="Ex: 250,50"
-                          required
-                          type="text"
-                          value={quickStartForm.gross_revenue}
-                        />
-                      </label>
-                    </fieldset>
-
-                    <fieldset className="form-group">
-                      <legend>Quanto trabalhou?</legend>
-                      <div className="form-grid quick-start-time">
+                      <div>
                         <label>
                           Km rodados
                           <input
                             inputMode="decimal"
+                            name="distance_km"
                             onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, distance_km: event.target.value })
+                              setWorkSessionForm({
+                                ...workSessionForm,
+                                distance_km: event.target.value,
+                              })
                             }
                             placeholder="Ex: 87,5"
                             required
                             type="text"
-                            value={quickStartForm.distance_km}
+                            value={workSessionForm.distance_km}
+                            aria-invalid={!!workSessionValidation.errors.distance_km}
+                            aria-describedby={workSessionValidation.errors.distance_km ? "work-session-distance_km-error" : undefined}
+                            className={workSessionValidation.errors.distance_km ? "field-error" : ""}
                           />
                         </label>
+                        <ErrorMessage id="work-session-distance_km-error" message={workSessionValidation.errors.distance_km} />
+                      </div>
+                    </div>
+
+                    <div className="form-grid form-grid-three">
+                      <div>
                         <label>
                           Tempo trabalhado
                           <input
                             inputMode="text"
+                            name="worked_duration"
                             onChange={(event) =>
-                              setQuickStartForm({
-                                ...quickStartForm,
+                              setWorkSessionForm({
+                                ...workSessionForm,
                                 worked_duration: event.target.value,
                               })
                             }
                             placeholder="Ex: 8:30"
                             required
                             type="text"
-                            value={quickStartForm.worked_duration}
+                            value={workSessionForm.worked_duration}
+                            aria-invalid={!!workSessionValidation.errors.worked_duration}
+                            aria-describedby={workSessionValidation.errors.worked_duration ? "work-session-worked_duration-error" : undefined}
+                            className={workSessionValidation.errors.worked_duration ? "field-error" : ""}
                           />
+                          <small>Ex.: 8:30 ou 8h30.</small>
                         </label>
+                        <ErrorMessage id="work-session-worked_duration-error" message={workSessionValidation.errors.worked_duration} />
                       </div>
-                    </fieldset>
 
-                    <fieldset className="form-group">
-                      <legend>Quanto gastou?</legend>
-                      <div className="form-grid">
+                      <div>
                         <label>
-                          Combustível ou recarga
+                          Número de corridas
                           <input
-                            inputMode="decimal"
+                            min="0"
+                            name="trip_count"
                             onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, fuel_expense: event.target.value })
-                            }
-                            placeholder="Ex: 80,00"
-                            required
-                            type="text"
-                            value={quickStartForm.fuel_expense}
-                          />
-                        </label>
-                        <label>
-                          Tipo de gasto
-                          <select
-                            onChange={(event) =>
-                              setQuickStartForm({
-                                ...quickStartForm,
-                                expense_category: event.target.value as "fuel" | "charging",
+                              setWorkSessionForm({
+                                ...workSessionForm,
+                                trip_count: event.target.value,
                               })
                             }
-                            value={quickStartForm.expense_category}
-                          >
-                            <option value="fuel">Combustível</option>
-                            <option value="charging">Recarga elétrica</option>
-                          </select>
+                            required
+                            type="number"
+                            value={workSessionForm.trip_count}
+                            aria-invalid={!!workSessionValidation.errors.trip_count}
+                            aria-describedby={workSessionValidation.errors.trip_count ? "work-session-trip_count-error" : undefined}
+                            className={workSessionValidation.errors.trip_count ? "field-error" : ""}
+                          />
                         </label>
+                        <ErrorMessage id="work-session-trip_count-error" message={workSessionValidation.errors.trip_count} />
                       </div>
-                    </fieldset>
+                    </div>
 
-                    <fieldset className="form-group">
-                      <legend>Seu veículo</legend>
-                      <label>
-                        Tipo do veículo
-                        <select
-                          onChange={(event) =>
-                            setQuickStartForm({
-                              ...quickStartForm,
-                              ownership_type: event.target.value as OwnershipType,
-                            })
-                          }
-                          value={quickStartForm.ownership_type}
+                    <div className="form-actions">
+                      <button
+                        className="button"
+                        disabled={isWorkSessionSaving || vehicles.length === 0}
+                        type="submit"
+                      >
+                        {isWorkSessionSaving
+                          ? "Salvando..."
+                          : editingWorkSessionId
+                            ? "Salvar jornada"
+                            : "Cadastrar jornada"}
+                      </button>
+                      {editingWorkSessionId ? (
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={resetWorkSessionForm}
                         >
-                          {ownershipOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      {quickStartForm.ownership_type === "rented" ? (
-                        <label>
-                          Aluguel mensal <span className="optional-label">(opcional)</span>
-                          <input
-                            inputMode="decimal"
-                            onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, rental_monthly: event.target.value })
-                            }
-                            placeholder="Ex: 2.200,00"
-                            type="text"
-                            value={quickStartForm.rental_monthly}
-                          />
-                        </label>
+                          Cancelar
+                        </button>
                       ) : null}
-
-                      {quickStartForm.ownership_type === "financed" ? (
-                        <label>
-                          Financiamento mensal <span className="optional-label">(opcional)</span>
-                          <input
-                            inputMode="decimal"
-                            onChange={(event) =>
-                              setQuickStartForm({ ...quickStartForm, financing_monthly: event.target.value })
-                            }
-                            placeholder="Ex: 1.800,00"
-                            type="text"
-                            value={quickStartForm.financing_monthly}
-                          />
-                        </label>
-                      ) : null}
-                    </fieldset>
-
-                    <label>
-                      Número de corridas <span className="optional-label">(opcional)</span>
-                      <input
-                        min="0"
-                        onChange={(event) =>
-                          setQuickStartForm({ ...quickStartForm, trip_count: event.target.value })
-                        }
-                        type="number"
-                        value={quickStartForm.trip_count}
-                      />
-                    </label>
-
-                    <button className="button quick-start-button" type="submit">
-                      Ver minha estimativa rápida
-                    </button>
+                    </div>
                   </form>
-                ) : (
-                  <div className="quick-start-result">
-                    <div className="section-title">
-                      <p className="eyebrow">Resultado inicial</p>
-                      <h3>Sua estimativa rápida</h3>
-                    </div>
-                    <div className="metric-grid quick-start-metrics">
-                      <article className="metric-card">
-                        <span>Faturamento</span>
-                        <strong>{formatCents(quickStartResult.grossRevenueCents)}</strong>
-                      </article>
-                      <article className="metric-card metric-expense">
-                        <span>Gasto informado</span>
-                        <strong>{formatCents(quickStartResult.fuelExpenseCents)}</strong>
-                      </article>
-                      <article className="metric-card metric-profit">
-                        <span>Sobra após gasto</span>
-                        <strong>{formatCents(quickStartResult.remainingCents)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>R$/hora</span>
-                        <strong>
-                          {quickStartResult.remainingPerHourCents === null
-                            ? "—"
-                            : formatCents(quickStartResult.remainingPerHourCents)}
-                        </strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>R$/km</span>
-                        <strong>
-                          {quickStartResult.remainingPerKmCents === null
-                            ? "—"
-                            : formatCents(quickStartResult.remainingPerKmCents)}
-                        </strong>
-                      </article>
-                      {quickStartResult.averageTicketCents !== null ? (
-                        <article className="metric-card">
-                          <span>Ticket médio</span>
-                          <strong>{formatCents(quickStartResult.averageTicketCents)}</strong>
-                        </article>
-                      ) : null}
-                    </div>
-                    <p className="quick-start-disclaimer">
-                      Este é um cálculo inicial. Custos como manutenção, pneus, seguro, IPVA e
-                      depreciação podem reduzir seu resultado real.
-                    </p>
-                    <div className="quick-start-actions">
-                      <p>Quer descobrir quanto realmente sobra considerando todos os custos do seu veículo?</p>
-                      <button className="button" type="button" onClick={() => void handleQuickStartConfigure()}>
-                        Configurar meu GanhoCerto
-                      </button>
-                      <button className="button button-ghost" type="button" onClick={() => void handleQuickStartRegister()}>
-                        Registrar meu primeiro dia
-                      </button>
+
+                  <div className="vehicles-list" id="lista-jornadas" aria-busy={isWorkSessionsLoading}>
+                    <div className="list-header">
+                      <h3>Minhas jornadas</h3>
                       <button
                         className="text-button"
+                        disabled={isWorkSessionsLoading}
                         type="button"
-                        onClick={() => setQuickStartResult(null)}
+                        onClick={() => void loadWorkSessions()}
                       >
-                        Ajustar dados
+                        Atualizar
                       </button>
                     </div>
-                  </div>
-                )}
-              </section>
-            ) : null}
 
-            <section className="manager-section" id="metas">
-              <div className="section-title">
-                <p className="eyebrow">Metas</p>
-                <h3>Metas financeiras</h3>
-                <p className="subtle-note">
-                  Acompanhe o valor registrado, quanto falta e o ritmo necessario dentro do
-                  periodo da meta. Ritmo e fechamento sao referencias baseadas nos registros, nao
-                  garantias.
-                </p>
-              </div>
+                    {isWorkSessionsLoading ? (
+                      <FeedbackMessage kind="loading">Carregando jornadas...</FeedbackMessage>
+                    ) : null}
 
-              <div className="vehicles-layout">
-                <form className="auth-form vehicle-form" onSubmit={handleFinancialGoalSubmit}>
-                  <h3>{editingFinancialGoalId ? "Editar meta" : "Criar meta"}</h3>
-
-                  <div className="simple-goal-intro">
-                    <strong>Quanto você quer que sobre?</strong>
-                    <p>
-                      Por padrão, a meta acompanha a sobra após as despesas que você registrou.
-                    </p>
-                  </div>
-
-                  <details
-                    className="advanced-options"
-                    open={financialGoalForm.goal_type === "projected"}
-                  >
-                    <summary>Opção avançada</summary>
-                    <label className="toggle-field">
-                      <input
-                        checked={financialGoalForm.goal_type === "projected"}
-                        name="financial-goal-type"
-                        onChange={(event) =>
-                          setFinancialGoalForm({
-                            ...financialGoalForm,
-                            goal_type: event.target.checked ? "projected" : "net",
-                          })
-                        }
-                        type="checkbox"
-                      />
-                      <span>Usar resultado projetado</span>
-                    </label>
-                    {financialGoalForm.goal_type === "projected" ? (
-                      <p className="subtle-note">
-                        O resultado projetado também considera custos do veículo e despesas
-                        recorrentes previstas.
+                    {!isWorkSessionsLoading && vehicles.length === 0 ? (
+                      <p className="empty-state">
+                        Cadastre um veículo antes de registrar sua primeira jornada.
                       </p>
                     ) : null}
-                  </details>
 
-                  <label>
-                    Valor da meta
-                    <input
-                      inputMode="decimal"
-                      name="financial-goal-target"
-                      onChange={(event) =>
-                        setFinancialGoalForm({
-                          ...financialGoalForm,
-                          target_amount: event.target.value,
-                        })
-                      }
-                      placeholder="4000,00"
-                      required
-                      type="text"
-                      value={financialGoalForm.target_amount}
-                    />
-                  </label>
-
-                  <div className="form-grid">
-                    <label>
-                      Data inicial
-                      <input
-                        name="financial-goal-start"
-                        onChange={(event) =>
-                          setFinancialGoalForm({
-                            ...financialGoalForm,
-                            start_date: event.target.value,
-                          })
-                        }
-                        required
-                        type="date"
-                        value={financialGoalForm.start_date}
-                      />
-                    </label>
-
-                    <label>
-                      Data final
-                      <input
-                        name="financial-goal-end"
-                        onChange={(event) =>
-                          setFinancialGoalForm({
-                            ...financialGoalForm,
-                            end_date: event.target.value,
-                          })
-                        }
-                        required
-                        type="date"
-                        value={financialGoalForm.end_date}
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    Veiculo <span className="optional-label">(opcional)</span>
-                    <select
-                      name="financial-goal-vehicle"
-                      onChange={(event) =>
-                        setFinancialGoalForm({
-                          ...financialGoalForm,
-                          vehicle_id: event.target.value,
-                        })
-                      }
-                      value={financialGoalForm.vehicle_id}
-                    >
-                      <option value="">Todos / sem veiculo especifico</option>
-                      {vehicles.map((vehicle) => (
-                        <option key={vehicle.id} value={vehicle.id}>
-                          {vehicle.name} - {vehicle.brand} {vehicle.model}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <div className="form-actions">
-                    <button className="button" disabled={isFinancialGoalSaving} type="submit">
-                      {isFinancialGoalSaving
-                        ? "Salvando..."
-                        : editingFinancialGoalId
-                          ? "Salvar meta"
-                          : "Criar meta"}
-                    </button>
-                    {editingFinancialGoalId ? (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={resetFinancialGoalForm}
-                      >
-                        Cancelar
-                      </button>
+                    {!isWorkSessionsLoading && vehicles.length > 0 && workSessions.length === 0 ? (
+                      <p className="empty-state">
+                        Nenhuma jornada registrada ainda. Adicione seu dia de trabalho.
+                      </p>
                     ) : null}
-                  </div>
-                </form>
 
-                <div className="vehicles-list" aria-busy={isFinancialGoalsLoading}>
-                  <div className="list-header">
-                    <h3>Minhas metas</h3>
-                    <button
-                      className="text-button"
-                      disabled={isFinancialGoalsLoading}
-                      type="button"
-                      onClick={() => void loadFinancialGoals()}
-                    >
-                      Atualizar
-                    </button>
-                  </div>
-
-                  {isFinancialGoalsLoading ? <FeedbackMessage kind="loading">Carregando metas...</FeedbackMessage> : null}
-
-                  {!isFinancialGoalsLoading && financialGoals.length === 0 ? (
-                    <p className="empty-state">
-                      Nenhuma meta cadastrada ainda. Crie uma meta para acompanhar seu progresso.
-                    </p>
-                  ) : null}
-
-                  {financialGoals.map((goal) => {
-                    const progress = financialGoalProgressById[goal.id];
-                    const isReached = progress?.remaining_amount === "0.00";
-                    const averagePerHour =
-                      goal.goal_type === "net"
-                        ? progress?.average_net_per_hour
-                        : progress?.average_projected_per_hour;
-
-                    return (
-                      <article className="vehicle-card session-card goal-card" key={goal.id}>
+                    {workSessions.map((workSession) => (
+                      <article className="vehicle-card session-card" key={workSession.id}>
                         <div>
-                          <div className="recurring-card-title">
-                            <h4>{getFinancialGoalTypeLabel(goal.goal_type)}</h4>
-                            <span
-                              className={
-                                goal.active
-                                  ? "status-pill status-active"
-                                  : "status-pill status-inactive"
-                              }
-                            >
-                              {goal.active ? "Ativa" : "Inativa"}
-                            </span>
-                          </div>
-
-                          <p>
-                            {formatMoney(goal.target_amount)} de {formatDate(goal.start_date)} ate{" "}
-                            {formatDate(goal.end_date)}
-                          </p>
-
-                          {progress ? (
-                            <div className="goal-progress-panel">
-                              <p className="subtle-note">{getGoalProgressScopeMessage()}</p>
-                              <div className="goal-progress-main">
-                                <span>{isReached ? "Status" : "Valor restante"}</span>
-                                <strong>
-                                  {isReached ? "Meta atingida" : formatMoney(progress.remaining_amount)}
-                                </strong>
-                                {!isReached && progress.days_remaining > 0 ? (
-                                  <small>
-                                    Ritmo necessario: aproximadamente{" "}
-                                    {formatMoney(progress.required_daily_amount)} por dia ate{" "}
-                                    {formatDate(goal.end_date)}.
-                                  </small>
-                                ) : null}
-                                {!isReached ? (
-                                  <small>
-                                    {getGoalRequiredPaceMessage(progress.days_remaining, isReached)}
-                                  </small>
-                                ) : null}
-                                {!isReached && progress.estimated_hours_remaining ? (
-                                  <small>
-                                    Estimativa: {formatHours(progress.estimated_hours_remaining)} de
-                                    trabalho no seu ritmo atual.
-                                  </small>
-                                ) : null}
-                              </div>
-
-                              <div className="goal-progress-bar" aria-label="Progresso da meta">
-                                <i style={{ width: getProgressWidth(progress.progress_percentage) }} />
-                              </div>
-                              <p className="goal-progress-status">
-                                {getGoalProgressStatusMessage(
-                                  isReached,
-                                  progress.estimated_hours_remaining !== null && averagePerHour != null,
-                                  progress.on_track,
-                                )}
-                              </p>
-
-                              <dl className="session-metrics goal-metrics">
-                                <div>
-                                  <dt>{getGoalCurrentValueLabel(goal.goal_type)}</dt>
-                                  <dd>{formatMoney(progress.current_amount)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Progresso</dt>
-                                  <dd>{formatPercent(progress.progress_percentage)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Dias decorridos</dt>
-                                  <dd>
-                                    {progress.days_elapsed} de {progress.days_total}
-                                  </dd>
-                                </div>
-                                <div>
-                                  <dt>Dias restantes</dt>
-                                  <dd>{progress.days_remaining}</dd>
-                                </div>
-                                <div>
-                                  <dt>Ritmo necessario por dia</dt>
-                                  <dd>
-                                    {isReached || progress.days_remaining === 0
-                                      ? "—"
-                                      : formatMoney(progress.required_daily_amount)}
-                                  </dd>
-                                </div>
-                                <div>
-                                  <dt>Ritmo atual por hora</dt>
-                                  <dd>{averagePerHour ? formatMoney(averagePerHour) : "Dados insuficientes"}</dd>
-                                </div>
-                                <div>
-                                  <dt>Horas estimadas restantes</dt>
-                                  <dd>{isReached ? "—" : formatHours(progress.estimated_hours_remaining)}</dd>
-                                </div>
-                                <div>
-                                  <dt>Fechamento estimado</dt>
-                                  <dd>
-                                    {progress.days_elapsed > 0
-                                      ? formatMoney(progress.projected_completion_amount)
-                                      : "Dados insuficientes"}
-                                  </dd>
-                                </div>
-                              </dl>
-                            </div>
-                          ) : (
-                            <FeedbackMessage kind="loading" compact>Carregando progresso...</FeedbackMessage>
-                          )}
-
-                          <dl className="session-metrics goal-summary-metrics">
+                          <h4>{formatDate(workSession.work_date)}</h4>
+                          <p>{getVehicleLabel(workSession.vehicle_id)}</p>
+                          <dl className="session-metrics">
                             <div>
-                              <dt>Veiculo</dt>
-                              <dd>
-                                {goal.vehicle_id ? getVehicleLabel(goal.vehicle_id) : "Todos / sem veiculo"}
-                              </dd>
+                              <dt>Faturamento</dt>
+                              <dd>{formatMoney(workSession.gross_revenue)}</dd>
                             </div>
                             <div>
-                              <dt>Resumo</dt>
-                              <dd>
-                                {progress
-                                  ? `${formatPercent(progress.progress_percentage)} concluida`
-                                  : "—"}
-                              </dd>
+                              <dt>Km</dt>
+                              <dd>{formatDistance(workSession.distance_km)}</dd>
+                            </div>
+                            <div>
+                              <dt>Tempo</dt>
+                              <dd>{formatWorkTime(workSession.worked_minutes)}</dd>
+                            </div>
+                            <div>
+                              <dt>Corridas</dt>
+                              <dd>{workSession.trip_count}</dd>
                             </div>
                           </dl>
                         </div>
-
                         <div className="card-actions">
                           <button
                             className="text-button"
                             type="button"
-                            onClick={() => handleEditFinancialGoal(goal)}
+                            onClick={() => handleEditWorkSession(workSession)}
                           >
                             Editar
                           </button>
                           <button
-                            className="text-button"
-                            type="button"
-                            onClick={() => void handleToggleFinancialGoal(goal)}
-                          >
-                            {goal.active ? "Desativar" : "Ativar"}
-                          </button>
-                          <button
                             className="text-button danger"
                             type="button"
-                            onClick={() => void handleDeleteFinancialGoal(goal)}
+                            onClick={() => void handleDeleteWorkSession(workSession)}
                           >
                             Excluir
                           </button>
                         </div>
                       </article>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              </section>
             </section>
-
-            {workSessions.length > 0 ? (
-              <Suspense fallback={<FeedbackMessage kind="loading">Carregando resultado...</FeedbackMessage>}>
-                <ResultSection
-                  vehicles={vehicles}
-                  dashboardFilters={{
-                    period: dashboardPeriod,
-                    customStartDate,
-                    customEndDate,
-                    vehicleId: dashboardVehicleId,
-                    onPeriodChange: setDashboardPeriod,
-                    onCustomStartDateChange: setCustomStartDate,
-                    onCustomEndDateChange: setCustomEndDate,
-                    onVehicleChange: setDashboardVehicleId,
-                  }}
-                  historyFilters={{
-                    period: historyPeriod,
-                    startDate: historyStartDate,
-                    endDate: historyEndDate,
-                    grouping: historyGrouping,
-                    vehicleId: historyVehicleId,
-                    onPeriodChange: handleHistoryPeriodChange,
-                    onDateChange: handleHistoryDateChange,
-                    onGroupingChange: setHistoryGrouping,
-                    onVehicleChange: setHistoryVehicleId,
-                  }}
-                  summary={financialSummary}
-                  insights={financialInsights}
-                  history={financialHistory}
-                  isSummaryLoading={isDashboardLoading}
-                  isInsightsLoading={isFinancialInsightsLoading}
-                  isHistoryLoading={isFinancialHistoryLoading}
-                  summaryError={dashboardError}
-                  insightsError={financialInsightsError}
-                  historyError={financialHistoryError}
-                  onSummaryRetry={() => void loadFinancialSummary()}
-                  onInsightsRetry={() => void loadFinancialInsights()}
-                  onHistoryRetry={() => void loadFinancialHistory()}
-                  onFirstResultViewed={() => void recordFirstResultViewed()}
-                  getAuthHeaders={getAuthHeaders}
-                  endSession={endSession}
-                  getVehicleLabel={getVehicleLabel}
-                  getExpenseCategoryLabel={getExpenseCategoryLabel}
-                />
-              </Suspense>
-            ) : null}
-            <section className="manager-section" id="mais">
-              <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
-                <CsvImportSection
-                  type="work_sessions"
-                  token={token}
-                  vehicles={vehicles}
-                  getAuthHeaders={getAuthHeaders}
-                  getVehicleLabel={getVehicleLabel}
-                  getExpenseCategoryLabel={getExpenseCategoryLabel}
-                  endSession={endSession}
-                  setMessage={setMessage}
-                  setSuccessMessage={setSuccessMessage}
-                  loadWorkSessions={loadWorkSessions}
-                  loadExpenses={loadExpenses}
-                  refreshDashboardData={refreshDashboardData}
-                />
-              </Suspense>
-              <div className="vehicles-layout">
-                <form className="auth-form vehicle-form" onSubmit={handleWorkSessionSubmit}>
-                  <h3>{editingWorkSessionId ? "Editar jornada" : "Cadastrar jornada"}</h3>
-
-                  <div className="form-grid">
-                    <label>
-                      Data
-                      <input
-                        name="work-date"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            work_date: event.target.value,
-                          })
-                        }
-                        required
-                        type="date"
-                        value={workSessionForm.work_date}
-                      />
-                    </label>
-
-                    <label>
-                      Veículo
-                      <select
-                        name="work-vehicle"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            vehicle_id: event.target.value,
-                          })
-                        }
-                        required
-                        value={workSessionForm.vehicle_id}
-                      >
-                        <option value="">Selecione</option>
-                        {vehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name} - {vehicle.brand} {vehicle.model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Faturamento bruto
-                      <input
-                        inputMode="decimal"
-                        name="gross-revenue"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            gross_revenue: event.target.value,
-                          })
-                        }
-                        placeholder="250,50"
-                        required
-                        type="text"
-                        value={workSessionForm.gross_revenue}
-                      />
-                    </label>
-
-                    <label>
-                      Km rodados
-                      <input
-                        inputMode="decimal"
-                        name="distance-km"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            distance_km: event.target.value,
-                          })
-                        }
-                        placeholder="87,5"
-                        required
-                        type="text"
-                        value={workSessionForm.distance_km}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="form-grid form-grid-three">
-                    <label>
-                      Tempo trabalhado
-                      <input
-                        inputMode="text"
-                        name="worked-duration"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            worked_duration: event.target.value,
-                          })
-                        }
-                        placeholder="8:30"
-                        required
-                        type="text"
-                        value={workSessionForm.worked_duration}
-                      />
-                      <small>Ex.: 8:30 ou 8h30.</small>
-                    </label>
-
-                    <label>
-                      Número de corridas
-                      <input
-                        min="0"
-                        name="trip-count"
-                        onChange={(event) =>
-                          setWorkSessionForm({
-                            ...workSessionForm,
-                            trip_count: event.target.value,
-                          })
-                        }
-                        required
-                        type="number"
-                        value={workSessionForm.trip_count}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="form-actions">
-                    <button
-                      className="button"
-                      disabled={isWorkSessionSaving || vehicles.length === 0}
-                      type="submit"
-                    >
-                      {isWorkSessionSaving
-                        ? "Salvando..."
-                        : editingWorkSessionId
-                          ? "Salvar jornada"
-                          : "Cadastrar jornada"}
-                    </button>
-                    {editingWorkSessionId ? (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={resetWorkSessionForm}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-
-                <div className="vehicles-list" id="lista-jornadas" aria-busy={isWorkSessionsLoading}>
-                  <div className="list-header">
-                    <h3>Minhas jornadas</h3>
-                    <button
-                      className="text-button"
-                      disabled={isWorkSessionsLoading}
-                      type="button"
-                      onClick={() => void loadWorkSessions()}
-                    >
-                      Atualizar
-                    </button>
-                  </div>
-
-                  {isWorkSessionsLoading ? (
-                    <FeedbackMessage kind="loading">Carregando jornadas...</FeedbackMessage>
-                  ) : null}
-
-                  {!isWorkSessionsLoading && vehicles.length === 0 ? (
-                    <p className="empty-state">
-                      Cadastre um veículo antes de registrar sua primeira jornada.
-                    </p>
-                  ) : null}
-
-                  {!isWorkSessionsLoading && vehicles.length > 0 && workSessions.length === 0 ? (
-                    <p className="empty-state">
-                      Nenhuma jornada registrada ainda. Adicione seu dia de trabalho.
-                    </p>
-                  ) : null}
-
-                  {workSessions.map((workSession) => (
-                    <article className="vehicle-card session-card" key={workSession.id}>
-                      <div>
-                        <h4>{formatDate(workSession.work_date)}</h4>
-                        <p>{getVehicleLabel(workSession.vehicle_id)}</p>
-                        <dl className="session-metrics">
-                          <div>
-                            <dt>Faturamento</dt>
-                            <dd>{formatMoney(workSession.gross_revenue)}</dd>
-                          </div>
-                          <div>
-                            <dt>Km</dt>
-                            <dd>{formatDistance(workSession.distance_km)}</dd>
-                          </div>
-                          <div>
-                            <dt>Tempo</dt>
-                            <dd>{formatWorkTime(workSession.worked_minutes)}</dd>
-                          </div>
-                          <div>
-                            <dt>Corridas</dt>
-                            <dd>{workSession.trip_count}</dd>
-                          </div>
-                        </dl>
-                      </div>
-                      <div className="card-actions">
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => handleEditWorkSession(workSession)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="text-button danger"
-                          type="button"
-                          onClick={() => void handleDeleteWorkSession(workSession)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="manager-section" id="custos">
-              <Suspense fallback={<FeedbackMessage kind="loading">Carregando importacao...</FeedbackMessage>}>
-                <CsvImportSection
-                  type="expenses"
-                  token={token}
-                  vehicles={vehicles}
-                  getAuthHeaders={getAuthHeaders}
-                  getVehicleLabel={getVehicleLabel}
-                  getExpenseCategoryLabel={getExpenseCategoryLabel}
-                  endSession={endSession}
-                  setMessage={setMessage}
-                  setSuccessMessage={setSuccessMessage}
-                  loadWorkSessions={loadWorkSessions}
-                  loadExpenses={loadExpenses}
-                  refreshDashboardData={refreshDashboardData}
-                />
-              </Suspense>
-              <div className="vehicles-layout">
-                <form className="auth-form vehicle-form" onSubmit={handleExpenseSubmit}>
-                  <h3>{editingExpenseId ? "Editar despesa" : "Cadastrar despesa"}</h3>
-
-                  <div className="form-grid">
-                    <label>
-                      Data
-                      <input
-                        name="expense-date"
-                        onChange={(event) =>
-                          setExpenseForm({
-                            ...expenseForm,
-                            expense_date: event.target.value,
-                          })
-                        }
-                        required
-                        type="date"
-                        value={expenseForm.expense_date}
-                      />
-                    </label>
-
-                    <label>
-                      Categoria
-                      <select
-                        name="expense-category"
-                        onChange={(event) =>
-                          setExpenseForm({
-                            ...expenseForm,
-                            category: event.target.value as ExpenseCategory,
-                          })
-                        }
-                        required
-                        value={expenseForm.category}
-                      >
-                        {expenseCategoryOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Valor
-                      <input
-                        inputMode="decimal"
-                        name="expense-amount"
-                        onChange={(event) =>
-                          setExpenseForm({
-                            ...expenseForm,
-                            amount: event.target.value,
-                          })
-                        }
-                        placeholder="89,90"
-                        required
-                        type="text"
-                        value={expenseForm.amount}
-                      />
-                    </label>
-
-                    <label>
-                      Veículo
-                      <select
-                        name="expense-vehicle"
-                        onChange={(event) =>
-                          setExpenseForm({
-                            ...expenseForm,
-                            vehicle_id: event.target.value,
-                          })
-                        }
-                        value={expenseForm.vehicle_id}
-                      >
-                        <option value="">Sem veículo</option>
-                        {vehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name} - {vehicle.brand} {vehicle.model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <label>
-                    Descrição
-                    <input
-                      maxLength={255}
-                      name="expense-description"
-                      onChange={(event) =>
-                        setExpenseForm({
-                          ...expenseForm,
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder="Opcional"
-                      type="text"
-                      value={expenseForm.description}
-                    />
-                  </label>
-
-                  <div className="form-actions">
-                    <button className="button" disabled={isExpenseSaving} type="submit">
-                      {isExpenseSaving
-                        ? "Salvando..."
-                        : editingExpenseId
-                          ? "Salvar despesa"
-                          : "Cadastrar despesa"}
-                    </button>
-                    {editingExpenseId ? (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={resetExpenseForm}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-
-                <div className="vehicles-list" id="lista-despesas" aria-busy={isExpensesLoading}>
-                  <div className="list-header">
-                    <h3>Minhas despesas</h3>
-                    <button
-                      className="text-button"
-                      disabled={isExpensesLoading}
-                      type="button"
-                      onClick={() => void loadExpenses()}
-                    >
-                      Atualizar
-                    </button>
-                  </div>
-
-                  {isExpensesLoading ? <FeedbackMessage kind="loading">Carregando despesas...</FeedbackMessage> : null}
-
-                  {!isExpensesLoading && expenses.length === 0 ? (
-                    <p className="empty-state">
-                      Nenhuma despesa registrada ainda. Adicione combustível, manutenção e outros
-                      custos conforme eles acontecerem.
-                    </p>
-                  ) : null}
-
-                  {expenses.map((expense) => (
-                    <article className="vehicle-card session-card" key={expense.id}>
-                      <div>
-                        <h4>{formatDate(expense.expense_date)}</h4>
-                        <p>{getExpenseCategoryLabel(expense.category)}</p>
-                        <dl className="session-metrics expense-metrics">
-                          <div>
-                            <dt>Valor</dt>
-                            <dd>{formatMoney(expense.amount)}</dd>
-                          </div>
-                          <div>
-                            <dt>Veículo</dt>
-                            <dd>
-                              {expense.vehicle_id
-                                ? getVehicleLabel(expense.vehicle_id)
-                                : "Sem veículo"}
-                            </dd>
-                          </div>
-                        </dl>
-                        {expense.description ? (
-                          <p className="expense-description">{expense.description}</p>
-                        ) : null}
-                      </div>
-                      <div className="card-actions">
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => handleEditExpense(expense)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="text-button danger"
-                          type="button"
-                          onClick={() => void handleDeleteExpense(expense)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="manager-section" id="despesas-recorrentes">
-              <div className="section-title">
-                <p className="eyebrow">Despesas recorrentes</p>
-                <h3>Custos que se repetem</h3>
-                <p className="subtle-note">
-                  Cadastre custos que se repetem para não precisar informá-los novamente todos os meses.
-                </p>
-                <p className="subtle-note">
-                  Despesas recorrentes entram nas projeções do GanhoCerto, mas não são registradas
-                  automaticamente como despesas já pagas.
-                </p>
-              </div>
-
-              <div className="vehicles-layout">
-                <form className="auth-form vehicle-form" onSubmit={handleRecurringExpenseSubmit}>
-                  <h3>
-                    {editingRecurringExpenseId
-                      ? "Editar despesa recorrente"
-                      : "Cadastrar despesa recorrente"}
-                  </h3>
-
-                  <div className="form-grid">
-                    <label>
-                      Categoria
-                      <select
-                        name="recurring-expense-category"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            category: event.target.value as ExpenseCategory,
-                          })
-                        }
-                        required
-                        value={recurringExpenseForm.category}
-                      >
-                        {expenseCategoryOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      Frequência
-                      <select
-                        name="recurring-expense-frequency"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            frequency: event.target.value as RecurringExpenseFrequency,
-                          })
-                        }
-                        required
-                        value={recurringExpenseForm.frequency}
-                      >
-                        {recurringFrequencyOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Valor
-                      <input
-                        inputMode="decimal"
-                        name="recurring-expense-amount"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            amount: event.target.value,
-                          })
-                        }
-                        placeholder="120,35"
-                        required
-                        type="text"
-                        value={recurringExpenseForm.amount}
-                      />
-                    </label>
-
-                    <label>
-                      Veículo
-                      <select
-                        name="recurring-expense-vehicle"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            vehicle_id: event.target.value,
-                          })
-                        }
-                        value={recurringExpenseForm.vehicle_id}
-                      >
-                        <option value="">Todos / sem veículo específico</option>
-                        {vehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name} - {vehicle.brand} {vehicle.model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Data de início
-                      <input
-                        name="recurring-expense-start-date"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            start_date: event.target.value,
-                          })
-                        }
-                        required
-                        type="date"
-                        value={recurringExpenseForm.start_date}
-                      />
-                    </label>
-
-                    <label>
-                      Data de término <span className="optional-label">(opcional)</span>
-                      <input
-                        name="recurring-expense-end-date"
-                        onChange={(event) =>
-                          setRecurringExpenseForm({
-                            ...recurringExpenseForm,
-                            end_date: event.target.value,
-                          })
-                        }
-                        type="date"
-                        value={recurringExpenseForm.end_date}
-                      />
-                    </label>
-                  </div>
-
-                  <label>
-                    Descrição <span className="optional-label">(opcional)</span>
-                    <input
-                      maxLength={255}
-                      name="recurring-expense-description"
-                      onChange={(event) =>
-                        setRecurringExpenseForm({
-                          ...recurringExpenseForm,
-                          description: event.target.value,
-                        })
-                      }
-                      placeholder="Ex: Seguro, aluguel, lavagem"
-                      type="text"
-                      value={recurringExpenseForm.description}
-                    />
-                  </label>
-
-                  <label className="toggle-field">
-                    <input
-                      checked={recurringExpenseForm.active}
-                      name="recurring-expense-active"
-                      onChange={(event) =>
-                        setRecurringExpenseForm({
-                          ...recurringExpenseForm,
-                          active: event.target.checked,
-                        })
-                      }
-                      type="checkbox"
-                    />
-                    <span>Despesa recorrente ativa</span>
-                  </label>
-
-                  <div className="form-actions">
-                    <button className="button" disabled={isRecurringExpenseSaving} type="submit">
-                      {isRecurringExpenseSaving
-                        ? "Salvando..."
-                        : editingRecurringExpenseId
-                          ? "Salvar recorrência"
-                          : "Cadastrar recorrência"}
-                    </button>
-                    {editingRecurringExpenseId ? (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={resetRecurringExpenseForm}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-
-                <div className="vehicles-list" aria-busy={isRecurringExpensesLoading}>
-                  <div className="list-header">
-                    <h3>Minhas recorrências</h3>
-                    <button
-                      className="text-button"
-                      disabled={isRecurringExpensesLoading}
-                      type="button"
-                      onClick={() => void loadRecurringExpenses()}
-                    >
-                      Atualizar
-                    </button>
-                  </div>
-
-                  {isRecurringExpensesLoading ? (
-                    <FeedbackMessage kind="loading">Carregando despesas recorrentes...</FeedbackMessage>
-                  ) : null}
-
-                  {!isRecurringExpensesLoading && recurringExpenses.length === 0 ? (
-                    <p className="empty-state">
-                      Nenhuma despesa recorrente cadastrada ainda. Use esta área para guardar
-                      custos fixos ou frequentes.
-                    </p>
-                  ) : null}
-
-                  {recurringExpenses.map((recurringExpense) => (
-                    <article className="vehicle-card session-card" key={recurringExpense.id}>
-                      <div>
-                        <div className="recurring-card-title">
-                          <h4>{getExpenseCategoryLabel(recurringExpense.category)}</h4>
-                          <span
-                            className={
-                              recurringExpense.active
-                                ? "status-pill status-active"
-                                : "status-pill status-inactive"
-                            }
-                          >
-                            {recurringExpense.active ? "Ativa" : "Inativa"}
-                          </span>
-                        </div>
-                        <p>{formatMoney(recurringExpense.amount)}</p>
-                        <dl className="session-metrics recurring-metrics">
-                          <div>
-                            <dt>Frequência</dt>
-                            <dd>{getRecurringFrequencyLabel(recurringExpense.frequency)}</dd>
-                          </div>
-                          <div>
-                            <dt>Veículo</dt>
-                            <dd>
-                              {recurringExpense.vehicle_id
-                                ? getVehicleLabel(recurringExpense.vehicle_id)
-                                : "Todos / sem veículo"}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>Período</dt>
-                            <dd>
-                              {formatDate(recurringExpense.start_date)} até{" "}
-                              {recurringExpense.end_date
-                                ? formatDate(recurringExpense.end_date)
-                                : "sem término"}
-                            </dd>
-                          </div>
-                        </dl>
-                        {recurringExpense.description ? (
-                          <p className="expense-description">{recurringExpense.description}</p>
-                        ) : null}
-                      </div>
-                      <div className="card-actions">
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => handleEditRecurringExpense(recurringExpense)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="text-button"
-                          type="button"
-                          onClick={() => void handleToggleRecurringExpense(recurringExpense)}
-                        >
-                          {recurringExpense.active ? "Desativar" : "Ativar"}
-                        </button>
-                        <button
-                          className="text-button danger"
-                          type="button"
-                          onClick={() => void handleDeleteRecurringExpense(recurringExpense)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="manager-section" id="manutencao">
-              <div className="section-title">
-                <p className="eyebrow">Manutencao</p>
-                <h3>Manutencao preventiva</h3>
-                <p className="subtle-note">
-                  Acompanhe revisoes por tempo ou km trabalhados, sem criar despesas
-                  automaticamente.
-                </p>
-              </div>
-
-              <div className="vehicles-layout">
-                <form className="auth-form vehicle-form" onSubmit={handleMaintenancePlanSubmit}>
-                  <h3>{editingMaintenancePlanId ? "Editar manutencao" : "Adicionar manutencao"}</h3>
-
-                  <div className="form-grid">
-                    <label>
-                      Nome
-                      <input
-                        maxLength={120}
-                        name="maintenance-name"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            name: event.target.value,
-                          })
-                        }
-                        placeholder="Troca de oleo"
-                        required
-                        type="text"
-                        value={maintenancePlanForm.name}
-                      />
-                    </label>
-
-                    <label>
-                      Categoria
-                      <select
-                        name="maintenance-category"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            category: event.target.value as MaintenanceCategory,
-                          })
-                        }
-                        required
-                        value={maintenancePlanForm.category}
-                      >
-                        {maintenanceCategoryOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Veiculo
-                      <select
-                        name="maintenance-vehicle"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            vehicle_id: event.target.value,
-                          })
-                        }
-                        required
-                        value={maintenancePlanForm.vehicle_id}
-                      >
-                        <option value="">Selecione</option>
-                        {vehicles.map((vehicle) => (
-                          <option key={vehicle.id} value={vehicle.id}>
-                            {vehicle.name} - {vehicle.brand} {vehicle.model}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label>
-                      Custo estimado <span className="optional-label">(opcional)</span>
-                      <input
-                        inputMode="decimal"
-                        name="maintenance-estimated-cost"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            estimated_cost: event.target.value,
-                          })
-                        }
-                        placeholder="280,00"
-                        type="text"
-                        value={maintenancePlanForm.estimated_cost}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="form-grid">
-                    <label>
-                      Intervalo em km <span className="optional-label">(opcional)</span>
-                      <input
-                        inputMode="decimal"
-                        name="maintenance-interval-km"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            interval_km: event.target.value,
-                          })
-                        }
-                        placeholder="10000"
-                        type="text"
-                        value={maintenancePlanForm.interval_km}
-                      />
-                    </label>
-
-                    <label>
-                      Intervalo em dias <span className="optional-label">(opcional)</span>
-                      <input
-                        inputMode="numeric"
-                        min="1"
-                        name="maintenance-interval-days"
-                        onChange={(event) =>
-                          setMaintenancePlanForm({
-                            ...maintenancePlanForm,
-                            interval_days: event.target.value,
-                          })
-                        }
-                        placeholder="180"
-                        type="number"
-                        value={maintenancePlanForm.interval_days}
-                      />
-                    </label>
-                  </div>
-
-                  <p className="subtle-note">
-                    Informe pelo menos um intervalo: km ou dias.
-                  </p>
-
-                  <label className="toggle-field">
-                    <input
-                      checked={maintenancePlanForm.active}
-                      name="maintenance-active"
-                      onChange={(event) =>
-                        setMaintenancePlanForm({
-                          ...maintenancePlanForm,
-                          active: event.target.checked,
-                        })
-                      }
-                      type="checkbox"
-                    />
-                    <span>Plano ativo</span>
-                  </label>
-
-                  <div className="form-actions">
-                    <button className="button" disabled={isMaintenanceSaving} type="submit">
-                      {isMaintenanceSaving
-                        ? "Salvando..."
-                        : editingMaintenancePlanId
-                          ? "Salvar manutencao"
-                          : "Adicionar manutencao"}
-                    </button>
-                    {editingMaintenancePlanId ? (
-                      <button
-                        className="button button-ghost"
-                        type="button"
-                        onClick={resetMaintenancePlanForm}
-                      >
-                        Cancelar
-                      </button>
-                    ) : null}
-                  </div>
-                </form>
-
-                <div className="vehicles-list" aria-busy={isMaintenanceLoading}>
-                  <div className="list-header">
-                    <h3>Minhas manutencoes</h3>
-                    <button
-                      className="text-button"
-                      disabled={isMaintenanceLoading}
-                      type="button"
-                      onClick={() => void loadMaintenancePlans()}
-                    >
-                      Atualizar
-                    </button>
-                  </div>
-
-                  {isMaintenanceLoading ? (
-                    <FeedbackMessage kind="loading">Carregando manutencoes...</FeedbackMessage>
-                  ) : null}
-
-                  {!isMaintenanceLoading && maintenancePlans.length === 0 ? (
-                    <p className="empty-state">
-                      Configure suas manutencoes para saber quando revisar o veiculo e quanto reservar.{" "}
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() =>
-                          document.getElementById("manutencao")?.scrollIntoView({
-                            behavior: "smooth",
-                          })
-                        }
-                      >
-                        Adicionar manutencao
-                      </button>
-                    </p>
-                  ) : null}
-
-                  {(["due", "due_soon", "ok"] as MaintenanceStatusType[]).map((statusValue) => {
-                    const plans = maintenancePlansByStatus[statusValue];
-                    if (plans.length === 0) {
-                      return null;
-                    }
-
-                    return (
-                      <div className="daily-breakdown" key={statusValue}>
-                        <div className="list-header">
-                          <h3>{getMaintenanceStatusLabel(statusValue)}</h3>
-                        </div>
-
-                        {plans.map((plan) => {
-                          const planStatus = maintenanceStatusesById[plan.id];
-                          const records = maintenanceRecordsByPlanId[plan.id] ?? [];
-
-                          return (
-                            <article className="vehicle-card session-card" key={plan.id}>
-                              <div>
-                                <div className="recurring-card-title">
-                                  <div>
-                                    <h4>{plan.name}</h4>
-                                    <p>
-                                      {getMaintenanceCategoryLabel(plan.category)} ·{" "}
-                                      {getVehicleLabel(plan.vehicle_id)}
-                                    </p>
-                                  </div>
-                                  <span className={getMaintenanceStatusClass(planStatus.status)}>
-                                    {getMaintenanceStatusLabel(planStatus.status)}
-                                  </span>
-                                </div>
-
-                                {planStatus.km_remaining !== null && planStatus.status !== "due" ? (
-                                  <p className="subtle-note">
-                                    Faltam aproximadamente {formatDistance(planStatus.km_remaining)} km.
-                                  </p>
-                                ) : null}
-
-                                <dl className="session-metrics recurring-metrics">
-                                  <div>
-                                    <dt>Km desde a ultima</dt>
-                                    <dd>
-                                      {planStatus.km_since_last_service
-                                        ? `${formatDistance(planStatus.km_since_last_service)} km`
-                                        : "—"}
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Km restantes</dt>
-                                    <dd>
-                                      {planStatus.km_remaining
-                                        ? `${formatDistance(planStatus.km_remaining)} km`
-                                        : "—"}
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Dias desde a ultima</dt>
-                                    <dd>
-                                      {planStatus.days_since_last_service ?? "—"}
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Dias restantes</dt>
-                                    <dd>{planStatus.days_remaining ?? "—"}</dd>
-                                  </div>
-                                  <div>
-                                    <dt>Custo estimado</dt>
-                                    <dd>
-                                      {planStatus.estimated_cost
-                                        ? formatMoney(planStatus.estimated_cost)
-                                        : "—"}
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Reserva sugerida</dt>
-                                    <dd>
-                                      {planStatus.recommended_reserve_per_km
-                                        ? formatMoneyPerKm(planStatus.recommended_reserve_per_km)
-                                        : "—"}
-                                    </dd>
-                                  </div>
-                                </dl>
-
-                                <div className="import-preview">
-                                  <div className="list-header">
-                                    <h4>Historico</h4>
-                                  </div>
-                                  {records.length === 0 ? (
-                                    <p className="subtle-note">
-                                      Nenhuma manutencao registrada ainda.
-                                    </p>
-                                  ) : (
-                                    <div className="import-preview-list">
-                                      {records.map((record) => (
-                                        <article className="vehicle-card session-card" key={record.id}>
-                                          <div>
-                                            <h4>{formatDate(record.service_date)}</h4>
-                                            <p>{record.notes ?? "Sem observacao"}</p>
-                                          </div>
-                                        </article>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {recordingMaintenancePlanId === plan.id ? (
-                                    <form
-                                      className="auth-form"
-                                      onSubmit={handleMaintenanceRecordSubmit}
-                                    >
-                                      <div className="form-grid">
-                                        <label>
-                                          Data
-                                          <input
-                                            onChange={(event) =>
-                                              setMaintenanceRecordForm({
-                                                ...maintenanceRecordForm,
-                                                service_date: event.target.value,
-                                              })
-                                            }
-                                            required
-                                            type="date"
-                                            value={maintenanceRecordForm.service_date}
-                                          />
-                                        </label>
-                                        <label>
-                                          Observacao <span className="optional-label">(opcional)</span>
-                                          <input
-                                            maxLength={255}
-                                            onChange={(event) =>
-                                              setMaintenanceRecordForm({
-                                                ...maintenanceRecordForm,
-                                                notes: event.target.value,
-                                              })
-                                            }
-                                            placeholder="Ex.: troca feita na oficina"
-                                            type="text"
-                                            value={maintenanceRecordForm.notes}
-                                          />
-                                        </label>
-                                      </div>
-                                      <div className="form-actions">
-                                        <button
-                                          className="button"
-                                          disabled={isMaintenanceRecordSaving}
-                                          type="submit"
-                                        >
-                                          {isMaintenanceRecordSaving
-                                            ? "Registrando..."
-                                            : "Salvar registro"}
-                                        </button>
-                                        <button
-                                          className="button button-ghost"
-                                          type="button"
-                                          onClick={() => setRecordingMaintenancePlanId(null)}
-                                        >
-                                          Cancelar
-                                        </button>
-                                      </div>
-                                    </form>
-                                  ) : null}
-                                </div>
-                              </div>
-
-                              <div className="card-actions">
-                                <button
-                                  className="text-button"
-                                  type="button"
-                                  onClick={() => handleStartMaintenanceRecord(plan.id)}
-                                >
-                                  Registrar manutencao realizada
-                                </button>
-                                <button
-                                  className="text-button"
-                                  type="button"
-                                  onClick={() => handleEditMaintenancePlan(plan)}
-                                >
-                                  Editar
-                                </button>
-                                <button
-                                  className="text-button danger"
-                                  type="button"
-                                  onClick={() => void handleDeleteMaintenancePlan(plan)}
-                                >
-                                  Excluir
-                                </button>
-                              </div>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-
-            <VehiclesSection
-              ref={vehiclesSectionRef}
-              vehicles={vehicles}
-              pendingQuickStartAction={pendingQuickStartAction}
-              isVehiclesLoading={isVehiclesLoading}
-              getAuthHeaders={getAuthHeaders}
-              endSession={endSession}
-              setMessage={setMessage}
-              setSuccessMessage={setSuccessMessage}
-              loadVehicles={() => loadVehicles()}
-              loadWorkSessions={() => loadWorkSessions()}
-              loadExpenses={() => loadExpenses()}
-              refreshDashboardData={() => refreshDashboardData()}
-              onVehicleCreated={handleVehicleCreated}
-            />
           </div>
         ) : (
           <>

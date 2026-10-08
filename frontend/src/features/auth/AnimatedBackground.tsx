@@ -56,15 +56,18 @@ void main() {
   // Mapeia o ruído em níveis de intensidade
   float intensity = smoothstep(-0.4, 0.8, finalNoise);
   
-  // Cores: Preto Absoluto -> Verde Neon -> Brilho Esmeralda Intenso
-  vec3 colorBlack = vec3(0.02, 0.04, 0.02);
-  vec3 colorGreen = vec3(0.0, 0.6, 0.2);
-  vec3 colorNeon  = vec3(0.1, 1.0, 0.4);
+  // Cores de alta luxuosidade: Cinza muito escuro -> Esmeralda profundo -> Verde Neon GanhoCerto
+  vec3 colorDark = vec3(0.02, 0.03, 0.03);      // Almost black / deep dark blue-gray
+  vec3 colorMid = vec3(0.0, 0.15, 0.06);        // Deep elegant emerald
+  vec3 colorHighlight = vec3(0.13, 0.77, 0.36); // GanhoCerto Neon Green (#22c55e)
   
-  vec3 finalColor = mix(colorBlack, colorGreen, intensity);
+  // Smooth color mapping
+  vec3 finalColor = mix(colorDark, colorMid, smoothstep(-0.2, 0.4, finalNoise));
+  finalColor = mix(finalColor, colorHighlight, smoothstep(0.5, 1.0, finalNoise));
   
-  // Adiciona os highlights de alto brilho nas cristas das "ondas"
-  finalColor = mix(finalColor, colorNeon, smoothstep(0.7, 1.0, intensity));
+  // Vignette muito sutil para suavizar bordas
+  float dist = distance(uv, vec2(0.5));
+  finalColor *= smoothstep(0.9, 0.2, dist);
   
   gl_FragColor = vec4(finalColor, 1.0);
 }
