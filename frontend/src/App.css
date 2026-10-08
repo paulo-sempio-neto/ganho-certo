@@ -1,4 +1,12 @@
+@import "tailwindcss";
 @import "./styles/tokens.css";
+
+/* ═══════════════════════════════════════════════════════════
+   GanhoCerto — Visual Identity
+   Precision · Movement · Confidence
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Base Reset & Typography ── */
 
 :root {
   color: var(--color-text);
@@ -6,7 +14,7 @@
   font-family: var(--font-family);
   font-size: var(--text-base);
   line-height: var(--leading-body);
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-normal);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -38,12 +46,15 @@ a {
 :where(.metric-card strong, .session-metrics dd, .dashboard-layer dd,
   .goal-progress-main strong, .recurring-projection-total strong, .weekday-card dd) {
   font-variant-numeric: tabular-nums lining-nums;
+  font-family: var(--font-mono), var(--font-family);
+  letter-spacing: var(--tracking-tight);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 button,
@@ -53,13 +64,16 @@ textarea {
   font: inherit;
 }
 
+/* ── Auth Page Shell (Split Layout) ── */
+
 .page {
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  gap: var(--space-14);
-  align-items: center;
-  padding: var(--space-12);
+  grid-template-columns: 1.4fr 1fr;
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  background: var(--color-canvas);
 }
 
 .app-error-boundary {
@@ -72,17 +86,18 @@ textarea {
 
 .app-error-boundary section {
   display: grid;
-  gap: var(--space-4);
-  width: min(100%, 440px);
+  gap: var(--space-5);
+  width: min(100%, 480px);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-card);
   background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
-  padding: var(--space-7);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-8);
 }
 
 .app-error-boundary h1 {
   font-size: var(--text-3xl);
+  letter-spacing: var(--tracking-tight);
 }
 
 .app-error-boundary p {
@@ -91,12 +106,15 @@ textarea {
   line-height: var(--leading-body);
 }
 
+/* ── Dashboard Shell ── */
+
 .page-dashboard {
   grid-template-columns: minmax(0, 1fr);
   align-items: start;
   width: min(100%, 1120px);
   margin-inline: auto;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-10) var(--space-6);
+  background: transparent;
 }
 
 .page-dashboard > .auth-panel {
@@ -105,11 +123,16 @@ textarea {
   background: transparent;
   box-shadow: none;
   padding: 0;
+  max-width: none;
+  place-self: stretch;
 }
 
 .dashboard-greeting {
   font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-heading);
 }
 
 .dashboard-start {
@@ -117,7 +140,7 @@ textarea {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
   align-items: center;
   gap: var(--space-6);
-  padding-block: var(--space-4) var(--space-6);
+  padding-block: var(--space-5) var(--space-6);
 }
 
 .dashboard-start-actions {
@@ -148,40 +171,69 @@ textarea {
   font-weight: var(--weight-semibold);
 }
 
+/* ── Intro (Auth hero) ── */
+
 .intro {
-  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(145deg, var(--color-brand) 0%, #0a4f2e 100%);
+  padding: var(--space-12) 10vw;
+  position: relative;
+  overflow: hidden;
+  color: var(--color-on-brand);
+}
+
+.intro::before {
+  content: '';
+  position: absolute;
+  top: -20vh;
+  left: -20vh;
+  width: 100vh;
+  height: 100vh;
+  background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .brand {
-  margin: 0 0 var(--space-7);
-  color: var(--color-brand);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
+  margin: 0 0 auto 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
 }
 
-h1 {
-  margin: 0;
-  max-width: 720px;
-  color: var(--color-heading);
-  font-size: var(--text-display);
-  line-height: var(--leading-tight);
+h1#page-title {
+  margin: auto 0 0 0;
+  color: var(--color-on-brand);
+  font-size: clamp(2.5rem, 4.5vw, 4.5rem);
+  font-weight: var(--weight-extrabold);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  max-width: 18ch;
 }
 
 .subtitle {
-  margin: var(--space-6) 0 0;
-  max-width: 560px;
-  color: var(--color-text-muted);
+  margin: var(--space-6) 0 auto 0;
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.8);
   font-size: var(--text-xl);
-  line-height: var(--leading-body);
+  line-height: 1.5;
+  font-weight: var(--weight-normal);
 }
+
+/* ── Auth Panel ── */
 
 .auth-panel {
   width: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-surface);
+  max-width: 480px;
+  place-self: center;
+  padding: var(--space-8);
   background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
-  padding: var(--space-7);
+  border-radius: var(--radius-card);
+  box-shadow: 0 24px 48px -12px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.03);
 }
 
 .vehicle-panel {
@@ -191,9 +243,9 @@ h1 {
 .tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin-bottom: var(--space-6);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
   padding: var(--space-1);
 }
@@ -206,16 +258,21 @@ h1 {
   color: var(--color-text-muted);
   cursor: pointer;
   font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  transition: background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .tab-active {
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-heading);
   box-shadow: var(--shadow-sm);
+  font-weight: var(--weight-bold);
 }
 
 .tab:not(.tab-active):hover {
   background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .auth-form,
@@ -229,7 +286,11 @@ h1 {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
 }
+
+/* ── Form Controls ── */
 
 label {
   display: grid;
@@ -243,14 +304,15 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--color-control-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--text-base);
   font-weight: var(--weight-normal);
   font-variant-numeric: tabular-nums lining-nums;
-  transition: border-color var(--duration-fast) ease;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 input,
@@ -265,15 +327,21 @@ textarea {
   resize: vertical;
 }
 
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-border-strong);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--color-brand);
-  box-shadow: none;
+  box-shadow: 0 0 0 3px var(--color-brand-subtle);
 }
 
 :where(input, textarea)::placeholder {
-  color: var(--color-text-muted);
+  color: var(--color-text-soft);
   opacity: 1;
 }
 
@@ -281,11 +349,18 @@ textarea:focus {
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 :where(input, select, textarea)[aria-invalid="true"] {
   border-color: var(--color-danger);
 }
+
+:where(input, select, textarea)[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px var(--color-danger-surface);
+}
+
+/* ── Buttons ── */
 
 .button {
   display: inline-flex;
@@ -293,18 +368,23 @@ textarea:focus {
   justify-content: center;
   gap: var(--space-2);
   min-height: var(--control-height);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-brand);
   color: var(--color-on-brand);
   cursor: pointer;
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
   line-height: var(--leading-label);
   text-align: center;
   text-decoration: none;
   overflow-wrap: anywhere;
-  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+  letter-spacing: var(--tracking-normal);
+  transition: background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-instant) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .button:disabled {
@@ -312,29 +392,35 @@ textarea:focus {
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
   border-color: var(--color-border);
+  opacity: 0.6;
 }
 
 .button:not(:disabled):hover {
   background: var(--color-brand-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.button:not(:disabled):active {
+  transform: scale(0.98);
 }
 
 .button-secondary {
-  background: var(--color-text);
-}
-
-.button-secondary:not(:disabled):hover {
   background: var(--color-heading);
 }
 
+.button-secondary:not(:disabled):hover {
+  background: var(--color-text);
+}
+
 .button-ghost {
-  border: 1px solid var(--color-control-border);
+  border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
 }
 
 .button-ghost:not(:disabled):hover {
   background: var(--color-surface-subtle);
-  border-color: var(--color-control-border);
+  border-color: var(--color-border-strong);
 }
 
 .text-button {
@@ -344,22 +430,28 @@ textarea:focus {
   color: var(--color-brand);
   cursor: pointer;
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
   padding: 0;
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .text-button:not(:disabled):hover {
   text-decoration: underline;
   text-underline-offset: 0.2em;
+  color: var(--color-brand-hover);
 }
 
 .text-button:disabled {
   cursor: not-allowed;
   color: var(--color-text-muted);
+  opacity: 0.6;
 }
 
 .danger {
   color: var(--color-danger);
 }
+
+/* ── Feedback Messages ── */
 
 .form-message {
   margin: 0;
@@ -369,6 +461,7 @@ textarea:focus {
   padding: var(--space-3) var(--space-4);
   line-height: var(--leading-label);
   overflow-wrap: anywhere;
+  font-weight: var(--weight-medium);
 }
 
 .form-message[role="alert"] {
@@ -392,16 +485,21 @@ textarea:focus {
   line-height: var(--leading-label);
   overflow-wrap: anywhere;
   border-inline-start: var(--space-1) solid var(--color-success);
+  font-weight: var(--weight-medium);
 }
+
+/* ── Eyebrow Label ── */
 
 .eyebrow {
   margin: 0;
   color: var(--color-brand);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
+
+/* ── User Data (Account) ── */
 
 .user-data {
   display: grid;
@@ -419,6 +517,7 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -427,6 +526,8 @@ textarea:focus {
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
+
+/* ── Account Menu ── */
 
 .account-menu {
   min-width: 160px;
@@ -446,17 +547,24 @@ textarea:focus {
   color: var(--color-brand);
   cursor: pointer;
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
   padding: var(--space-2) var(--space-4);
   text-align: center;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
 
 .account-menu summary::-webkit-details-marker {
   display: none;
 }
 
+.account-menu summary:hover {
+  border-color: var(--color-brand);
+}
+
 .account-menu[open] summary {
   border-color: var(--color-brand);
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
 }
 
 .compact-user-data {
@@ -468,12 +576,14 @@ textarea:focus {
   padding: var(--space-3);
 }
 
+/* ── Account Plan Panel ── */
+
 .account-plan-panel {
   margin-top: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface-subtle);
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 
 .account-plan-header {
@@ -487,6 +597,7 @@ textarea:focus {
   margin: var(--space-half) 0 0;
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
 
 .plan-feature-group {
@@ -501,11 +612,12 @@ textarea:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface);
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 
 .plan-status-panel strong {
   color: var(--color-heading);
+  font-weight: var(--weight-bold);
 }
 
 .plan-status-panel span,
@@ -520,6 +632,7 @@ textarea:focus {
   margin: 0 0 var(--space-2);
   color: var(--color-text);
   font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
 }
 
 .plan-feature-list {
@@ -553,12 +666,14 @@ textarea:focus {
   background: var(--color-warning);
 }
 
+/* ── Account forms ── */
+
 .account-password-form {
   margin-top: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface-subtle);
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 
 .feedback-form {
@@ -566,20 +681,24 @@ textarea:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface-subtle);
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 
 .feedback-form h3 {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
 
 .account-password-form h3 {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
+
+/* ── Session Header ── */
 
 .session-header {
   display: flex;
@@ -588,28 +707,84 @@ textarea:focus {
   justify-content: space-between;
 }
 
+/* ── Dashboard Navigation ── */
+
 .dashboard-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-5);
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 
 .dashboard-nav a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
   min-height: var(--control-height-compact);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-brand);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  padding: var(--space-2) var(--space-1);
   text-decoration: none;
+  position: relative;
+  transition: color var(--duration-fast) var(--ease-out);
 }
+
+.dashboard-nav a::after {
+  content: "";
+  position: absolute;
+  bottom: calc(var(--space-2) * -1 - 1px);
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+  background: transparent;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.dashboard-nav a.active {
+  color: var(--color-brand);
+  font-weight: var(--weight-bold);
+}
+
+.dashboard-nav a.active::after {
+  background: var(--color-brand);
+}
+
+.dashboard-nav a:not(.active):hover {
+  color: var(--color-heading);
+}
+
+.dashboard-nav a:not(.active):hover::after {
+  background: var(--color-border-strong);
+}
+
+.dashboard-nav .nav-icon {
+  display: none; /* Hide icons on desktop for a cleaner text-tab look */
+}
+
+/* ── Dashboard Area ── */
+
+.dashboard-area {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+  scroll-margin-block: var(--space-5);
+  padding-bottom: var(--space-8);
+}
+
+.dashboard-area[hidden] {
+  display: none !important;
+}
+
+.dashboard-area [id] {
+  scroll-margin-block: var(--space-5);
+}
+
+/* ── Daily Entry Nav Buttons ── */
 
 .daily-entry-nav-button,
 .quick-start-nav-button {
@@ -622,15 +797,25 @@ textarea:focus {
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
   padding: var(--space-2) var(--space-4);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
+
+.daily-entry-nav-button:hover,
+.quick-start-nav-button:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-subtle);
+}
+
+/* ── Daily Entry ── */
 
 .daily-entry {
   display: grid;
   gap: var(--space-5);
   border: 2px solid var(--color-brand);
-  border-radius: var(--radius-surface);
-  background: var(--color-success-surface);
-  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-brand-subtle);
+  padding: var(--space-6);
 }
 
 .daily-entry-form {
@@ -651,10 +836,10 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   margin: 0;
-  border-radius: var(--radius-surface);
-  background: var(--color-success-surface);
+  border-radius: var(--radius-control);
+  background: var(--color-brand-subtle);
   color: var(--color-text);
-  padding: var(--space-3) var(--space-3);
+  padding: var(--space-3);
 }
 
 .daily-date-row p {
@@ -663,7 +848,7 @@ textarea:focus {
 }
 
 .daily-date-input {
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
   padding: var(--space-3);
 }
@@ -687,6 +872,8 @@ textarea:focus {
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-4);
 }
+
+/* ── Activation & Action Prompts ── */
 
 .activation-panel,
 .action-prompt,
@@ -738,6 +925,8 @@ textarea:focus {
   background: var(--color-surface-subtle);
 }
 
+/* ── Daily Entry Metrics ── */
+
 .daily-entry-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -753,6 +942,23 @@ textarea:focus {
 
 .metric-card.result-primary > strong {
   font-size: var(--text-3xl);
+  font-weight: var(--weight-extrabold);
+}
+
+.result-summary-grid .result-label {
+  margin: 0;
+  color: var(--color-heading);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-label);
+}
+
+.result-summary-grid .result-primary .result-label {
+  font-size: var(--text-xl);
+}
+
+.result-summary-grid > [data-result-kind]:not(.result-primary) {
+  background: var(--color-surface);
 }
 
 .result-details {
@@ -776,8 +982,10 @@ textarea:focus {
 }
 
 .secondary-metrics {
-  opacity: 0.92;
+  opacity: 0.88;
 }
+
+/* ── Daily Entry Actions ── */
 
 .daily-entry-actions {
   display: grid;
@@ -789,16 +997,18 @@ textarea:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface);
-  padding: var(--space-4);
+  padding: var(--space-5);
 }
+
+/* ── Quick Start ── */
 
 .quick-start {
   display: grid;
   gap: var(--space-5);
   border: 2px solid var(--color-success-border);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-card);
   background: var(--color-success-surface);
-  padding: var(--space-5);
+  padding: var(--space-6);
 }
 
 .quick-start-progress {
@@ -809,7 +1019,7 @@ textarea:focus {
 
 .quick-start-progress span {
   border-radius: var(--radius-pill);
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
   color: var(--color-brand);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
@@ -854,6 +1064,7 @@ textarea:focus {
   color: var(--color-warning);
   line-height: var(--leading-body);
   padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
 }
 
 .quick-start-actions {
@@ -867,6 +1078,8 @@ textarea:focus {
   font-weight: var(--weight-semibold);
   line-height: var(--leading-label);
 }
+
+/* ── Dashboard Section ── */
 
 .dashboard-section {
   border-top: 0;
@@ -885,6 +1098,8 @@ textarea:focus {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
 }
+
+/* ── Result Context Nav ── */
 
 .result-context-nav {
   display: flex;
@@ -905,7 +1120,18 @@ textarea:focus {
   font-weight: var(--weight-bold);
   padding: var(--space-2) var(--space-4);
   text-decoration: none;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
+
+.result-context-nav a:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-subtle);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Metric Cards — the heart of the financial UI
+   ═══════════════════════════════════════════════════════════ */
 
 .metric-grid {
   display: grid;
@@ -923,8 +1149,9 @@ textarea:focus {
   gap: var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface);
   padding: var(--space-4);
+  transition: box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .metric-card[data-result-kind="realized"] {
@@ -952,6 +1179,7 @@ textarea:focus {
   color: var(--result-color);
   font-size: var(--text-sm);
   text-transform: none;
+  font-weight: var(--weight-semibold);
 }
 
 .metric-card[data-result-kind="estimated"] > strong,
@@ -963,18 +1191,21 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
 .metric-card strong {
   color: var(--color-heading);
   font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
 }
 
 .metric-card small {
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
   line-height: var(--leading-label);
 }
 
@@ -996,6 +1227,8 @@ textarea:focus {
 .metric-negative > strong {
   color: var(--color-danger);
 }
+
+/* ── Economic Panel ── */
 
 .economic-panel {
   display: grid;
@@ -1023,6 +1256,8 @@ textarea:focus {
   font-size: var(--text-3xl);
 }
 
+/* ── Calculation/Advanced Details ── */
+
 .calculation-details,
 .advanced-options,
 .secondary-import-options {
@@ -1040,6 +1275,7 @@ textarea:focus {
   cursor: pointer;
   color: var(--color-brand);
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
 }
 
 .calculation-details[open],
@@ -1047,6 +1283,8 @@ textarea:focus {
 .secondary-import-options[open] {
   background: var(--color-surface);
 }
+
+/* ── Dashboard Layers ── */
 
 .dashboard-layers {
   display: grid;
@@ -1059,7 +1297,7 @@ textarea:focus {
   gap: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface);
   padding: var(--space-4);
 }
 
@@ -1090,6 +1328,7 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -1100,12 +1339,16 @@ textarea:focus {
   font-weight: var(--weight-bold);
 }
 
+/* ── Recurring Projection ── */
+
 .recurring-projection {
   display: grid;
   gap: var(--space-3);
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-5);
 }
+
+/* ── Financial Insights ── */
 
 .financial-insights {
   display: grid;
@@ -1118,6 +1361,8 @@ textarea:focus {
   display: grid;
   gap: var(--space-3);
 }
+
+/* ── Financial History ── */
 
 .financial-history {
   display: grid;
@@ -1134,10 +1379,11 @@ textarea:focus {
   align-self: end;
   margin: 0;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
   padding: var(--space-3) var(--space-4);
 }
 
@@ -1171,7 +1417,7 @@ textarea:focus {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface);
-  padding: var(--space-4);
+  padding: var(--space-5);
 }
 
 .history-chart-panel .list-header {
@@ -1193,11 +1439,11 @@ textarea:focus {
   min-height: 180px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: linear-gradient(180deg, var(--color-surface-subtle), var(--color-surface));
+  background: var(--color-surface-subtle);
 }
 
 .history-chart-zero {
-  stroke: var(--color-control-border);
+  stroke: var(--color-border-strong);
   stroke-dasharray: 4 4;
   stroke-width: 1.5;
 }
@@ -1207,13 +1453,13 @@ textarea:focus {
   stroke: var(--color-brand);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 3;
+  stroke-width: 2.5;
 }
 
 .history-chart-point {
   fill: var(--color-brand);
   stroke: var(--color-surface);
-  stroke-width: 1.5;
+  stroke-width: 2;
 }
 
 .history-chart-labels {
@@ -1240,6 +1486,7 @@ textarea:focus {
 .history-period-card h4 {
   margin: 0;
   color: var(--color-heading);
+  font-weight: var(--weight-bold);
 }
 
 .history-empty-state {
@@ -1251,6 +1498,8 @@ textarea:focus {
 .history-empty-state p {
   margin: 0;
 }
+
+/* ── Work Patterns ── */
 
 .work-patterns {
   display: grid;
@@ -1308,6 +1557,8 @@ textarea:focus {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
+/* ── Weekday Cards ── */
+
 .weekday-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1339,6 +1590,7 @@ textarea:focus {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
 }
 
 .weekday-card-header span {
@@ -1347,13 +1599,14 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
 .weekday-card-header strong {
   min-width: 38px;
   border-radius: var(--radius-pill);
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
   color: var(--color-brand);
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
@@ -1383,6 +1636,7 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -1402,7 +1656,10 @@ textarea:focus {
   cursor: pointer;
   color: var(--color-brand);
   font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
 }
+
+/* ── Financial Insight Cards ── */
 
 .financial-insight {
   display: grid;
@@ -1410,19 +1667,21 @@ textarea:focus {
   border: 1px solid var(--color-border);
   border-left-width: 4px;
   border-radius: var(--radius-surface);
-  background: var(--color-surface-subtle);
-  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  padding: var(--space-4);
 }
 
 .financial-insight strong {
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
 
 .financial-insight-label {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -1430,6 +1689,7 @@ textarea:focus {
   margin: 0;
   color: var(--color-text-muted);
   line-height: var(--leading-label);
+  font-size: var(--text-sm);
 }
 
 .financial-insight-info {
@@ -1445,6 +1705,8 @@ textarea:focus {
   border-left-color: var(--color-warning-border);
   background: var(--color-warning-surface);
 }
+
+/* ── Recurring Projection ── */
 
 .recurring-projection-list {
   display: grid;
@@ -1468,6 +1730,7 @@ textarea:focus {
   color: var(--color-brand);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -1482,6 +1745,8 @@ textarea:focus {
 .compact-message {
   margin: 0;
 }
+
+/* ── Structural Breakdown ── */
 
 .structural-breakdown {
   display: grid;
@@ -1503,7 +1768,7 @@ textarea:focus {
   justify-content: space-between;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface);
   padding: var(--space-3);
 }
 
@@ -1517,6 +1782,8 @@ textarea:focus {
   font-size: var(--text-sm);
 }
 
+/* ── Daily Breakdown ── */
+
 .daily-breakdown {
   display: grid;
   gap: var(--space-3);
@@ -1528,6 +1795,7 @@ textarea:focus {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
 
 .daily-list {
@@ -1557,6 +1825,8 @@ textarea:focus {
   color: var(--color-brand);
 }
 
+/* ── Bar Visualization ── */
+
 .bar-line {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);
@@ -1569,7 +1839,7 @@ textarea:focus {
 
 .bar-line div {
   overflow: hidden;
-  height: 10px;
+  height: 8px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-subtle);
 }
@@ -1587,8 +1857,10 @@ textarea:focus {
 }
 
 .profit-bar i {
-  background: var(--color-text);
+  background: var(--color-heading);
 }
+
+/* ── Vehicles ── */
 
 .vehicles-layout {
   display: grid;
@@ -1619,6 +1891,8 @@ textarea:focus {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
 }
 
 .vehicle-form {
@@ -1630,6 +1904,7 @@ textarea:focus {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
 }
 
 .cost-profile-panel {
@@ -1657,12 +1932,12 @@ textarea:focus {
 }
 
 .cost-field {
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   padding: var(--space-3);
 }
 
 .cost-field-active {
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
   box-shadow: inset 0 0 0 1px var(--color-success-border);
 }
 
@@ -1681,13 +1956,15 @@ textarea:focus {
   gap: var(--space-3);
 }
 
+/* ── Import ── */
+
 .import-panel {
   display: grid;
   gap: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
   background: var(--color-surface);
-  padding: var(--space-4);
+  padding: var(--space-5);
 }
 
 .import-template-help {
@@ -1716,11 +1993,18 @@ textarea:focus {
   cursor: pointer;
   padding: var(--space-5);
   text-align: center;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+
+.import-dropzone:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-subtle);
 }
 
 .import-dropzone-active {
   border-color: var(--color-brand);
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
 }
 
 .import-dropzone span {
@@ -1793,13 +2077,14 @@ textarea:focus {
   gap: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: var(--color-success-surface);
+  background: var(--color-brand-subtle);
   padding: var(--space-4);
 }
 
 .import-mapping h4 {
   margin: 0;
   color: var(--color-heading);
+  font-weight: var(--weight-bold);
 }
 
 .import-summary {
@@ -1819,6 +2104,7 @@ textarea:focus {
 .import-result h4 {
   margin: 0;
   color: var(--color-heading);
+  font-weight: var(--weight-bold);
 }
 
 .import-errors article {
@@ -1850,11 +2136,13 @@ textarea:focus {
   flex-direction: column;
 }
 
+/* ── Toggle Field ── */
+
 .toggle-field {
   display: flex;
   gap: var(--space-3);
   align-items: center;
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-control);
   background: var(--color-surface-subtle);
   padding: var(--space-3);
 }
@@ -1864,6 +2152,8 @@ textarea:focus {
   min-height: 20px;
   accent-color: var(--color-brand);
 }
+
+/* ── Vehicles List ── */
 
 .vehicles-list {
   display: grid;
@@ -1878,16 +2168,21 @@ textarea:focus {
   justify-content: space-between;
 }
 
+/* ── Empty State ── */
+
 .empty-state {
   margin: 0;
-  border: 1px dashed var(--color-control-border);
+  border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-surface);
   color: var(--color-text-muted);
-  padding: var(--space-5);
+  padding: var(--space-6);
   line-height: var(--leading-body);
   overflow-wrap: anywhere;
   background: var(--color-surface-subtle);
+  text-align: center;
 }
+
+/* ── Loading State ── */
 
 .loading-state {
   display: flex;
@@ -1900,6 +2195,7 @@ textarea:focus {
   background: var(--color-info-surface);
   color: var(--color-info);
   overflow-wrap: anywhere;
+  font-weight: var(--weight-medium);
 }
 
 .loading-state::before {
@@ -1928,6 +2224,8 @@ textarea:focus {
   }
 }
 
+/* ── Vehicle Card ── */
+
 .vehicle-card {
   display: flex;
   gap: var(--space-4);
@@ -1935,17 +2233,22 @@ textarea:focus {
   justify-content: space-between;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-surface);
-  background: var(--color-surface-subtle);
+  background: var(--color-surface);
   padding: var(--space-4);
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.vehicle-card:hover {
+  box-shadow: var(--shadow-panel);
 }
 
 .vehicle-card h4 {
   margin: 0;
   color: var(--color-heading);
   font-size: var(--text-base);
+  font-weight: var(--weight-bold);
 }
 
-/* Keep every record searchable while skipping layout/paint for offscreen cards. */
 .vehicles-list > .session-card {
   content-visibility: auto;
   contain-intrinsic-size: auto 180px;
@@ -1962,6 +2265,7 @@ textarea:focus {
   margin: var(--space-1) 0 var(--space-3);
   color: var(--color-text-muted);
   line-height: var(--leading-label);
+  font-size: var(--text-sm);
 }
 
 .vehicle-card span {
@@ -1992,13 +2296,13 @@ textarea:focus {
 .session-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: var(--space-3) 0 0;
 }
 
 .session-metrics div {
   border-radius: var(--radius-control);
-  background: var(--color-surface);
+  background: var(--color-surface-subtle);
   padding: var(--space-3);
 }
 
@@ -2006,6 +2310,7 @@ textarea:focus {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
@@ -2026,6 +2331,8 @@ textarea:focus {
   align-items: center;
 }
 
+/* ── Status Pill ── */
+
 .status-pill,
 .vehicle-card .status-pill {
   display: inline-flex;
@@ -2034,11 +2341,13 @@ textarea:focus {
   border-radius: var(--radius-pill);
   background: var(--color-surface-subtle);
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
   line-height: var(--leading-label);
   padding: var(--space-1) var(--space-2);
   overflow-wrap: anywhere;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .status-active,
@@ -2056,6 +2365,8 @@ textarea:focus {
 .recurring-metrics {
   grid-template-columns: 0.8fr 1.1fr 1.1fr;
 }
+
+/* ── Goal Cards ── */
 
 .goal-card {
   gap: var(--space-5);
@@ -2083,24 +2394,28 @@ textarea:focus {
   color: var(--color-brand);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
 
 .goal-progress-main strong {
   color: var(--color-heading);
   font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
 }
 
 .goal-progress-main small,
 .goal-progress-status {
   color: var(--color-text-muted);
   line-height: var(--leading-label);
+  font-size: var(--text-sm);
 }
 
 .goal-progress-bar {
   overflow: hidden;
-  height: 12px;
+  height: 10px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-subtle);
 }
@@ -2111,6 +2426,7 @@ textarea:focus {
   min-width: 0;
   border-radius: inherit;
   background: var(--color-brand);
+  transition: width var(--duration-normal) var(--ease-out);
 }
 
 .goal-progress-status {
@@ -2128,24 +2444,56 @@ textarea:focus {
 
 .expense-description {
   margin: var(--space-3) 0 0;
-  border-left: 3px solid var(--color-control-border);
+  border-left: 3px solid var(--color-border);
   color: var(--color-text-muted);
   padding-left: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Responsive Layout
+   ═══════════════════════════════════════════════════════════ */
+
+@media (min-width: 861px) {
+  .dashboard-area {
+    scroll-margin-top: calc(var(--control-height-compact) + var(--space-5) * 3);
+  }
 }
 
 @media (max-width: 860px) {
   h1 {
     font-size: var(--text-display-compact);
   }
+  
+  h1#page-title {
+    font-size: 2.5rem;
+  }
 
   .page {
     grid-template-columns: 1fr;
-    gap: var(--space-9);
+    gap: 0;
+    padding: 0;
+  }
+  
+  .intro {
+    padding: var(--space-10) var(--space-6);
+  }
+  
+  .auth-panel {
     padding: var(--space-8) var(--space-5);
+    max-width: 100%;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
   }
 
   .page.page-dashboard {
     padding: var(--space-5) var(--space-4);
+    padding-bottom: calc(var(--control-height) + var(--space-12) + env(safe-area-inset-bottom, 0px));
+  }
+
+  html {
+    scroll-padding-bottom: calc(var(--control-height) + var(--space-8) + env(safe-area-inset-bottom, 0px));
   }
 
   .dashboard-start {
@@ -2164,12 +2512,63 @@ textarea:focus {
   }
 
   .page-dashboard .dashboard-nav {
-    gap: var(--space-2);
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40; /* Above regular content and forms, but below dialogs */
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    box-shadow: var(--shadow-card);
+    padding: 0 max(var(--space-2), env(safe-area-inset-right, 0px))
+      env(safe-area-inset-bottom, 0px) max(var(--space-2), env(safe-area-inset-left, 0px));
+    margin-bottom: 0;
+  }
+
+  /* Oculta navegação se viewport diminuir muito de altura (teclado virtual aberto) ou body com focos em inputs */
+  @media (max-height: 480px) {
+    .page-dashboard .dashboard-nav {
+      display: none !important;
+    }
+  }
+  
+  /* Modern CSS approach for hiding bottom nav on focus within forms */
+  .page-dashboard:has(input:focus, select:focus, textarea:focus) .dashboard-nav {
+    display: none !important;
   }
 
   .page-dashboard .dashboard-nav a {
-    flex: 1 1 auto;
-    padding-inline: var(--space-3);
+    flex-direction: column;
+    min-width: 0;
+    min-height: var(--control-height-prominent);
+    padding: var(--space-2) var(--space-1);
+    border-radius: 0;
+    font-size: var(--text-xs);
+    gap: 4px;
+  }
+
+  .page-dashboard .dashboard-nav a::after {
+    display: none; /* No top borders for active states in the mobile bottom bar */
+  }
+
+  .page-dashboard .dashboard-nav .nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .page-dashboard .dashboard-nav a.active .nav-icon {
+    transform: translateY(-2px);
+  }
+
+  .dashboard-nav a,
+  .result-context-nav a,
+  .daily-entry-nav-button {
+    text-align: center;
   }
 
   .vehicles-layout,
@@ -2209,13 +2608,6 @@ textarea:focus {
     font-size: var(--text-xs);
   }
 
-  .dashboard-nav a,
-  .result-context-nav a,
-  .daily-entry-nav-button {
-    flex: 1 1 calc(50% - 10px);
-    text-align: center;
-  }
-
   .quick-start-nav-button {
     flex: 1 1 calc(50% - 10px);
   }
@@ -2229,4 +2621,112 @@ textarea:focus {
   .session-header .button {
     width: 100%;
   }
+}
+
+/* ── Today Summary ── */
+
+.today-summary {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.daily-entry[hidden],
+.daily-expense-form[hidden] {
+  display: none !important;
+}
+
+.metric-grid.today-summary-metrics {
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
+}
+
+.today-summary-metrics .result-primary {
+  grid-column: auto;
+}
+
+.today-summary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 860px) {
+  .metric-grid.today-summary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today-summary-metrics .result-primary {
+    grid-column: 1 / -1;
+  }
+
+  .today-summary-metrics .metric-card {
+    padding: var(--space-3);
+  }
+
+  .today-summary-metrics .metric-card > strong {
+    font-size: var(--text-xl);
+  }
+
+  .today-summary-metrics .result-primary > strong {
+    font-size: var(--text-2xl);
+  }
+
+  .today-summary-actions .button {
+    padding-inline: var(--space-2);
+  }
+}
+
+.today-summary .goal-progress-panel {
+  margin-top: 0;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.today-summary .goal-progress-panel h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+}
+
+.today-summary .goal-progress-main strong {
+  font-size: var(--text-lg);
+}
+.field-error { color: var(--color-danger); font-size: var(--text-sm); margin-top: var(--space-1); }
+
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--color-danger); } input[aria-invalid="true"]:focus, select[aria-invalid="true"]:focus { outline-color: var(--color-danger); border-color: var(--color-danger); }
+
+.auth-panel h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  margin-bottom: var(--space-8);
+  color: var(--color-heading);
+}
+
+.auth-panel label {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-heading);
+  margin-bottom: var(--space-1);
+}
+
+.auth-panel input {
+  background-color: var(--color-canvas);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.auth-panel input:focus {
+  background-color: var(--color-surface);
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-brand-subtle);
+  outline: none;
+}
+
+.auth-panel .button {
+  margin-top: var(--space-4);
+  min-height: var(--control-height-prominent);
+  font-size: var(--text-base);
+  border-radius: var(--radius-control);
 }
