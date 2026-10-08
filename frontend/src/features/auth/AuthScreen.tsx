@@ -21,6 +21,8 @@ interface AuthScreenProps {
   onForgotPassword: () => void;
 }
 
+import { CustomCursor } from "../../components/CustomCursor";
+
 export function AuthScreen({
   mode,
   setMode,
@@ -53,6 +55,7 @@ export function AuthScreen({
 
   return (
     <div className="relative min-h-screen w-full bg-[#0a0a0b] text-gray-100 font-sans selection:bg-green-500/30 selection:text-green-200">
+      <CustomCursor />
       
       {/* FULL SCREEN FLUID BACKGROUND */}
       <div className="fixed inset-0 z-0 pointer-events-none">
