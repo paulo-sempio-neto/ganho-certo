@@ -2,6 +2,9 @@ import { FormEvent, useRef } from "react";
 import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AnimatedBackground } from "./AnimatedBackground";
+import { GlowCard } from "../../components/GlowCard";
+import { AnimatedCounter } from "../../components/AnimatedCounter";
+import { PremiumCTA } from "../../components/PremiumCTA";
 
 export type AuthMode = "login" | "register";
 
@@ -322,35 +325,12 @@ export function AuthScreen({
                   )}
                 </AnimatePresence>
 
-                {/* Submit button */}
-                <motion.button type="submit" disabled={isLoading}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.7 }}
-                  whileHover={{ scale: 1.015, boxShadow: "0 8px 30px rgba(255,255,255,0.12)" }} 
-                  whileTap={{ scale: 0.97 }}
-                  className="mt-2 w-full flex items-center justify-center gap-2 bg-white text-black font-medium py-3 rounded-lg transition-shadow disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {isLoading ? (
-                    <motion.div 
-                      className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full"
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                    />
-                  ) : (
-                    <>
-                      {mode === "login" ? "Entrar" : "Criar conta"}
-                      <motion.svg 
-                        className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        initial={{ x: 0 }}
-                        whileHover={{ x: 3 }}
-                        transition={springSnappy}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </motion.svg>
-                    </>
-                  )}
-                </motion.button>
+                {/* Submit button with magnetic & shine effect */}
+                <div className="mt-1">
+                  <PremiumCTA disabled={isLoading} type="submit">
+                    {isLoading ? "Processando..." : (mode === "login" ? "Entrar na conta" : "Criar conta gratuitamente")}
+                  </PremiumCTA>
+                </div>
 
                 {/* Trust signals */}
                 <motion.div 
@@ -395,15 +375,7 @@ export function AuthScreen({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {features.map((feature, i) => (
                 <Reveal key={i} delay={i * 0.15}>
-                  <motion.div
-                    className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-8 h-full transition-all duration-300 group"
-                    whileHover={{ 
-                      borderColor: "rgba(255,255,255,0.15)",
-                      backgroundColor: "rgba(255,255,255,0.04)",
-                      y: -4,
-                    }}
-                    transition={{ duration: 0.3 }}
-                  >
+                  <GlowCard className="p-8 h-full">
                     <motion.div 
                       className="mb-6 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"
                       whileHover={{ scale: 1.1, backgroundColor: "rgba(16,185,129,0.15)" }}
@@ -413,10 +385,38 @@ export function AuthScreen({
                     </motion.div>
                     <h3 className="text-lg font-medium text-white mb-3 tracking-tight">{feature.title}</h3>
                     <p className="text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
-                  </motion.div>
+                  </GlowCard>
                 </Reveal>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════
+            STATS / LIVE COUNTER SECTION
+            ═══════════════════════════════════════════ */}
+        <AnimatedDivider />
+        
+        <div className="w-full bg-[#050505] py-20 px-6 md:px-12 border-y border-white/[0.04]">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10 text-center">
+            <Reveal delay={0.1}>
+              <div className="text-4xl md:text-5xl font-semibold text-white tracking-tight mb-2">
+                <AnimatedCounter target={4850000} prefix="R$ " />
+              </div>
+              <p className="text-zinc-500 text-sm font-medium">Em faturamento e despesas calculados</p>
+            </Reveal>
+            <Reveal delay={0.2}>
+              <div className="text-4xl md:text-5xl font-semibold text-emerald-400 tracking-tight mb-2">
+                <AnimatedCounter target={24000} suffix="+" />
+              </div>
+              <p className="text-zinc-500 text-sm font-medium">Horas e jornadas cadastradas</p>
+            </Reveal>
+            <Reveal delay={0.3}>
+              <div className="text-4xl md:text-5xl font-semibold text-white tracking-tight mb-2">
+                <AnimatedCounter target={99} suffix=",6%" />
+              </div>
+              <p className="text-zinc-500 text-sm font-medium">Precisão e clareza no lucro líquido</p>
+            </Reveal>
           </div>
         </div>
 
@@ -451,21 +451,14 @@ export function AuthScreen({
             <p className="text-zinc-400 text-lg mb-10 max-w-xl">
               Deixe as planilhas para trás. Obtenha insights instantâneos sobre sua rentabilidade e tome decisões melhores.
             </p>
-            <motion.button
-              onClick={() => { setMode("register"); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              whileHover={{ scale: 1.03, boxShadow: "0 0 40px rgba(255,255,255,0.15)" }}
-              whileTap={{ scale: 0.97 }}
-              className="flex items-center gap-2.5 bg-white text-black px-8 py-3.5 rounded-lg font-medium shadow-lg transition-shadow cursor-pointer"
-            >
-              Criar conta gratuitamente
-              <motion.svg 
-                className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                whileHover={{ x: 4 }}
-                transition={springSnappy}
+            <div className="w-full max-w-sm mx-auto">
+              <PremiumCTA
+                type="button"
+                onClick={() => { setMode("register"); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </motion.svg>
-            </motion.button>
+                Criar conta gratuitamente
+              </PremiumCTA>
+            </div>
           </Reveal>
         </div>
         

@@ -197,14 +197,24 @@ class Settings(BaseSettings):
             raise ValueError("BILLING_CURRENCY_ID must be a 3-letter currency code.")
         return normalized
 
-    @field_validator("beta_admin_token")
+    @field_validator(
+        "billing_secret_key",
+        "mercadopago_access_token",
+        "mercadopago_public_key",
+        "mercadopago_webhook_secret",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "smtp_from_email",
+        "beta_admin_token",
+        mode="before",
+    )
     @classmethod
-    def normalize_beta_admin_token(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-
-        normalized = value.strip()
-        return normalized or None
+    def normalize_optional_empty_strings(cls, value: object) -> object:
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
 
     @property
     def environment(self) -> str:

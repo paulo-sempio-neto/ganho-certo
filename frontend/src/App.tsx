@@ -1,4 +1,5 @@
 import { FeedbackMessage } from "./components/FeedbackMessage";
+import { CustomCursor } from "./components/CustomCursor";
 import { DashboardStart } from "./features/home/DashboardStart";
 import { TodaySummary } from "./features/home/TodaySummary";
 import { useTodaySummary } from "./features/home/useTodaySummary";
@@ -2244,7 +2245,9 @@ function App() {
 
   if (!user && !isResetPasswordRoute && mode !== "forgot-password") {
     return (
-      <AuthScreen
+      <>
+        <CustomCursor />
+        <AuthScreen
         mode={mode as "login" | "register"}
         setMode={(m) => {
           setMode(m);
@@ -2268,11 +2271,14 @@ function App() {
           setPassword("");
         }}
       />
+      </>
     );
   }
 
   return (
-    <main className={user ? "page page-dashboard" : "page"}>
+    <>
+      <CustomCursor />
+      <main className={user ? "page page-dashboard" : "page"}>
       {!user ? (
         <section className="intro" aria-labelledby="page-title">
           <p className="brand">GanhoCerto</p>
@@ -4550,6 +4556,7 @@ function App() {
         )}
       </section>
     </main>
+    </>
   );
 }
 

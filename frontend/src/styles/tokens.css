@@ -133,4 +133,23 @@
   --duration-loading: 900ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ── Premium / Glass Tokens ── */
+  --color-brand-dark: #0a4f2e;
+  --color-glass-text: #fafafa;
+  --color-glass-white: #ffffff;
+  --color-accent-emerald-light: #34d399;
+  --color-accent-emerald: #10b981;
+  --color-glass-border: rgb(255 255 255 / 6%);
+  --color-glass-border-hover: rgb(255 255 255 / 12%);
+  --color-glass-border-focus: rgb(16 185 129 / 50%);
+  --color-glass-bg: rgb(255 255 255 / 2%);
+  --color-glass-bg-subtle: rgb(255 255 255 / 3%);
+  --color-glass-bg-tabs: rgb(255 255 255 / 4%);
+  --color-glass-highlight: rgb(255 255 255 / 10%);
+  --color-glass-shadow: rgb(0 0 0 / 50%);
+  --color-glass-focus-glow: rgb(16 185 129 / 8%);
+  --color-glass-placeholder: rgb(255 255 255 / 25%);
+  --color-intro-glow: rgb(255 255 255 / 6%);
+  --color-intro-subtitle: rgb(255 255 255 / 80%);
 }
