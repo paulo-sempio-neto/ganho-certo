@@ -1,10 +1,7 @@
-import { FormEvent, useRef } from "react";
-import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from "framer-motion";
+import { FormEvent, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AnimatedBackground } from "./AnimatedBackground";
-import { GlowCard } from "../../components/GlowCard";
-import { AnimatedCounter } from "../../components/AnimatedCounter";
-import { PremiumCTA } from "../../components/PremiumCTA";
 
 export type AuthMode = "login" | "register";
 
@@ -24,451 +21,498 @@ interface AuthScreenProps {
   onForgotPassword: () => void;
 }
 
-/* ── Spring Presets ── */
-const spring = { type: "spring" as const, stiffness: 100, damping: 20, mass: 0.8 };
-const springSnappy = { type: "spring" as const, stiffness: 300, damping: 30 };
-
-/* ── Feature Data ── */
-const features = [
-  {
-    icon: (
-      <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    ),
-    title: "Gestão de Ganhos",
-    desc: "Acompanhe suas corridas e entenda seu faturamento real, descontando automaticamente os gastos com combustível e manutenção.",
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    ),
-    title: "Análise de Desempenho",
-    desc: "Métricas avançadas sobre quais horários, regiões e aplicativos trazem o maior retorno para o seu perfil e veículo.",
-  },
-  {
-    icon: (
-      <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    ),
-    title: "Segurança Financeira",
-    desc: "Seus dados protegidos e sua independência financeira construída de forma inteligente, consistente e segura.",
-  },
-];
-
-/* ── Reusable scroll-reveal wrapper ── */
-function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 40 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
-      className={className}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-/* ── Animated line that draws on scroll ── */
-function AnimatedDivider() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-50px" });
-  return (
-    <div ref={ref} className="w-full flex justify-center py-1">
-      <motion.div
-        className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"
-        initial={{ width: "0%" }}
-        animate={isInView ? { width: "100%" } : { width: "0%" }}
-        transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-      />
-    </div>
-  );
-}
-
-
 export function AuthScreen({
-  mode, setMode, name, setName, email, setEmail,
-  password, setPassword, isLoading, message, successMessage,
-  onSubmit, onForgotPassword,
+  mode,
+  setMode,
+  name,
+  setName,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  isLoading,
+  message,
+  successMessage,
+  onSubmit,
+  onForgotPassword,
 }: AuthScreenProps) {
-
-  /* ── Hero parallax ── */
-  const heroRef = useRef(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroY = useSpring(useTransform(scrollYProgress, [0, 1], [0, 120]), { stiffness: 50, damping: 20 });
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.6], [1, 0]);
-
-  /* ── Word-by-word animation for headline ── */
-  const line1Words = "Faturar é o começo.".split(" ");
-  const line2Words = "Lucrar é o destino.".split(" ");
+  const [activeTab, setActiveTab] = useState<"visao" | "custos" | "metas">("visao");
 
   return (
-    <div className="relative min-h-screen w-full bg-[#030303] text-zinc-300 selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden"
-         style={{ fontFamily: "var(--font-family)" }}>
-      
-      {/* Background */}
+    <div className="relative min-h-screen w-full bg-[#030303] text-zinc-100 selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
+      {/* Background dinâmico suave */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
         <AnimatedBackground />
       </div>
 
+      {/* Brilho radial superior */}
+      <div 
+        className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] pointer-events-none z-0"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(16, 185, 129, 0.08) 0%, transparent 70%)",
+        }}
+      />
+
       <div className="relative z-10 flex flex-col w-full">
-
-        {/* ═══════════════════════════════════════════
-            HERO / AUTH SECTION
-            ═══════════════════════════════════════════ */}
-        <div ref={heroRef} className="flex flex-col lg:flex-row min-h-screen w-full relative">
-          
-          {/* LEFT — BRAND COPY with parallax */}
-          <motion.div 
-            className="flex-1 lg:flex-[1.1] flex flex-col justify-center px-8 py-12 lg:p-24 relative"
-            style={{ y: heroY, opacity: heroOpacity }}
-          >
-            <div className="max-w-xl mx-auto lg:mx-0">
-              
-              {/* Logo */}
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-                className="flex items-center gap-2.5 mb-16 lg:mb-24"
-              >
-                <motion.div 
-                  className="w-5 h-5 rounded bg-emerald-500"
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ ...springSnappy, delay: 0.2 }}
-                />
-                <span className="font-semibold text-white tracking-tight">GanhoCerto</span>
-              </motion.div>
-              
-              {/* Headline — word by word */}
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium text-white mb-6 leading-[1.1] tracking-[-0.05em]">
-                <span className="block mb-1">
-                  {line1Words.map((word, i) => (
-                    <motion.span
-                      key={i}
-                      className="inline-block mr-[0.3em]"
-                      initial={{ opacity: 0, y: 30, filter: "blur(8px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      transition={{ duration: 0.6, delay: 0.3 + i * 0.08, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                      {word}
-                    </motion.span>
-                  ))}
-                </span>
-                <span className="block bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-emerald-600">
-                  {line2Words.map((word, i) => (
-                    <motion.span
-                      key={i}
-                      className="inline-block mr-[0.3em]"
-                      initial={{ opacity: 0, y: 30, filter: "blur(8px)" }}
-                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                      transition={{ duration: 0.6, delay: 0.7 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                      {word}
-                    </motion.span>
-                  ))}
-                </span>
-              </h1>
-              
-              {/* Subheadline */}
-              <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, delay: 1.2, ease: [0.22, 1, 0.36, 1] }}
-                className="text-lg md:text-xl text-zinc-400 font-normal leading-relaxed max-w-lg tracking-[-0.01em]"
-              >
-                A plataforma financeira definitiva para profissionais independentes.
-                Entenda seus custos reais e otimize sua margem em segundos.
-              </motion.p>
-
-              {/* Animated accent line under text */}
-              <motion.div
-                className="h-px mt-10 bg-gradient-to-r from-emerald-500/50 via-emerald-500/20 to-transparent"
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "60%", opacity: 1 }}
-                transition={{ duration: 1.2, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
-              />
+        {/* ── Top Header / Navbar ── */}
+        <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-white/[0.04]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <span className="text-emerald-400 font-bold text-sm tracking-tighter">GC</span>
             </div>
-            
-            {/* Scroll indicator */}
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              transition={{ delay: 2, duration: 1 }}
-              className="absolute bottom-10 left-8 lg:left-24 hidden md:flex items-center gap-2 text-zinc-600"
-            >
-              <motion.svg 
-                className="w-4 h-4" 
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                animate={{ y: [0, 6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </motion.svg>
-              <span className="text-xs font-medium uppercase tracking-widest">Descubra</span>
-            </motion.div>
-          </motion.div>
+            <span className="font-semibold text-lg text-white tracking-tight">GanhoCerto</span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              FINTECH PARA MOTORISTAS
+            </span>
+          </div>
 
-          {/* RIGHT — AUTH FORM */}
-          <div className="flex-1 lg:flex-[0.9] flex items-center justify-center p-6 sm:p-12 lg:p-16">
-            <motion.div 
-              initial={{ opacity: 0, y: 30, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ ...spring, delay: 0.4 }}
-              className="w-full max-w-[420px] bg-white/[0.03] border border-white/[0.06] backdrop-blur-xl rounded-xl p-8 shadow-2xl"
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "login" ? "register" : "login");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-white/[0.08] cursor-pointer"
             >
-              {/* Tabs */}
-              <div className="flex w-full mb-8 bg-black/40 rounded-lg p-1 border border-white/[0.04]">
-                {(['login', 'register'] as AuthMode[]).map((tab) => (
-                  <button key={tab} type="button"
-                    onClick={() => setMode(tab)}
-                    className="relative flex-1 py-2.5 text-sm font-medium rounded-md transition-colors cursor-pointer"
-                  >
-                    <span className={`relative z-10 transition-colors duration-200 ${mode === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}>
-                      {tab === 'login' ? 'Entrar' : 'Criar conta'}
-                    </span>
-                    {mode === tab && (
-                      <motion.div 
-                        layoutId="auth-tab" 
-                        className="absolute inset-0 bg-white/[0.08] rounded-md border border-white/[0.06]" 
-                        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }} 
-                      />
-                    )}
-                  </button>
-                ))}
+              {mode === "login" ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar"}
+            </button>
+          </div>
+        </header>
+
+        {/* ── Hero / Auth Split Section ── */}
+        <section className="w-full max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          
+          {/* Coluna Esquerda: Proposta de Valor e Mockup do Produto */}
+          <div className="lg:col-span-7 flex flex-col gap-8">
+            <div className="flex flex-col gap-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit">
+                <span className="text-emerald-400">●</span> Uber · 99 · inDrive · Entregas
               </div>
 
-              <form className="flex flex-col gap-5" onSubmit={onSubmit}>
-                {/* Form title */}
-                <div className="mb-1">
-                  <AnimatePresence mode="wait">
-                    <motion.h2 key={mode}
-                      initial={{ opacity: 0, x: -12 }} 
-                      animate={{ opacity: 1, x: 0 }} 
-                      exit={{ opacity: 0, x: 12 }}
-                      transition={{ duration: 0.25, ease: "easeOut" }}
-                      className="text-xl font-medium text-white tracking-[-0.03em]"
-                    >
-                      {mode === "login" ? "Acesse sua conta" : "Comece gratuitamente"}
-                    </motion.h2>
-                  </AnimatePresence>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance">
+                Faturar é fácil. <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
+                  Lucrar de verdade
+                </span>{" "}
+                é o que importa.
+              </h1>
+
+              <p className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty">
+                Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
+              </p>
+            </div>
+
+            {/* Mockup Interativo do Painel GanhoCerto */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Header do Mockup */}
+              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
+                </div>
+                <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("visao")}
+                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "visao" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                  >
+                    Resumo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("custos")}
+                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "custos" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                  >
+                    Custos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("metas")}
+                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "metas" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                  >
+                    Meta
+                  </button>
+                </div>
+              </div>
+
+              {/* Conteúdo Dinâmico do Mockup */}
+              <AnimatePresence mode="wait">
+                {activeTab === "visao" && (
+                  <motion.div
+                    key="visao"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col gap-4"
+                  >
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
+                        <strong className="text-xl sm:text-2xl font-semibold text-emerald-400 tracking-tight">R$ 384,50</strong>
+                        <span className="text-[11px] text-emerald-500/80 mt-1 block">Margem: 72%</span>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
+                        <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight">R$ 534,00</strong>
+                        <span className="text-[11px] text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
+                      </div>
+                      <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                        <span className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
+                        <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight">-R$ 149,50</strong>
+                        <span className="text-[11px] text-zinc-400 mt-1 block">Combustível + Reserva</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex items-center justify-between text-xs">
+                      <span className="text-zinc-400 flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Rendimento médio: <strong className="text-white font-medium">R$ 57,60 / hora trabalhada</strong>
+                      </span>
+                      <span className="text-emerald-400 font-medium">Excelente</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === "custos" && (
+                  <motion.div
+                    key="custos"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col gap-2.5"
+                  >
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                      <span className="text-zinc-300">Combustível (Gasolina / GNV)</span>
+                      <span className="font-semibold text-rose-400">-R$ 110,00</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                      <span className="text-zinc-300">Provisão de Manutenção (Óleo, Pneus)</span>
+                      <span className="font-semibold text-amber-400">-R$ 27,50</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                      <span className="text-zinc-300">Alimentação e Pedágios</span>
+                      <span className="font-semibold text-zinc-400">-R$ 12,00</span>
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeTab === "metas" && (
+                  <motion.div
+                    key="metas"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex flex-col gap-3"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-400">Meta Semanal de Lucro</span>
+                      <strong className="text-white font-semibold">R$ 2.450 de R$ 2.800</strong>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: "87.5%" }} />
+                    </div>
+                    <span className="text-[11px] text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+
+          {/* Coluna Direita: Formulário de Autenticação Limpo & Awwwards-Tier */}
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-8 shadow-2xl backdrop-blur-2xl">
+              
+              {/* Tab Selector */}
+              <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className={`py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${
+                    mode === "login"
+                      ? "bg-white text-black shadow-md font-semibold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("register")}
+                  className={`py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${
+                    mode === "register"
+                      ? "bg-white text-black shadow-md font-semibold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  Criar conta
+                </button>
+              </div>
+
+              {/* Form Title */}
+              <div className="mb-6">
+                <h2 className="text-xl font-medium text-white tracking-tight">
+                  {mode === "login" ? "Acesse sua conta" : "Comece gratuitamente"}
+                </h2>
+                <p className="text-zinc-400 text-xs mt-1">
+                  {mode === "login" ? "Digite suas credenciais para continuar." : "Leva menos de 1 minuto. Sem cartão."}
+                </p>
+              </div>
+
+              {/* Formulário */}
+              <form onSubmit={onSubmit} className="flex flex-col gap-4">
+                {mode === "register" && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-zinc-300" htmlFor="name">
+                      Nome completo
+                    </label>
+                    <input
+                      id="name"
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Ex: Carlos Silva"
+                      className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-zinc-300" htmlFor="email">
+                    E-mail
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                  />
                 </div>
 
-                {/* Name field (register only) */}
-                <AnimatePresence initial={false}>
-                  {mode === "register" && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }} 
-                      animate={{ opacity: 1, height: "auto" }} 
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      className="flex flex-col gap-1.5 overflow-hidden"
-                    >
-                      <label className="text-sm font-medium text-zinc-400" htmlFor="name">Nome</label>
-                      <input id="name" type="text" name="name" required value={name} onChange={(e) => setName(e.target.value)}
-                        className="input-glass" placeholder="Seu nome completo" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Email */}
-                <motion.div 
-                  className="flex flex-col gap-1.5"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.5 }}
-                >
-                  <label className="text-sm font-medium text-zinc-400" htmlFor="email">Email</label>
-                  <input id="email" type="email" name="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="input-glass" placeholder="voce@exemplo.com" />
-                </motion.div>
-
-                {/* Password */}
-                <motion.div 
-                  className="flex flex-col gap-1.5"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.6 }}
-                >
+                <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium text-zinc-400" htmlFor="password">Senha</label>
+                    <label className="text-xs font-medium text-zinc-300" htmlFor="password">
+                      Senha
+                    </label>
                     {mode === "login" && (
-                      <button type="button" onClick={onForgotPassword} className="text-xs font-medium text-zinc-500 hover:text-white transition-colors cursor-pointer">
+                      <button
+                        type="button"
+                        onClick={onForgotPassword}
+                        className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors cursor-pointer"
+                      >
                         Esqueceu a senha?
                       </button>
                     )}
                   </div>
-                  <input id="password" type="password" name="password" required value={password} onChange={(e) => setPassword(e.target.value)}
+                  <input
+                    id="password"
+                    type="password"
+                    required
                     minLength={mode === "login" ? 1 : 6}
-                    className="input-glass" placeholder="••••••••" />
-                </motion.div>
-
-                {/* Feedback messages */}
-                <AnimatePresence>
-                  {message && (
-                    <motion.div initial={{ opacity: 0, y: -8, height: 0 }} animate={{ opacity: 1, y: 0, height: "auto" }} exit={{ opacity: 0, y: -8, height: 0 }}>
-                      <FeedbackMessage kind="error">{message}</FeedbackMessage>
-                    </motion.div>
-                  )}
-                  {successMessage && (
-                    <motion.div initial={{ opacity: 0, y: -8, height: 0 }} animate={{ opacity: 1, y: 0, height: "auto" }} exit={{ opacity: 0, y: -8, height: 0 }}>
-                      <FeedbackMessage kind="success">{successMessage}</FeedbackMessage>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Submit button with magnetic & shine effect */}
-                <div className="mt-1">
-                  <PremiumCTA disabled={isLoading} type="submit">
-                    {isLoading ? "Processando..." : (mode === "login" ? "Entrar na conta" : "Criar conta gratuitamente")}
-                  </PremiumCTA>
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
+                  />
                 </div>
 
-                {/* Trust signals */}
-                <motion.div 
-                  className="flex items-center justify-center gap-4 mt-2 text-zinc-600 text-xs"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1, duration: 0.6 }}
+                {message && <FeedbackMessage kind="error">{message}</FeedbackMessage>}
+                {successMessage && <FeedbackMessage kind="success">{successMessage}</FeedbackMessage>}
+
+                {/* Primary CTA Button */}
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full mt-2 py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all duration-200 shadow-[0_0_25px_rgba(255,255,255,0.12)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <span className="flex items-center gap-1">
-                    <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    Sem cartão
-                  </span>
-                  <span className="text-zinc-700">·</span>
-                  <span className="flex items-center gap-1">
-                    <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    Cancele quando quiser
-                  </span>
-                </motion.div>
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      {mode === "login" ? "Entrar na plataforma" : "Criar minha conta gratuita"}
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-center gap-4 mt-2 text-zinc-500 text-[11px]">
+                  <span>✓ 100% gratuito</span>
+                  <span>·</span>
+                  <span>✓ Sem cartão de crédito</span>
+                  <span>·</span>
+                  <span>✓ Seus dados seguros</span>
+                </div>
               </form>
-            </motion.div>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* ═══════════════════════════════════════════
-            FEATURES SECTION
-            ═══════════════════════════════════════════ */}
-        <AnimatedDivider />
-        
-        <div className="w-full bg-[#000000] py-24 px-6 md:px-12">
-          <div className="max-w-6xl mx-auto">
-            {/* Section header */}
-            <Reveal className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-medium text-white mb-4 tracking-[-0.04em]">
-                Controle total da sua operação
+        {/* ── Bento Grid Section: Recursos Essenciais ── */}
+        <section className="w-full bg-[#000000] py-24 px-6 border-t border-white/[0.04]">
+          <div className="max-w-6xl mx-auto flex flex-col gap-16">
+            <div className="text-center max-w-2xl mx-auto flex flex-col gap-3">
+              <span className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</span>
+              <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
+                Tudo o que você precisa para dominar suas finanças
               </h2>
-              <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
-                Ferramentas precisas para transformar dados em decisões financeiras inteligentes.
+              <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+                Desenvolvido com base no dia a dia de centenas de motoristas para eliminar o estresse financeiro.
               </p>
-            </Reveal>
-            
-            {/* Feature cards with stagger */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-              {features.map((feature, i) => (
-                <Reveal key={i} delay={i * 0.15}>
-                  <GlowCard className="p-8 h-full">
-                    <motion.div 
-                      className="mb-6 w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"
-                      whileHover={{ scale: 1.1, backgroundColor: "rgba(16,185,129,0.15)" }}
-                      transition={springSnappy}
-                    >
-                      {feature.icon}
-                    </motion.div>
-                    <h3 className="text-lg font-medium text-white mb-3 tracking-tight">{feature.title}</h3>
-                    <p className="text-zinc-400 text-sm leading-relaxed">{feature.desc}</p>
-                  </GlowCard>
-                </Reveal>
-              ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Bento Card 1: Gestão de Ganhos */}
+              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
+                <div className="flex flex-col gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-white tracking-tight">Lucro Real por Quilômetro</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Descubra quanto sobrou limpo em cada corrida ou jornada após abater automaticamente o custo de combustível por km.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
+                  Rendimento transparente →
+                </div>
+              </div>
+
+              {/* Bento Card 2: Metas */}
+              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
+                <div className="flex flex-col gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-white tracking-tight">Metas e Horas Restantes</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Defina sua meta financeira semanal ou mensal e saiba exatamente quantas horas a mais precisa rodar para atingi-la.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
+                  Previsibilidade no volante →
+                </div>
+              </div>
+
+              {/* Bento Card 3: Manutenção */}
+              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
+                <div className="flex flex-col gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-white tracking-tight">Manutenção e Veículos</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    Controle trocas de óleo, pneus e revisões periódicas. Nunca seja pego de surpresa por quebras inesperadas no carro.
+                  </p>
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
+                  Zero surpresas no mecânico →
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* ═══════════════════════════════════════════
-            STATS / LIVE COUNTER SECTION
-            ═══════════════════════════════════════════ */}
-        <AnimatedDivider />
-        
-        <div className="w-full bg-[#050505] py-20 px-6 md:px-12 border-y border-white/[0.04]">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10 text-center">
-            <Reveal delay={0.1}>
-              <div className="text-4xl md:text-5xl font-semibold text-white tracking-tight mb-2">
-                <AnimatedCounter target={4850000} prefix="R$ " />
+        {/* ── Depoimentos Reais ── */}
+        <section className="w-full bg-[#030303] py-20 px-6 border-t border-white/[0.04]">
+          <div className="max-w-6xl mx-auto flex flex-col gap-12">
+            <div className="text-center">
+              <h2 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">
+                Quem usa não volta para planilhas de papel
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
+                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
+                  "Eu achava que lucrava R$ 5.500 no mês. Quando coloquei os custos de manutenção no GanhoCerto, vi que meu lucro real era R$ 3.800. Mudei os horários que rodava e agora tiro R$ 6.200 limpos."
+                </p>
+                <div>
+                  <strong className="text-white text-xs block font-semibold">Carlos Eduardo</strong>
+                  <span className="text-zinc-500 text-[11px]">Motorista Uber Black · São Paulo</span>
+                </div>
               </div>
-              <p className="text-zinc-500 text-sm font-medium">Em faturamento e despesas calculados</p>
-            </Reveal>
-            <Reveal delay={0.2}>
-              <div className="text-4xl md:text-5xl font-semibold text-emerald-400 tracking-tight mb-2">
-                <AnimatedCounter target={24000} suffix="+" />
+
+              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
+                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
+                  "A melhor coisa é a meta diária. Eu sei a hora exata de parar e voltar para casa sem ficar rodando à toa gastando gasolina de madrugada."
+                </p>
+                <div>
+                  <strong className="text-white text-xs block font-semibold">Juliana Mendes</strong>
+                  <span className="text-zinc-500 text-[11px]">Motorista 99 · Belo Horizonte</span>
+                </div>
               </div>
-              <p className="text-zinc-500 text-sm font-medium">Horas e jornadas cadastradas</p>
-            </Reveal>
-            <Reveal delay={0.3}>
-              <div className="text-4xl md:text-5xl font-semibold text-white tracking-tight mb-2">
-                <AnimatedCounter target={99} suffix=",6%" />
+
+              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
+                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
+                  "Simples, direto e rápido de preencher pelo celular quando paro no posto para abastecer. Não precisa entender nada de contabilidade."
+                </p>
+                <div>
+                  <strong className="text-white text-xs block font-semibold">Rodrigo Fontes</strong>
+                  <span className="text-zinc-500 text-[11px]">Motorista Confort · Rio de Janeiro</span>
+                </div>
               </div>
-              <p className="text-zinc-500 text-sm font-medium">Precisão e clareza no lucro líquido</p>
-            </Reveal>
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* ═══════════════════════════════════════════
-            FINAL CTA
-            ═══════════════════════════════════════════ */}
-        <AnimatedDivider />
-
-        <div className="w-full bg-[#030303] py-32 px-6">
-          <Reveal className="max-w-3xl mx-auto text-center flex flex-col items-center">
-            <motion.div
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/15 text-emerald-400 text-xs font-medium mb-8"
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-            >
-              <motion.span 
-                className="w-1.5 h-1.5 rounded-full bg-emerald-400"
-                animate={{ opacity: [1, 0.4, 1] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              />
-              Comece agora — é gratuito
-            </motion.div>
-
-            <h2 className="text-3xl md:text-5xl font-medium text-white mb-6 tracking-[-0.04em] leading-tight">
-              A clareza financeira{" "}
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-emerald-600">
-                que você merece.
-              </span>
+        {/* ── Call To Action Final ── */}
+        <section className="w-full bg-[#000000] py-24 px-6 border-t border-white/[0.04]">
+          <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-6">
+            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-[-0.03em] leading-tight">
+              Pronto para ter o controle total do seu volante?
             </h2>
-            <p className="text-zinc-400 text-lg mb-10 max-w-xl">
-              Deixe as planilhas para trás. Obtenha insights instantâneos sobre sua rentabilidade e tome decisões melhores.
+            <p className="text-zinc-400 text-base max-w-lg">
+              Cadastre-se gratuitamente em segundos e veja exatamente quanto sobra no seu bolso hoje.
             </p>
-            <div className="w-full max-w-sm mx-auto">
-              <PremiumCTA
-                type="button"
-                onClick={() => { setMode("register"); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              >
-                Criar conta gratuitamente
-              </PremiumCTA>
-            </div>
-          </Reveal>
-        </div>
-        
-        {/* FOOTER */}
-        <AnimatedDivider />
-        <footer className="w-full py-8 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between text-zinc-600 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="py-3.5 px-8 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all shadow-[0_0_35px_rgba(255,255,255,0.15)] flex items-center gap-2 cursor-pointer mt-2"
+            >
+              Começar agora gratuitamente
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        {/* ── Footer ── */}
+        <footer className="w-full py-8 px-6 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-zinc-600 text-xs border-t border-white/[0.04] gap-4">
           <div>GanhoCerto © 2026. Todos os direitos reservados.</div>
-          <div className="flex gap-6 mt-4 md:mt-0">
-            <a href="#" className="hover:text-zinc-300 transition-colors">Privacidade</a>
-            <a href="#" className="hover:text-zinc-300 transition-colors">Termos</a>
+          <div className="flex gap-6">
+            <span>Privacidade</span>
+            <span>Termos de Uso</span>
+            <span>Suporte</span>
           </div>
         </footer>
       </div>
