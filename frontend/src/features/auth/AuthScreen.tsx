@@ -2,6 +2,7 @@ import { FormEvent } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AmbientBackground } from "./AmbientBackground";
+import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { ProductCanvas } from "./ProductCanvas";
 import { reveal, spring, stagger } from "./motion";
@@ -48,10 +49,7 @@ export function AuthScreen({
         {/* ── Top Header / Navbar ── */}
         <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-white/[0.04]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_var(--color-lux-glow)]">
-              <span className="text-emerald-400 font-bold text-sm tracking-tighter">GC</span>
-            </div>
-            <span className="font-semibold text-lg text-white tracking-tight">GanhoCerto</span>
+            <BrandMark />
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               FINTECH PARA MOTORISTAS

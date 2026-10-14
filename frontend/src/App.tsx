@@ -27,6 +27,7 @@ import { LazyCsvImportSection as CsvImportSection } from "./features/imports/Laz
 import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
 import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
+import { AuthShell } from "./features/auth/AuthShell";
 import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
 import { getGoalUpdatedAfterWorkMessage } from "./features/goals/goalMessages";
 import { FinancialGoalsSection } from "./features/goals/FinancialGoalsSection";
@@ -2275,6 +2276,23 @@ function App() {
         }}
       />
       </Suspense>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthShell>
+        {isResetPasswordRoute ? (
+          <ResetPasswordForm
+            token={resetPasswordToken}
+            onBackToLogin={handleBackToLogin}
+            onRequestNewLink={handleRequestNewResetLink}
+            onResetComplete={handleResetComplete}
+          />
+        ) : (
+          <ForgotPasswordForm initialEmail={email} onBackToLogin={handleBackToLogin} />
+        )}
+      </AuthShell>
     );
   }
 
