@@ -1,6 +1,7 @@
 import { FormEvent } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
+import { GlowCard } from "../../components/GlowCard";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
@@ -29,6 +30,24 @@ interface AuthScreenProps {
 }
 
 const formSwing = tiltIn("y", -16);
+
+const testimonials = [
+  {
+    quote: "Eu achava que lucrava R$ 5.500 no mês. Quando coloquei os custos de manutenção no GanhoCerto, vi que meu lucro real era R$ 3.800. Mudei os horários que rodava e agora tiro R$ 6.200 limpos.",
+    name: "Carlos Eduardo",
+    role: "Motorista Uber Black · São Paulo",
+  },
+  {
+    quote: "A melhor coisa é a meta diária. Eu sei a hora exata de parar e voltar para casa sem ficar rodando à toa gastando gasolina de madrugada.",
+    name: "Juliana Mendes",
+    role: "Motorista 99 · Belo Horizonte",
+  },
+  {
+    quote: "Simples, direto e rápido de preencher pelo celular quando paro no posto para abastecer. Não precisa entender nada de contabilidade.",
+    name: "Rodrigo Fontes",
+    role: "Motorista Confort · Rio de Janeiro",
+  },
+];
 
 export function AuthScreen({
   mode,
@@ -275,45 +294,33 @@ export function AuthScreen({
 
         {/* ── Depoimentos Reais ── */}
         <section className="w-full bg-(--color-lux-canvas) py-20 px-6 border-t border-white/[0.04]">
-          <div className="max-w-6xl mx-auto flex flex-col gap-12">
-            <div className="text-center">
-              <h2 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">
-                Quem usa não volta para planilhas de papel
-              </h2>
-            </div>
+          <motion.div
+            className="max-w-6xl mx-auto flex flex-col gap-12"
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={stagger(0.12, 0)}
+          >
+            <h2 className="text-center text-2xl sm:text-3xl font-medium text-white tracking-tight">
+              <MaskLine>Quem usa não volta para planilhas de papel</MaskLine>
+            </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
-                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
-                  "Eu achava que lucrava R$ 5.500 no mês. Quando coloquei os custos de manutenção no GanhoCerto, vi que meu lucro real era R$ 3.800. Mudei os horários que rodava e agora tiro R$ 6.200 limpos."
-                </p>
-                <div>
-                  <strong className="text-white text-xs block font-semibold">Carlos Eduardo</strong>
-                  <span className="text-zinc-500 text-sm">Motorista Uber Black · São Paulo</span>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
-                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
-                  "A melhor coisa é a meta diária. Eu sei a hora exata de parar e voltar para casa sem ficar rodando à toa gastando gasolina de madrugada."
-                </p>
-                <div>
-                  <strong className="text-white text-xs block font-semibold">Juliana Mendes</strong>
-                  <span className="text-zinc-500 text-sm">Motorista 99 · Belo Horizonte</span>
-                </div>
-              </div>
-
-              <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
-                <p className="text-zinc-300 text-sm leading-relaxed mb-6">
-                  "Simples, direto e rápido de preencher pelo celular quando paro no posto para abastecer. Não precisa entender nada de contabilidade."
-                </p>
-                <div>
-                  <strong className="text-white text-xs block font-semibold">Rodrigo Fontes</strong>
-                  <span className="text-zinc-500 text-sm">Motorista Confort · Rio de Janeiro</span>
-                </div>
-              </div>
+              {testimonials.map((testimonial) => (
+                <GlowCard
+                  key={testimonial.name}
+                  className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.15] transition-colors duration-300 flex flex-col justify-between"
+                  variants={reveal}
+                >
+                  <p className="text-zinc-300 text-sm leading-relaxed mb-6">“{testimonial.quote}”</p>
+                  <div>
+                    <strong className="text-white text-xs block font-semibold">{testimonial.name}</strong>
+                    <span className="text-zinc-500 text-sm">{testimonial.role}</span>
+                  </div>
+                </GlowCard>
+              ))}
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* ── Call To Action Final ── */}
