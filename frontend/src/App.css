@@ -2771,7 +2771,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   gap: var(--space-3);
 }
 
-.today-overview:has(.today-pace-card) {
+.today-overview-paced {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
@@ -2787,7 +2787,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 }
 
 @media (max-width: 860px) {
-  .today-overview:has(.today-pace-card) {
+  .today-overview-paced {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -2802,4 +2802,11 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 
 .lux .button:not(.button-secondary, .button-ghost):not(:disabled):hover {
   box-shadow: 0 12px 32px -14px var(--color-accent-emerald);
+}
+
+/* ── Scroll story stage: full screen height, small-viewport units where supported ── */
+
+.story-stage {
+  height: 100vh;
+  height: 100svh;
 }

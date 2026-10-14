@@ -90,7 +90,7 @@ export function ScrollStory() {
       aria-label="Do faturamento ao lucro real"
       className={`relative bg-(--color-lux-void) before:pointer-events-none before:absolute before:inset-x-0 before:-top-16 before:h-16 before:bg-gradient-to-b before:from-transparent before:to-(--color-lux-void) lg:before:-top-32 lg:before:h-32 ${shouldReduceMotion ? "py-24" : "h-[220vh] lg:h-[260vh]"}`}
     >
-      <div className={shouldReduceMotion ? "" : "sticky top-0 flex h-[100svh] items-center"}>
+      <div className={shouldReduceMotion ? "" : "story-stage sticky top-0 flex items-center"}>
         <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-6 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
           <div className="flex flex-col gap-6">
             <motion.div

@@ -21,7 +21,11 @@ export function Odometer({ value, className = "" }: { value: string; className?:
               {cell.char}
             </span>
           ) : (
-            <span key={cell.key} className="relative inline-block overflow-x-visible overflow-y-clip">
+            <span
+              key={cell.key}
+              // overflow: clip keeps wide digits unclipped sideways; older browsers fall back to hidden.
+              className="relative inline-block overflow-hidden supports-[overflow:clip]:overflow-x-visible supports-[overflow:clip]:overflow-y-clip"
+            >
               <span className="invisible">0</span>
               <motion.span
                 className="absolute inset-x-0 top-0 flex flex-col"

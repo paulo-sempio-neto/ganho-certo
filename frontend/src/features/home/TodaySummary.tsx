@@ -74,7 +74,7 @@ export function TodaySummary({
               Nenhum registro neste dia. Registre seu dia ou adicione um gasto para acompanhar os valores.
             </p>
           ) : null}
-          <div className="today-overview">
+          <div className={profitPerHourCents !== null ? "today-overview today-overview-paced" : "today-overview"}>
           <div className="metric-grid today-summary-metrics">
             <article
               className={`metric-card ${isNegative ? "metric-negative" : "metric-profit"} result-primary`}

@@ -41,7 +41,8 @@ type ProfitGaugeProps = {
 export function ProfitGauge({ profitPerHourCents, pace }: ProfitGaugeProps) {
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="relative w-44 aspect-[120/66]" aria-hidden="true">
+      {/* Explicit 120:66 height instead of aspect-ratio, which older Safari lacks. */}
+      <div className="relative h-[6.05rem] w-44" aria-hidden="true">
         <svg viewBox="0 0 120 66" className="absolute inset-0 h-full w-full overflow-visible">
           <path d={arcPath(-90, 90)} fill="none" strokeWidth="9" strokeLinecap="round" className="stroke-white/[0.05]" />
           {zones.map((zone) => (
