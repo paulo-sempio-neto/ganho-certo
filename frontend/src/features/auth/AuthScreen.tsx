@@ -183,11 +183,12 @@ export function AuthScreen({
             <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl lg:backdrop-blur-2xl">
               
               {/* Tab Selector */}
-              <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
+              <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6" role="group" aria-label="Tipo de acesso">
                 {([["login", "Entrar"], ["register", "Criar conta"]] as const).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
+                    aria-pressed={mode === key}
                     onClick={() => setMode(key)}
                     className={`relative py-2 text-xs sm:text-sm font-medium rounded-lg cursor-pointer transition-colors duration-200 ${
                       mode === key ? "text-black font-semibold" : "text-zinc-400 hover:text-white"
@@ -324,11 +325,12 @@ export function AuthScreen({
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
                 <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
               </div>
-              <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm">
+              <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm" role="group" aria-label="Visão do painel">
                 {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
+                    aria-pressed={activeTab === key}
                     onClick={() => setActiveTab(key)}
                     className={`relative px-2.5 py-0.5 rounded transition-colors ${activeTab === key ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}
                   >
