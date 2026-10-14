@@ -1,7 +1,7 @@
 import { FormEvent, useRef, useState } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
-import { AnimatedBackground } from "./AnimatedBackground";
+import { AmbientBackground } from "./AmbientBackground";
 
 export type AuthMode = "login" | "register";
 
@@ -119,13 +119,7 @@ export function AuthScreen({
 
   return (
     <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
-      {/* Background dinâmico suave */}
-      <div className="fixed inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
-        <AnimatedBackground />
-      </div>
-
-      {/* Brilho radial superior */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] pointer-events-none z-0 bg-[radial-gradient(ellipse_at_center,var(--color-glass-focus-glow)_0%,transparent_70%)]" />
+      <AmbientBackground />
 
       <div className="relative z-10 flex flex-col w-full">
         {/* ── Top Header / Navbar ── */}

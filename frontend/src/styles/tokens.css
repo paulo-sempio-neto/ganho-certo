@@ -161,6 +161,8 @@
   --color-lux-text-soft: #71717a;
   --color-lux-border-strong: rgb(255 255 255 / 22%);
   --color-lux-glow: rgb(16 185 129 / 20%);
+  --color-lux-beam: rgb(16 185 129 / 9%);
+  --color-lux-beam-neutral: rgb(255 255 255 / 3%);
   --color-lux-success: #6ee7b7;
   --color-lux-success-surface: rgb(16 185 129 / 10%);
   --color-lux-info: #7dd3fc;
