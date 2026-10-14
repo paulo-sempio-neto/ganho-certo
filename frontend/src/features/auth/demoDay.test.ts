@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay, toGaugeAngle } from "./demoDay";
+import {
+  DEMO_ASSUMPTIONS,
+  getStorySteps,
+  projectWeeklyGoal,
+  simulateDemoDay,
+  toGaugeAngle,
+  toStoryStage,
+} from "./demoDay";
 
 describe("simulateDemoDay", () => {
   it("subtracts fuel, maintenance and daily extras from gross revenue", () => {
@@ -71,5 +78,23 @@ describe("toGaugeAngle", () => {
   it("pins the needle at the ends for losses and very good days", () => {
     expect(toGaugeAngle(-2_146n)).toBe(-90);
     expect(toGaugeAngle(12_000n)).toBe(90);
+  });
+});
+
+describe("scroll story", () => {
+  it("steps from revenue down to the real profit, one cost at a time", () => {
+    const day = simulateDemoDay(530, 195);
+
+    expect(getStorySteps(day)).toEqual([53_000n, 42_027n, 39_297n, 38_097n]);
+    expect(getStorySteps(day).at(-1)).toBe(day.profitCents);
+  });
+
+  it("counts a cost as gone once half of its fall has been scrolled", () => {
+    expect(toStoryStage(0)).toBe(0);
+    expect(toStoryStage(0.26)).toBe(0);
+    expect(toStoryStage(0.265)).toBe(1);
+    expect(toStoryStage(0.5)).toBe(2);
+    expect(toStoryStage(0.725)).toBe(3);
+    expect(toStoryStage(1)).toBe(3);
   });
 });

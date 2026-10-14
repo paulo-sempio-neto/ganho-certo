@@ -19,7 +19,7 @@ export function BrandMark() {
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <MotionConfig reducedMotion="user">
-      <div className="lux relative min-h-screen w-full overflow-x-hidden">
+      <div className="lux relative min-h-screen w-full overflow-x-clip">
         <AmbientBackground />
         <div className="relative z-10 flex min-h-screen flex-col">
           <header className="w-full max-w-7xl mx-auto px-6 py-6 border-b border-white/[0.04]">

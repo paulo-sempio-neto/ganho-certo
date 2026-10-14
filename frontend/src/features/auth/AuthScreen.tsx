@@ -5,6 +5,7 @@ import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { ProductCanvas } from "./ProductCanvas";
+import { ScrollStory } from "./ScrollStory";
 import { MaskLine } from "./MaskLine";
 import { reveal, spring, stagger, underlineDraw } from "./motion";
 
@@ -43,7 +44,7 @@ export function AuthScreen({
 }: AuthScreenProps) {
   return (
     <MotionConfig reducedMotion="user">
-    <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
+    <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-clip">
       <AmbientBackground />
 
       <div className="relative z-10 flex flex-col w-full">
@@ -251,6 +252,9 @@ export function AuthScreen({
 
           <ProductCanvas className="lg:col-span-7 lg:col-start-1 lg:row-start-2" />
         </motion.section>
+
+        {/* ── História no scroll: do faturamento ao lucro ── */}
+        <ScrollStory />
 
         {/* ── Bento Grid Section: Recursos Essenciais ── */}
         <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">

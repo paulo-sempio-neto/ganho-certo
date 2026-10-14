@@ -89,3 +89,22 @@ export function toGaugeAngle(profitPerHourCents: bigint): number {
   const permille = (profitPerHourCents * 1000n) / GAUGE_MAX_PER_HOUR_CENTS;
   return -90 + (Number(permille) * 180) / 1000;
 }
+
+/** Scroll ranges (0..1) in which fuel, maintenance and extras fall off the revenue bar. */
+export const STORY_FALLS = [
+  [0.15, 0.38],
+  [0.38, 0.61],
+  [0.61, 0.84],
+] as const;
+
+/** How many costs have fallen at a scroll progress: a cost counts once half its fall is done. */
+export function toStoryStage(progress: number): number {
+  return STORY_FALLS.filter(([start, end]) => progress >= (start + end) / 2).length;
+}
+
+/** Money left after each fall: revenue, minus fuel, minus maintenance, minus extras (the real profit). */
+export function getStorySteps(day: DemoDay): bigint[] {
+  const afterFuel = day.grossCents - day.fuelCents;
+  const afterMaintenance = afterFuel - day.maintenanceCents;
+  return [day.grossCents, afterFuel, afterMaintenance, afterMaintenance - day.extrasCents];
+}
