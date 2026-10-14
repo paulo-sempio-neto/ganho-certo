@@ -3096,3 +3096,15 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Primary buttons glow softly on hover in the dark scope ── */
+
+.lux .button:not(.button-secondary, .button-ghost) {
+  transition: background-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out),
+    transform var(--duration-instant) var(--ease-out);
+}
+
+.lux .button:not(.button-secondary, .button-ghost):not(:disabled):hover {
+  box-shadow: 0 12px 32px -14px var(--color-accent-emerald);
+}
