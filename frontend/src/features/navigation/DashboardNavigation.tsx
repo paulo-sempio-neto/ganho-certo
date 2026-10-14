@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type MouseEvent } from "react";
+import { motion } from "framer-motion";
 
 export type DashboardArea = "hoje" | "resultado" | "custos" | "mais";
 
@@ -198,6 +199,13 @@ export function DashboardNavigation({ activeArea }: { activeArea: DashboardArea 
         >
           <span className="nav-icon" aria-hidden="true">{icon}</span>
           <span className="nav-label">{label}</span>
+          {activeArea === id && (
+            <motion.span
+              layoutId="dashboard-nav-indicator"
+              className="dashboard-nav-active-pill"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
         </a>
       ))}
     </nav>
