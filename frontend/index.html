@@ -9,8 +9,9 @@
     <meta name="theme-color" content="#030303" />
     <style>html { background: #030303; }</style>
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-    <!-- Premium Font Stack -->
-    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&f[]=satoshi@300,400,500,700,900&display=swap" rel="stylesheet">
+    <!-- Self-hosted Satoshi (see src/styles/fonts.css); preload the two weights the first screen needs. -->
+    <link rel="preload" href="/fonts/satoshi-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/satoshi-500.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
