@@ -6,6 +6,7 @@ import { formatWorkTime } from "../../utils/formatters";
 import { formatCents } from "../../utils/money";
 import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
 import { panelSwap, reveal, spring } from "./motion";
+import { ProfitGauge } from "./ProfitGauge";
 
 type CanvasTab = "visao" | "custos" | "metas";
 
@@ -122,43 +123,34 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
           <motion.div
             key="visao"
             {...panelSwap}
-            className="flex flex-col gap-4"
+            className="grid items-center gap-5 sm:grid-cols-[auto_1fr] sm:gap-8"
           >
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro real</span>
-                <strong className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums ${profitTone}`}>
-                  <Odometer value={formatCents(day.profitCents)} />
-                </strong>
-                <span className="text-sm text-zinc-400 mt-1 block">Margem de {day.marginPercent.toString()}%</span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight tabular-nums">
-                  <Odometer value={grossLabel} />
-                </strong>
-                <span className="text-sm text-zinc-400 mt-1 block">{km} km · {formatWorkTime(Number(DEMO_ASSUMPTIONS.workedMinutes))}</span>
-              </div>
-              <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Custos do dia</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight tabular-nums">
-                  <Odometer value={`-${formatCents(day.costsCents)}`} />
-                </strong>
-                <span className="text-sm text-zinc-400 mt-1 block">Combustível + manutenção</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="text-zinc-400 flex flex-wrap items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Lucro por hora:
-                <strong className="text-white font-medium tabular-nums">{formatCents(day.profitPerHourCents)}/h</strong>
-                <span className="text-zinc-600" aria-hidden="true">·</span>
-                <strong className="text-white font-medium tabular-nums">{formatCents(day.profitPerKmCents)}/km</strong>
-              </span>
-              <span className={`font-medium ${pace.tone}`}>{pace.label}</span>
+            <ProfitGauge profitPerHourCents={day.profitPerHourCents} pace={pace} />
+            <div className="flex flex-col gap-3">
+              <dl className="flex flex-col divide-y divide-white/[0.06] text-sm">
+                <div className="flex items-baseline justify-between gap-3 pb-2.5">
+                  <dt className="text-zinc-400">Lucro real</dt>
+                  <dd className={`text-2xl font-semibold tracking-tight ${profitTone}`}>
+                    <Odometer value={formatCents(day.profitCents)} />
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                  <dt className="text-zinc-400">Faturamento</dt>
+                  <dd className="text-lg font-medium text-white">
+                    <Odometer value={grossLabel} />
+                  </dd>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 pt-2.5">
+                  <dt className="text-zinc-400">Custos do dia</dt>
+                  <dd className="text-lg font-medium text-rose-400">
+                    <Odometer value={`-${formatCents(day.costsCents)}`} />
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-sm text-zinc-500">
+                Margem de {day.marginPercent.toString()}% · {formatCents(day.profitPerKmCents)}/km · {km} km em{" "}
+                {formatWorkTime(Number(DEMO_ASSUMPTIONS.workedMinutes))}
+              </p>
             </div>
           </motion.div>
         )}
