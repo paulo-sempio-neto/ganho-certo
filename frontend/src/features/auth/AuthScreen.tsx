@@ -1,5 +1,5 @@
-import { FormEvent, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { FormEvent, useRef, useState } from "react";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AnimatedBackground } from "./AnimatedBackground";
 
@@ -19,6 +19,85 @@ interface AuthScreenProps {
   successMessage: string;
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onForgotPassword: () => void;
+}
+
+const bentoCards = [
+  {
+    icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    title: "Lucro Real por Quilômetro",
+    description: "Descubra quanto sobrou limpo em cada corrida ou jornada após abater automaticamente o custo de combustível por km.",
+    cta: "Rendimento transparente →",
+  },
+  {
+    icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+    title: "Metas e Horas Restantes",
+    description: "Defina sua meta financeira semanal ou mensal e saiba exatamente quantas horas a mais precisa rodar para atingi-la.",
+    cta: "Previsibilidade no volante →",
+  },
+  {
+    icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
+    secondIcon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+    title: "Manutenção e Veículos",
+    description: "Controle trocas de óleo, pneus e revisões periódicas. Nunca seja pego de surpresa por quebras inesperadas no carro.",
+    cta: "Zero surpresas no mecânico →",
+  },
+];
+
+const cardVariant = {
+  hidden: { opacity: 0, y: 40, filter: "blur(8px)" },
+  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] as const } },
+};
+
+function BentoGridSection() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      className="max-w-6xl mx-auto flex flex-col gap-16"
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
+      }}
+    >
+      <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={cardVariant}>
+        <span className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</span>
+        <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
+          Tudo o que você precisa para dominar suas finanças
+        </h2>
+        <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+          Desenvolvido com base no dia a dia de centenas de motoristas para eliminar o estresse financeiro.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {bentoCards.map((card) => (
+          <motion.div
+            key={card.title}
+            className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group"
+            variants={cardVariant}
+          >
+            <div className="flex flex-col gap-4">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.icon} />
+                  {card.secondIcon && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={card.secondIcon} />}
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-white tracking-tight">{card.title}</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed">{card.description}</p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
+              {card.cta}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
 }
 
 export function AuthScreen({
@@ -86,23 +165,49 @@ export function AuthScreen({
           
           {/* Coluna Esquerda: Proposta de Valor e Mockup do Produto */}
           <div className="lg:col-span-7 flex flex-col gap-8">
-            <div className="flex flex-col gap-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit">
+            <motion.div
+              className="flex flex-col gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.15, delayChildren: 0.1 } },
+              }}
+            >
+              <motion.div
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit"
+                variants={{
+                  hidden: { opacity: 0, y: 20, filter: "blur(8px)" },
+                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+                }}
+              >
                 <span className="text-emerald-400">●</span> Uber · 99 · inDrive · Entregas
-              </div>
+              </motion.div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance">
+              <motion.h1
+                className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
+                variants={{
+                  hidden: { opacity: 0, y: 24, filter: "blur(8px)" },
+                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+                }}
+              >
                 Faturar é fácil. <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
                   Lucrar de verdade
                 </span>{" "}
                 é o que importa.
-              </h1>
+              </motion.h1>
 
-              <p className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty">
+              <motion.p
+                className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
+                variants={{
+                  hidden: { opacity: 0, y: 20, filter: "blur(8px)" },
+                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+                }}
+              >
                 Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
-              </p>
-            </div>
+              </motion.p>
+            </motion.div>
 
             {/* Mockup Interativo do Painel GanhoCerto */}
             <motion.div
@@ -120,27 +225,23 @@ export function AuthScreen({
                   <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
                 </div>
                 <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("visao")}
-                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "visao" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                  >
-                    Resumo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("custos")}
-                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "custos" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                  >
-                    Custos
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("metas")}
-                    className={`px-2.5 py-0.5 rounded transition-colors ${activeTab === "metas" ? "bg-white/[0.1] text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                  >
-                    Meta
-                  </button>
+                  {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveTab(key)}
+                      className={`relative px-2.5 py-0.5 rounded transition-colors ${activeTab === key ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                    >
+                      {activeTab === key && (
+                        <motion.span
+                          layoutId="mockup-tab-indicator"
+                          className="absolute inset-0 rounded bg-white/[0.1]"
+                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        />
+                      )}
+                      <span className="relative z-10">{label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -233,33 +334,35 @@ export function AuthScreen({
           </div>
 
           {/* Coluna Direita: Formulário de Autenticação Limpo & Awwwards-Tier */}
-          <div className="lg:col-span-5 flex justify-center">
+          <motion.div
+            className="lg:col-span-5 flex justify-center"
+            initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.8, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          >
             <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-8 shadow-2xl backdrop-blur-2xl">
               
               {/* Tab Selector */}
               <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
-                <button
-                  type="button"
-                  onClick={() => setMode("login")}
-                  className={`py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${
-                    mode === "login"
-                      ? "bg-white text-black shadow-md font-semibold"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  Entrar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("register")}
-                  className={`py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer ${
-                    mode === "register"
-                      ? "bg-white text-black shadow-md font-semibold"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  Criar conta
-                </button>
+                {([["login", "Entrar"], ["register", "Criar conta"]] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setMode(key)}
+                    className={`relative py-2 text-xs sm:text-sm font-medium rounded-lg cursor-pointer transition-colors duration-200 ${
+                      mode === key ? "text-black font-semibold" : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {mode === key && (
+                      <motion.span
+                        layoutId="auth-tab-indicator"
+                        className="absolute inset-0 rounded-lg bg-white shadow-md"
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10">{label}</span>
+                  </button>
+                ))}
               </div>
 
               {/* Form Title */}
@@ -363,79 +466,12 @@ export function AuthScreen({
                 </div>
               </form>
             </div>
-          </div>
+          </motion.div>
         </section>
 
         {/* ── Bento Grid Section: Recursos Essenciais ── */}
         <section className="w-full bg-[#000000] py-24 px-6 border-t border-white/[0.04]">
-          <div className="max-w-6xl mx-auto flex flex-col gap-16">
-            <div className="text-center max-w-2xl mx-auto flex flex-col gap-3">
-              <span className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</span>
-              <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
-                Tudo o que você precisa para dominar suas finanças
-              </h2>
-              <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-                Desenvolvido com base no dia a dia de centenas de motoristas para eliminar o estresse financeiro.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Bento Card 1: Gestão de Ganhos */}
-              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
-                <div className="flex flex-col gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-white tracking-tight">Lucro Real por Quilômetro</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed">
-                    Descubra quanto sobrou limpo em cada corrida ou jornada após abater automaticamente o custo de combustível por km.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
-                  Rendimento transparente →
-                </div>
-              </div>
-
-              {/* Bento Card 2: Metas */}
-              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
-                <div className="flex flex-col gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-white tracking-tight">Metas e Horas Restantes</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed">
-                    Defina sua meta financeira semanal ou mensal e saiba exatamente quantas horas a mais precisa rodar para atingi-la.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
-                  Previsibilidade no volante →
-                </div>
-              </div>
-
-              {/* Bento Card 3: Manutenção */}
-              <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group">
-                <div className="flex flex-col gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-white tracking-tight">Manutenção e Veículos</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed">
-                    Controle trocas de óleo, pneus e revisões periódicas. Nunca seja pego de surpresa por quebras inesperadas no carro.
-                  </p>
-                </div>
-                <div className="mt-6 pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">
-                  Zero surpresas no mecânico →
-                </div>
-              </div>
-            </div>
-          </div>
+          <BentoGridSection />
         </section>
 
         {/* ── Depoimentos Reais ── */}
