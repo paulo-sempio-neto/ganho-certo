@@ -114,7 +114,8 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
         </label>
       </div>
 
-      {/* Conteúdo Dinâmico do Mockup */}
+      {/* Conteúdo Dinâmico do Mockup: altura reservada para a aba mais alta, sem pulo de layout */}
+      <div className="sm:min-h-[10.75rem]">
       <AnimatePresence mode="wait">
         {activeTab === "visao" && (
           <motion.div
@@ -240,6 +241,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </motion.div>
   );
 }
