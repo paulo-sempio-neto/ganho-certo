@@ -3026,3 +3026,45 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   .recurring-projection-list, .history-period-list) > :nth-child(4) { animation-delay: calc(var(--stagger-step) * 2.25); }
 :where(.vehicles-list, .financial-insights-list, .weekday-card-grid, .metric-grid,
   .recurring-projection-list, .history-period-list) > :nth-child(n + 5) { animation-delay: calc(var(--stagger-step) * 3); }
+
+/* ── Charts grow in: the evolution line rises from its zero line, then points and bars follow in order ── */
+
+@keyframes plot-rise {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+@keyframes mark-pop {
+  from { transform: scale(0); }
+}
+
+@keyframes bar-rise-in {
+  from { transform: scaleY(0); }
+}
+
+.history-chart-plot {
+  transform-box: view-box;
+  animation: plot-rise calc(var(--duration-enter) * 2) var(--ease-out) both;
+}
+
+.history-chart-point {
+  --point-index: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mark-pop var(--duration-enter) var(--ease-out) both;
+  animation-delay: calc(var(--duration-enter) + var(--point-index) * var(--stagger-step));
+}
+
+.pattern-chart-bar {
+  --bar-index: 0;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: bar-rise-in calc(var(--duration-enter) * 1.5) var(--ease-out) both;
+  animation-delay: calc(var(--bar-index) * var(--stagger-step));
+}
+
+.pattern-chart-bar-negative {
+  transform-origin: center top;
+}

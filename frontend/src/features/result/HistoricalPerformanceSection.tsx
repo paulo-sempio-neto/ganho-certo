@@ -1,5 +1,5 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import type {
   FinancialHistoryGrouping,
@@ -448,7 +448,11 @@ export function HistoricalPerformanceSection({
                     y1={chartZeroY}
                     y2={chartZeroY}
                   />
-                  {chartPoints ? <polyline className="history-chart-line" points={chartPoints} /> : null}
+                  {chartPoints ? (
+                    <g className="history-chart-plot" style={{ transformOrigin: `0 ${chartZeroY}px` }}>
+                      <polyline className="history-chart-line" points={chartPoints} />
+                    </g>
+                  ) : null}
                   {chartValues.map((value, index) => {
                     const x = 30 + index * chartXStep;
                     const y = chartTop + ((chartMax - value) / chartRange) * chartInnerHeight;
@@ -459,6 +463,7 @@ export function HistoricalPerformanceSection({
                         cy={y}
                         key={`${chartPeriods[index]?.period_start}-${index}`}
                         r="3.5"
+                        style={{ "--point-index": index } as CSSProperties}
                       />
                     );
                   })}

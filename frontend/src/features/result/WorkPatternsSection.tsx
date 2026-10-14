@@ -1,5 +1,5 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { getWorkPatterns } from "../../api/financial";
 import type { Vehicle } from "../../types/domain";
@@ -508,14 +508,15 @@ export function WorkPatternsSection({
 
                     return (
                       <rect
-                        className={
-                          isWeakSample
-                            ? "pattern-chart-bar pattern-chart-bar-muted"
-                            : "pattern-chart-bar"
-                        }
+                        className={[
+                          "pattern-chart-bar",
+                          isWeakSample ? "pattern-chart-bar-muted" : "",
+                          value < 0 ? "pattern-chart-bar-negative" : "",
+                        ].filter(Boolean).join(" ")}
                         height={height}
                         key={weekday.weekday}
                         rx="4"
+                        style={{ "--bar-index": index } as CSSProperties}
                         width={barWidth}
                         x={x}
                         y={y}
