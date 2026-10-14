@@ -2,6 +2,7 @@ import { FormEvent, useRef, useState } from "react";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AmbientBackground } from "./AmbientBackground";
+import { panelSwap, reveal, spring, stagger } from "./motion";
 
 export type AuthMode = "login" | "register";
 
@@ -43,11 +44,6 @@ const bentoCards = [
   },
 ];
 
-const cardVariant = {
-  hidden: { opacity: 0, y: 40, filter: "blur(8px)" },
-  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] as const } },
-};
-
 function BentoGridSection() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
@@ -58,12 +54,9 @@ function BentoGridSection() {
       className="max-w-6xl mx-auto flex flex-col gap-16"
       initial="hidden"
       animate={isInView ? "visible" : "hidden"}
-      variants={{
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
-      }}
+      variants={stagger()}
     >
-      <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={cardVariant}>
+      <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={reveal}>
         <span className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</span>
         <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
           Tudo o que você precisa para dominar suas finanças
@@ -78,7 +71,7 @@ function BentoGridSection() {
           <motion.div
             key={card.title}
             className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group"
-            variants={cardVariant}
+            variants={reveal}
           >
             <div className="flex flex-col gap-4">
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -150,35 +143,26 @@ export function AuthScreen({
         </header>
 
         {/* ── Hero / Auth Split Section ── */}
-        <section className="w-full max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+        <motion.section
+          className="w-full max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center"
+          initial="hidden"
+          animate="visible"
+          variants={stagger(0.12, 0.1)}
+        >
           
           {/* Coluna Esquerda: Proposta de Valor e Mockup do Produto */}
           <div className="lg:col-span-7 flex flex-col gap-8">
-            <motion.div
-              className="flex flex-col gap-4"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: { transition: { staggerChildren: 0.15, delayChildren: 0.1 } },
-              }}
-            >
+            <motion.div className="flex flex-col gap-4" variants={stagger(0.15, 0)}>
               <motion.div
                 className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit"
-                variants={{
-                  hidden: { opacity: 0, y: 20, filter: "blur(8px)" },
-                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
-                }}
+                variants={reveal}
               >
                 <span className="text-emerald-400">●</span> Uber · 99 · inDrive · Entregas
               </motion.div>
 
               <motion.h1
                 className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
-                variants={{
-                  hidden: { opacity: 0, y: 24, filter: "blur(8px)" },
-                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
-                }}
+                variants={reveal}
               >
                 Faturar é fácil. <br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
@@ -189,10 +173,7 @@ export function AuthScreen({
 
               <motion.p
                 className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
-                variants={{
-                  hidden: { opacity: 0, y: 20, filter: "blur(8px)" },
-                  visible: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
-                }}
+                variants={reveal}
               >
                 Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
               </motion.p>
@@ -200,9 +181,7 @@ export function AuthScreen({
 
             {/* Mockup Interativo do Painel GanhoCerto */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              variants={reveal}
               className="w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] backdrop-blur-xl relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -225,7 +204,7 @@ export function AuthScreen({
                         <motion.span
                           layoutId="mockup-tab-indicator"
                           className="absolute inset-0 rounded bg-white/[0.1]"
-                          transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                          transition={spring.snappy}
                         />
                       )}
                       <span className="relative z-10">{label}</span>
@@ -239,10 +218,7 @@ export function AuthScreen({
                 {activeTab === "visao" && (
                   <motion.div
                     key="visao"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
+                    {...panelSwap}
                     className="flex flex-col gap-4"
                   >
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -278,10 +254,7 @@ export function AuthScreen({
                 {activeTab === "custos" && (
                   <motion.div
                     key="custos"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
+                    {...panelSwap}
                     className="flex flex-col gap-2.5"
                   >
                     <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
@@ -302,10 +275,7 @@ export function AuthScreen({
                 {activeTab === "metas" && (
                   <motion.div
                     key="metas"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
+                    {...panelSwap}
                     className="flex flex-col gap-3"
                   >
                     <div className="flex items-center justify-between text-xs">
@@ -323,12 +293,7 @@ export function AuthScreen({
           </div>
 
           {/* Coluna Direita: Formulário de Autenticação Limpo & Awwwards-Tier */}
-          <motion.div
-            className="lg:col-span-5 flex justify-center"
-            initial={{ opacity: 0, y: 30, filter: "blur(6px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-            transition={{ duration: 0.8, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          >
+          <motion.div className="lg:col-span-5 flex justify-center" variants={reveal}>
             <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-8 shadow-2xl backdrop-blur-2xl">
               
               {/* Tab Selector */}
@@ -346,7 +311,7 @@ export function AuthScreen({
                       <motion.span
                         layoutId="auth-tab-indicator"
                         className="absolute inset-0 rounded-lg bg-white shadow-md"
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                        transition={spring.snappy}
                       />
                     )}
                     <span className="relative z-10">{label}</span>
@@ -453,7 +418,7 @@ export function AuthScreen({
               </form>
             </div>
           </motion.div>
-        </section>
+        </motion.section>
 
         {/* ── Bento Grid Section: Recursos Essenciais ── */}
         <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">
