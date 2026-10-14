@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 
+import { RollText } from "../../components/RollText";
 import { MaskLine } from "./MaskLine";
 import { stagger } from "./motion";
 
@@ -43,7 +44,9 @@ export function FinalCta({ onStart }: { onStart: () => void }) {
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
           />
-          <span className="relative">Começar agora gratuitamente</span>
+          <span className="relative">
+            <RollText>Começar agora gratuitamente</RollText>
+          </span>
           <svg className="relative w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>

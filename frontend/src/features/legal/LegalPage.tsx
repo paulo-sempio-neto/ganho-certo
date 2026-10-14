@@ -20,7 +20,7 @@ export function LegalPage({ kind }: { kind: LegalPageKind }) {
             <a href="/" aria-label="Voltar para o início">
               <BrandMark />
             </a>
-            <a href="/" className="text-sm text-zinc-400 hover:text-white transition-colors">
+            <a href="/" className="link-draw text-sm text-zinc-400 hover:text-white transition-colors">
               Voltar
             </a>
           </header>
@@ -69,7 +69,7 @@ export function LegalPage({ kind }: { kind: LegalPageKind }) {
                   "Para exercer seus direitos, pedir a exclusão da conta ou tirar dúvidas, use \"Enviar feedback da beta\" no menu Mais, dentro do app."
                 )}
               </p>
-              <a className="text-sm text-emerald-400 underline-offset-4 hover:underline" href={other.href}>
+              <a className="link-draw w-fit text-sm text-emerald-400" href={other.href}>
                 Ler também: {other.label}
               </a>
             </motion.section>

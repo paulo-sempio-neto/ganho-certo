@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig, useScroll } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { GlowCard } from "../../components/GlowCard";
+import { RollText } from "../../components/RollText";
 import { SUPPORT_EMAIL } from "../../utils/support";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
@@ -108,7 +109,7 @@ export function AuthScreen({
                 setMode(mode === "login" ? "register" : "login");
                 scrollToTop();
               }}
-              className="text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-white/[0.08] cursor-pointer"
+              className="link-draw text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition-colors py-1.5 cursor-pointer"
             >
               {mode === "login" ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar"}
             </button>
@@ -250,7 +251,7 @@ export function AuthScreen({
                       <button
                         type="button"
                         onClick={onForgotPassword}
-                        className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors cursor-pointer"
+                        className="link-draw text-xs text-zinc-500 hover:text-emerald-400 transition-colors cursor-pointer"
                       >
                         Esqueceu a senha?
                       </button>
@@ -276,14 +277,14 @@ export function AuthScreen({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full mt-2 py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all duration-200 shadow-[0_0_25px_var(--color-glass-border-hover)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group w-full mt-2 py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-[background-color,transform] duration-200 shadow-[0_0_25px_var(--color-glass-border-hover)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                   ) : (
                     <>
-                      {mode === "login" ? "Entrar na plataforma" : "Criar minha conta gratuita"}
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <RollText>{mode === "login" ? "Entrar na plataforma" : "Criar minha conta gratuita"}</RollText>
+                      <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                       </svg>
                     </>
@@ -363,10 +364,10 @@ export function AuthScreen({
         <footer className="w-full py-8 px-6 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-zinc-600 text-xs border-t border-white/[0.04] gap-4">
           <div>GanhoCerto © 2026. Todos os direitos reservados.</div>
           <nav className="flex gap-6" aria-label="Institucional">
-            <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href="/privacidade">Privacidade</a>
-            <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href="/termos">Termos de Uso</a>
+            <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href="/privacidade">Privacidade</a>
+            <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href="/termos">Termos de Uso</a>
             {SUPPORT_EMAIL ? (
-              <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href={`mailto:${SUPPORT_EMAIL}`}>Suporte</a>
+              <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href={`mailto:${SUPPORT_EMAIL}`}>Suporte</a>
             ) : null}
           </nav>
         </footer>
