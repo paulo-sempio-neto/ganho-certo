@@ -31,8 +31,9 @@ export function FinalCta({ onStart }: { onStart: () => void }) {
       >
         <SectionIndex index="04" label="Comece agora" />
         <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-[-0.03em] leading-tight">
-          <MaskLine>Pronto para ter o controle</MaskLine>
-          <MaskLine>total do seu volante?</MaskLine>
+          <MaskLine>Pronto para ter</MaskLine>
+          <MaskLine>o controle total</MaskLine>
+          <MaskLine>do seu volante?</MaskLine>
         </h2>
         <p className="text-zinc-400 text-base max-w-lg">
           Cadastre-se gratuitamente em segundos e veja exatamente quanto sobra no seu bolso hoje.

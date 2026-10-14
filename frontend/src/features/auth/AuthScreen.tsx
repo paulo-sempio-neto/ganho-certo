@@ -2,7 +2,6 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig, useScroll } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { RollText } from "../../components/RollText";
-import { SUPPORT_EMAIL } from "../../utils/support";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
@@ -13,6 +12,7 @@ import { readIntroState, shouldPlayIntro } from "./intro";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
+import { SiteFooter } from "./SiteFooter";
 import { scrollToElement, scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
@@ -334,16 +334,7 @@ export function AuthScreen({
         />
 
         {/* ── Footer ── */}
-        <footer className="w-full py-8 px-6 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-zinc-600 text-xs border-t border-white/[0.04] gap-4">
-          <div>GanhoCerto © 2026. Todos os direitos reservados.</div>
-          <nav className="flex gap-6" aria-label="Institucional">
-            <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href="/privacidade">Privacidade</a>
-            <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href="/termos">Termos de Uso</a>
-            {SUPPORT_EMAIL ? (
-              <a className="link-draw text-zinc-600 hover:text-zinc-300 transition-colors" href={`mailto:${SUPPORT_EMAIL}`}>Suporte</a>
-            ) : null}
-          </nav>
-        </footer>
+        <SiteFooter />
       </div>
     </div>
     </MotionConfig>
