@@ -180,7 +180,7 @@ export function AuthScreen({
 
           {/* Formulário: logo após o título no celular, coluna direita no desktop */}
           <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 flex justify-center" variants={reveal}>
-            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl backdrop-blur-2xl">
+            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl lg:backdrop-blur-2xl">
               
               {/* Tab Selector */}
               <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
@@ -314,9 +314,9 @@ export function AuthScreen({
           {/* Mockup Interativo do Painel GanhoCerto */}
           <motion.div
             variants={reveal}
-            className="lg:col-span-7 lg:col-start-1 lg:row-start-2 w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] backdrop-blur-xl relative overflow-hidden"
+            className="lg:col-span-7 lg:col-start-1 lg:row-start-2 w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] lg:backdrop-blur-xl relative overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[radial-gradient(closest-side,var(--color-glass-focus-glow),transparent)] pointer-events-none" />
 
             {/* Header do Mockup */}
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
