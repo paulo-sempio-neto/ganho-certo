@@ -30,9 +30,12 @@
   outline-offset: var(--focus-offset);
 }
 
-a {
-  color: var(--color-brand);
-  text-underline-offset: 0.2em;
+/* In the base layer so Tailwind colour utilities on a link can override it. */
+@layer base {
+  a {
+    color: var(--color-brand);
+    text-underline-offset: 0.2em;
+  }
 }
 
 :where(h1, h2, h3, h4, p, label, strong, dd, summary) {

@@ -61,6 +61,7 @@ import type {
 import { createLatestRequest } from "./utils/latestRequest";
 import { getBetaActivationNextStep } from "./utils/activation";
 import { isRestoringSession } from "./utils/session";
+import { getLegalPage } from "./features/legal/legalContent";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
 import { getDailyEntryDate, getDefaultDailyVehicleId, readLastDailyVehicle, writeLastDailyVehicle } from "./utils/dailyEntry";
 import { useFormValidation } from "./utils/formValidation";
@@ -107,6 +108,10 @@ const ForgotPasswordForm = lazy(() =>
 );
 const ResetPasswordForm = lazy(() =>
   import("./features/auth/ResetPasswordForm").then((module) => ({ default: module.ResetPasswordForm })),
+);
+
+const LegalPage = lazy(() =>
+  import("./features/legal/LegalPage").then((module) => ({ default: module.LegalPage })),
 );
 
 const ResultSection = lazy(() =>
@@ -2264,6 +2269,16 @@ function App() {
     vehicleCount: vehicles.length,
     workSessionCount: workSessions.length,
   });
+
+  // Legal pages are public and work the same signed in or out.
+  const legalPage = getLegalPage(window.location.pathname);
+  if (legalPage) {
+    return (
+      <Suspense fallback={<div className="lux min-h-screen" />}>
+        <LegalPage kind={legalPage} />
+      </Suspense>
+    );
+  }
 
   if (isRestoringSession({ token, hasUser: user !== null, hasError: message !== "", isResetPasswordRoute })) {
     return <SessionSplash />;

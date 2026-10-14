@@ -155,12 +155,13 @@ Para preparar o primeiro deploy com Vercel, Render e Neon, siga
 ### Frontend na Vercel
 
 `frontend/vercel.json` já define o build (`npm ci`, `npm run build`, saída `dist`),
-o fallback de SPA para todas as rotas (como `/reset-password`)
+o fallback de SPA para todas as rotas (`/reset-password`, `/privacidade`, `/termos`)
 e cache longo para os arquivos versionados em `/assets`. Para publicar:
 
 1. Na Vercel, importe este repositório e defina o Root Directory como `frontend`.
 2. Em Environment Variables, defina `VITE_API_BASE_URL` com a origem HTTPS da API
-   no Render (sem barra no final).
+   no Render (sem barra no final) e, para exibir o link de suporte no rodapé e nas
+   páginas legais, `VITE_SUPPORT_EMAIL`.
 3. Faça o deploy. Depois disso, cada push na `main` publica em produção e cada
    branch ou PR ganha uma URL de preview própria.
 4. No Render, inclua a origem da Vercel em `CORS_ALLOWED_ORIGINS` e em

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { GlowCard } from "../../components/GlowCard";
+import { SUPPORT_EMAIL } from "../../utils/support";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
@@ -287,6 +288,15 @@ export function AuthScreen({
                     </li>
                   ))}
                 </ul>
+
+                {mode === "register" ? (
+                  <p className="text-center text-xs leading-relaxed text-zinc-500">
+                    Ao criar a conta, você concorda com os{" "}
+                    <a className="text-zinc-300 underline underline-offset-4 hover:text-white" href="/termos">Termos de Uso</a>{" "}
+                    e a{" "}
+                    <a className="text-zinc-300 underline underline-offset-4 hover:text-white" href="/privacidade">Política de Privacidade</a>.
+                  </p>
+                ) : null}
               </form>
             </div>
           </motion.div>
@@ -343,11 +353,13 @@ export function AuthScreen({
         {/* ── Footer ── */}
         <footer className="w-full py-8 px-6 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-zinc-600 text-xs border-t border-white/[0.04] gap-4">
           <div>GanhoCerto © 2026. Todos os direitos reservados.</div>
-          <div className="flex gap-6">
-            <span>Privacidade</span>
-            <span>Termos de Uso</span>
-            <span>Suporte</span>
-          </div>
+          <nav className="flex gap-6" aria-label="Institucional">
+            <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href="/privacidade">Privacidade</a>
+            <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href="/termos">Termos de Uso</a>
+            {SUPPORT_EMAIL ? (
+              <a className="text-zinc-600 hover:text-zinc-300 transition-colors" href={`mailto:${SUPPORT_EMAIL}`}>Suporte</a>
+            ) : null}
+          </nav>
         </footer>
       </div>
     </div>
