@@ -2986,3 +2986,20 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   transform-origin: left center;
   animation: bar-grow calc(var(--duration-enter) * 2) var(--ease-out) both;
 }
+
+/* ── Greeting rises from behind its own line mask, like the landing headlines ── */
+
+@keyframes line-rise {
+  from { transform: translateY(105%); }
+}
+
+.dashboard-greeting {
+  overflow: hidden;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.dashboard-greeting > span {
+  display: inline-block;
+  animation: line-rise calc(var(--duration-enter) * 2) var(--ease-out) both;
+}

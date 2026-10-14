@@ -2313,7 +2313,7 @@ function App() {
             <div className="session-header">
               <div>
                 <p className="eyebrow">GanhoCerto</p>
-                <h1 className="dashboard-greeting">Olá, {user.name}.</h1>
+                <h1 className="dashboard-greeting"><span>Olá, {user.name}.</span></h1>
               </div>
               <a className="button button-ghost" href="#conta">Minha conta</a>
             </div>
