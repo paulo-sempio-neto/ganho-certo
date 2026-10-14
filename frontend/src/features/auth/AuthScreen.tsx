@@ -32,21 +32,22 @@ interface AuthScreenProps {
 
 const formSwing = tiltIn("y", -16);
 
-const testimonials = [
+// Real moments of use, each backed by a feature in the app (no invented people or numbers).
+const momentsOfUse = [
   {
-    quote: "Eu achava que lucrava R$ 5.500 no mês. Quando coloquei os custos de manutenção no GanhoCerto, vi que meu lucro real era R$ 3.800. Mudei os horários que rodava e agora tiro R$ 6.200 limpos.",
-    name: "Carlos Eduardo",
-    role: "Motorista Uber Black · São Paulo",
+    moment: "No posto",
+    title: "Registre o gasto em segundos",
+    text: "Abasteceu? Lance o valor pelo celular ali mesmo, sem planilha e sem conta de cabeça.",
   },
   {
-    quote: "A melhor coisa é a meta diária. Eu sei a hora exata de parar e voltar para casa sem ficar rodando à toa gastando gasolina de madrugada.",
-    name: "Juliana Mendes",
-    role: "Motorista 99 · Belo Horizonte",
+    moment: "No fim do dia",
+    title: "Veja quanto sobrou de verdade",
+    text: "Faturamento menos combustível e despesas: o lucro real do dia, por hora e por km.",
   },
   {
-    quote: "Simples, direto e rápido de preencher pelo celular quando paro no posto para abastecer. Não precisa entender nada de contabilidade.",
-    name: "Rodrigo Fontes",
-    role: "Motorista Confort · Rio de Janeiro",
+    moment: "Na semana",
+    title: "Saiba quanto falta para a meta",
+    text: "Acompanhe a meta da semana, quanto falta e o ritmo necessário para fechar o período.",
   },
 ];
 
@@ -280,7 +281,7 @@ export function AuthScreen({
                 </button>
 
                 <ul className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-zinc-500 text-sm">
-                  {["100% gratuito", "Sem cartão de crédito", "Seus dados seguros"].map((item) => (
+                  {["Comece grátis", "Sem cartão de crédito", "Seus dados seguros"].map((item) => (
                     <li key={item} className="whitespace-nowrap">
                       <span aria-hidden="true" className="text-emerald-400">✓</span> {item}
                     </li>
@@ -301,7 +302,7 @@ export function AuthScreen({
           <BentoGrid />
         </section>
 
-        {/* ── Depoimentos Reais ── */}
+        {/* ── Momentos de uso ── */}
         <section className="w-full bg-(--color-lux-canvas) py-20 px-6 border-t border-white/[0.04]">
           <motion.div
             className="max-w-6xl mx-auto flex flex-col gap-12"
@@ -311,21 +312,19 @@ export function AuthScreen({
             variants={stagger(0.12, 0)}
           >
             <h2 className="text-center text-2xl sm:text-3xl font-medium text-white tracking-tight">
-              <MaskLine>Quem usa não volta para planilhas de papel</MaskLine>
+              <MaskLine>Feito para o dia a dia de quem dirige</MaskLine>
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {testimonials.map((testimonial) => (
+              {momentsOfUse.map((item) => (
                 <GlowCard
-                  key={testimonial.name}
-                  className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.15] transition-colors duration-300 flex flex-col justify-between"
+                  key={item.moment}
+                  className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.15] transition-colors duration-300 flex flex-col gap-3"
                   variants={reveal}
                 >
-                  <p className="text-zinc-300 text-sm leading-relaxed mb-6">“{testimonial.quote}”</p>
-                  <div>
-                    <strong className="text-white text-xs block font-semibold">{testimonial.name}</strong>
-                    <span className="text-zinc-500 text-sm">{testimonial.role}</span>
-                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">{item.moment}</span>
+                  <h3 className="text-lg font-medium text-white tracking-tight">{item.title}</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">{item.text}</p>
                 </GlowCard>
               ))}
             </div>

@@ -163,7 +163,7 @@ export function BentoGrid() {
           <MaskLine>para dominar suas finanças</MaskLine>
         </h2>
         <motion.p className="text-zinc-400 text-sm sm:text-base leading-relaxed" variants={reveal}>
-          Desenvolvido com base no dia a dia de centenas de motoristas para eliminar o estresse financeiro.
+          Pensado para quem dirige por aplicativo: menos planilha e mais clareza sobre o que sobra no bolso.
         </motion.p>
       </motion.div>
 
