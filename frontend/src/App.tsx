@@ -2233,6 +2233,9 @@ function App() {
   const isQuickStartVisible = (workSessionsLoaded && workSessions.length === 0) || quickStartVisible ||
     (activeArea === "hoje" && window.location.hash === "#quick-start");
   const hasWorkdays = workSessions.length > 0;
+  const todayWorkedMinutes = workSessions
+    .filter((session) => session.work_date === todaySummary.date)
+    .reduce((total, session) => total + session.worked_minutes, 0);
   const isDailyEntryVisible = navigationTarget === "daily-revenue" || (workSessionsLoaded && !hasWorkdays);
   const isDailyExpenseVisible = navigationTarget === "daily-expense-form";
   const todayGoal = selectTodayGoal(financialGoals, todaySummary.date, vehicles.map((vehicle) => vehicle.id));
@@ -2327,6 +2330,7 @@ function App() {
               {hasWorkdays ? (
                 <TodaySummary
                   date={todaySummary.date}
+                  workedMinutes={todayWorkedMinutes}
                   daily={todaySummary.daily}
                   isLoading={todaySummary.isLoading}
                   error={todaySummary.error}

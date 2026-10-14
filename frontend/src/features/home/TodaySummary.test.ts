@@ -174,4 +174,14 @@ describe("TodaySummary", () => {
     expect(open.match(/Registrar dia/g)).toHaveLength(1);
     expect(open.match(/Adicionar gasto/g)).toHaveLength(1);
   });
+
+  it("shows today's profit per hour on the gauge once worked time is known", () => {
+    const withTime = renderSummary({ workedMinutes: 480 });
+
+    expect(withTime).toContain("Lucro por hora");
+    expect(withTime).toContain("R$ 27,50");
+    expect(withTime).toContain("Na média");
+    expect(renderSummary()).not.toContain("Lucro por hora");
+    expect(renderSummary({ daily: null, workedMinutes: 480 })).not.toContain("Lucro por hora");
+  });
 });

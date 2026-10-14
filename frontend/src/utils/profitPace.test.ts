@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getProfitPace, toGaugeAngle } from "./profitPace";
+import { getProfitPace, getProfitPerHourCents, toGaugeAngle } from "./profitPace";
 
 describe("toGaugeAngle", () => {
   it("sweeps the needle from -90 to 90 degrees across R$ 0 to R$ 80 per hour", () => {
@@ -26,5 +26,17 @@ describe("getProfitPace", () => {
     [4_000n, "Excelente"],
   ])("labels %s cents per hour as %s", (cents, label) => {
     expect(getProfitPace(cents).label).toBe(label);
+  });
+});
+
+describe("getProfitPerHourCents", () => {
+  it("spreads the day's net profit over the worked hours, rounding half away from zero", () => {
+    expect(getProfitPerHourCents("299.43", 480)).toBe(3_743n);
+    expect(getProfitPerHourCents("-80.00", 120)).toBe(-4_000n);
+  });
+
+  it("has no pace without worked time", () => {
+    expect(getProfitPerHourCents("120.00", 0)).toBeNull();
+    expect(getProfitPerHourCents("120.00", Number.NaN)).toBeNull();
   });
 });

@@ -1,8 +1,10 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { Odometer } from "../../components/Odometer";
+import { ProfitGauge } from "../../components/ProfitGauge";
 import type { FinancialDailySummary, FinancialGoal, FinancialGoalProgress } from "../../types/financial";
 import { formatDate, formatPercent, getProgressWidth } from "../../utils/formatters";
 import { formatMoney, moneyValueToCents } from "../../utils/money";
+import { getProfitPace, getProfitPerHourCents } from "../../utils/profitPace";
 import { getGoalCurrentValueLabel } from "../goals/goalMessages";
 
 type TodaySummaryProps = {
@@ -21,6 +23,8 @@ type TodaySummaryProps = {
     vehicleLabel: string | null;
   } | null;
   isGoalLoading: boolean;
+  /** Minutes worked on `date` across all vehicles; enables the profit-per-hour gauge. */
+  workedMinutes?: number;
 };
 
 export function TodaySummary({
@@ -35,10 +39,12 @@ export function TodaySummary({
   isExpenseOpen,
   goal,
   isGoalLoading,
+  workedMinutes = 0,
 }: TodaySummaryProps) {
   const day = daily?.date === date ? daily : null;
   const isNegative = day !== null && moneyValueToCents(day.estimated_net_profit) < 0n;
   const goalProgressWidth = getProgressWidth(goal?.progress.progress_percentage ?? null);
+  const profitPerHourCents = day === null ? null : getProfitPerHourCents(day.estimated_net_profit, workedMinutes);
 
   return (
     <section
@@ -68,6 +74,7 @@ export function TodaySummary({
               Nenhum registro neste dia. Registre seu dia ou adicione um gasto para acompanhar os valores.
             </p>
           ) : null}
+          <div className="today-overview">
           <div className="metric-grid today-summary-metrics">
             <article
               className={`metric-card ${isNegative ? "metric-negative" : "metric-profit"} result-primary`}
@@ -85,6 +92,12 @@ export function TodaySummary({
               <span>Gastos registrados</span>
               <strong>{day === null ? "—" : <Odometer value={formatMoney(day.expenses)} />}</strong>
             </article>
+          </div>
+          {profitPerHourCents !== null ? (
+            <div className="today-pace-card">
+              <ProfitGauge profitPerHourCents={profitPerHourCents} pace={getProfitPace(profitPerHourCents)} />
+            </div>
+          ) : null}
           </div>
         </>
       )}
