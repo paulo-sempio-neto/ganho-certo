@@ -2523,9 +2523,6 @@ textarea:focus {
 .today-summary .goal-progress-main strong {
   font-size: var(--text-lg);
 }
-.field-error { color: var(--color-danger); font-size: var(--text-sm); margin-top: var(--space-1); }
-
-input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--color-danger); } input[aria-invalid="true"]:focus, select[aria-invalid="true"]:focus { outline-color: var(--color-danger); border-color: var(--color-danger); }
 
 .auth-panel h2 {
   font-size: var(--text-2xl);
@@ -2544,7 +2541,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 
 .auth-panel input {
   background-color: var(--color-canvas);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-control);
   padding: var(--space-3) var(--space-4);
   transition: all var(--duration-fast) var(--ease-out);
@@ -2810,4 +2807,73 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .story-stage {
   height: 100vh;
   height: 100svh;
+}
+
+/* ── Validation and feedback: invalid controls turn red and nudge once, messages slide in ── */
+/* Kept last so they win over the .auth-panel input rules that wrap the whole dashboard. */
+
+@keyframes control-nudge {
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--space-1) * -1));
+  }
+}
+
+:is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  animation: control-nudge calc(var(--duration-enter) * 0.8) var(--ease-out);
+}
+
+:is(input, select, textarea)[aria-invalid="true"]:focus {
+  border-color: var(--color-danger);
+  outline-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-surface);
+}
+
+.field-error-message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-label);
+  animation: message-in var(--duration-enter) var(--ease-out) both;
+}
+
+.field-error-message::before {
+  content: "";
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.form-message,
+.success-message {
+  animation: message-in var(--duration-enter) var(--ease-out) both;
+}
+
+/* Empty states get a quiet inbox mark (an alpha mask, tinted by the soft text token) and step in. */
+.empty-state {
+  animation: item-enter var(--duration-enter) var(--ease-out) both;
+}
+
+.empty-state:not(.compact-empty-state)::before {
+  content: "";
+  display: block;
+  width: var(--space-8);
+  height: var(--space-8);
+  margin: 0 auto var(--space-3);
+  background: var(--color-text-soft);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 13h4l2 3h6l2-3h4'/%3E%3Cpath d='M5.5 5h13l2.5 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
