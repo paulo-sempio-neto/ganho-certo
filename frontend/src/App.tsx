@@ -24,13 +24,8 @@ import { getFinancialHistory, getFinancialInsights, getFinancialSummary } from "
 import { listVehicles } from "./api/vehicles";
 import "./App.css";
 import { LazyCsvImportSection as CsvImportSection } from "./features/imports/LazyCsvImportSection";
-import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
-import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
-import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
 import { AuthShell } from "./features/auth/AuthShell";
-import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
 import { getGoalUpdatedAfterWorkMessage } from "./features/goals/goalMessages";
-import { FinancialGoalsSection } from "./features/goals/FinancialGoalsSection";
 import {
   VehiclesSection,
   type VehiclesSectionHandle,
@@ -93,6 +88,23 @@ const AuthScreen = lazy(() =>
   import("./features/auth/AuthScreen").then((module) => ({
     default: module.AuthScreen,
   })),
+);
+
+// Sections outside the first screen load on demand; navigation waits for lazy targets to mount.
+const FinancialGoalsSection = lazy(() =>
+  import("./features/goals/FinancialGoalsSection").then((module) => ({ default: module.FinancialGoalsSection })),
+);
+const AccountPlanPanel = lazy(() =>
+  import("./features/account/AccountPlanPanel").then((module) => ({ default: module.AccountPlanPanel })),
+);
+const ChangePasswordForm = lazy(() =>
+  import("./features/auth/ChangePasswordForm").then((module) => ({ default: module.ChangePasswordForm })),
+);
+const ForgotPasswordForm = lazy(() =>
+  import("./features/auth/ForgotPasswordForm").then((module) => ({ default: module.ForgotPasswordForm })),
+);
+const ResetPasswordForm = lazy(() =>
+  import("./features/auth/ResetPasswordForm").then((module) => ({ default: module.ResetPasswordForm })),
 );
 
 const ResultSection = lazy(() =>
@@ -2285,6 +2297,7 @@ function App() {
   if (!user) {
     return (
       <AuthShell>
+        <Suspense fallback={<FeedbackMessage kind="loading">Carregando...</FeedbackMessage>}>
         {isResetPasswordRoute ? (
           <ResetPasswordForm
             token={resetPasswordToken}
@@ -2295,6 +2308,7 @@ function App() {
         ) : (
           <ForgotPasswordForm initialEmail={email} onBackToLogin={handleBackToLogin} />
         )}
+        </Suspense>
       </AuthShell>
     );
   }
@@ -3038,6 +3052,7 @@ function App() {
                 </div>
               )}
 
+              <Suspense fallback={<FeedbackMessage kind="loading">Carregando metas...</FeedbackMessage>}>
               <FinancialGoalsSection
                 financialGoals={financialGoals}
                 financialGoalProgressById={financialGoalProgressById}
@@ -3050,6 +3065,7 @@ function App() {
                 setSuccessMessage={setSuccessMessage}
                 loadFinancialGoals={loadFinancialGoals}
               />
+              </Suspense>
             </section>
 
             <section className="dashboard-area" id="area-custos" aria-label="Custos" hidden={activeArea !== "custos"} tabIndex={-1}>
@@ -4112,6 +4128,7 @@ function App() {
                     <dd>{user.email}</dd>
                   </div>
                 </dl>
+                <Suspense fallback={<FeedbackMessage kind="loading">Carregando seu plano...</FeedbackMessage>}>
                 <AccountPlanPanel
                   accountPlan={accountPlan}
                   billingError={billingCheckoutError}
@@ -4122,6 +4139,7 @@ function App() {
                   onCheckoutPro={() => void handleCheckoutPro()}
                   onRetry={() => void loadAccountPlan()}
                 />
+                </Suspense>
                 <button
                   className="button button-ghost"
                   type="button"
@@ -4135,11 +4153,13 @@ function App() {
                   Alterar senha
                 </button>
                 {isChangePasswordVisible ? (
-                  <ChangePasswordForm
-                    getAuthHeaders={getAuthHeaders}
-                    onCancel={() => setIsChangePasswordVisible(false)}
-                    onPasswordChanged={handlePasswordChanged}
-                  />
+                  <Suspense fallback={<FeedbackMessage kind="loading">Carregando...</FeedbackMessage>}>
+                    <ChangePasswordForm
+                      getAuthHeaders={getAuthHeaders}
+                      onCancel={() => setIsChangePasswordVisible(false)}
+                      onPasswordChanged={handlePasswordChanged}
+                    />
+                  </Suspense>
                 ) : null}
                 <button
                   className="button button-ghost"
