@@ -6,6 +6,7 @@ import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollStory } from "./ScrollStory";
+import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
 import { reveal, spring, stagger, underlineDraw } from "./motion";
 
@@ -42,6 +43,8 @@ export function AuthScreen({
   onSubmit,
   onForgotPassword,
 }: AuthScreenProps) {
+  const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
+
   return (
     <MotionConfig reducedMotion="user">
     <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-clip">
@@ -49,7 +52,13 @@ export function AuthScreen({
 
       <div className="relative z-10 flex flex-col w-full">
         {/* ── Top Header / Navbar ── */}
-        <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-white/[0.04]">
+        <motion.header
+          className="sticky top-0 z-50 w-full border-b border-white/[0.04] bg-(--color-lux-canvas)/80 lg:backdrop-blur-xl"
+          animate={{ y: isHeaderHidden ? "-100%" : "0%" }}
+          transition={spring.snappy}
+          onFocusCapture={() => setIsHeaderHidden(false)}
+        >
+          <div className="w-full max-w-7xl mx-auto px-6 py-4 sm:py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <BrandMark />
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium tracking-wide">
@@ -70,7 +79,8 @@ export function AuthScreen({
               {mode === "login" ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar"}
             </button>
           </div>
-        </header>
+          </div>
+        </motion.header>
 
         {/* ── Hero / Auth Split Section ── */}
         <motion.section
