@@ -9,6 +9,7 @@ import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { FinalCta } from "./FinalCta";
 import { ProductCanvas } from "./ProductCanvas";
+import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
 import { scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
@@ -316,6 +317,9 @@ export function AuthScreen({
 
         {/* ── História no scroll: do faturamento ao lucro ── */}
         <ScrollStory />
+
+        {/* ── Faixa de termos guiada pelo scroll ── */}
+        <ScrollMarquee />
 
         {/* ── Bento Grid Section: Recursos Essenciais ── */}
         <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">
