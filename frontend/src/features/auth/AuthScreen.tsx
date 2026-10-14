@@ -1,10 +1,11 @@
-import { FormEvent } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { GlowCard } from "../../components/GlowCard";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
+import { FinalCta } from "./FinalCta";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollStory } from "./ScrollStory";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
@@ -65,6 +66,13 @@ export function AuthScreen({
   onForgotPassword,
 }: AuthScreenProps) {
   const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const [nameFocusRequest, setNameFocusRequest] = useState(0);
+
+  // The closing CTA lands on the form with the cursor already in the first field.
+  useEffect(() => {
+    if (nameFocusRequest > 0) nameInputRef.current?.focus({ preventScroll: true });
+  }, [nameFocusRequest]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -193,6 +201,7 @@ export function AuthScreen({
                       Nome completo
                     </label>
                     <input
+                      ref={nameInputRef}
                       id="name"
                       name="name"
                       type="text"
@@ -324,29 +333,13 @@ export function AuthScreen({
         </section>
 
         {/* ── Call To Action Final ── */}
-        <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">
-          <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-6">
-            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-[-0.03em] leading-tight">
-              Pronto para ter o controle total do seu volante?
-            </h2>
-            <p className="text-zinc-400 text-base max-w-lg">
-              Cadastre-se gratuitamente em segundos e veja exatamente quanto sobra no seu bolso hoje.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className="py-3.5 px-8 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all shadow-[0_0_35px_var(--color-glass-border-hover)] flex items-center gap-2 cursor-pointer mt-2"
-            >
-              Começar agora gratuitamente
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </div>
-        </section>
+        <FinalCta
+          onStart={() => {
+            setMode("register");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            setNameFocusRequest((request) => request + 1);
+          }}
+        />
 
         {/* ── Footer ── */}
         <footer className="w-full py-8 px-6 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-zinc-600 text-xs border-t border-white/[0.04] gap-4">
