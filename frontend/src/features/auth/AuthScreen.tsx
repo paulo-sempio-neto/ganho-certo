@@ -123,7 +123,7 @@ export function AuthScreen({
               <span className="text-emerald-400 font-bold text-sm tracking-tighter">GC</span>
             </div>
             <span className="font-semibold text-lg text-white tracking-tight">GanhoCerto</span>
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium tracking-wide">
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm font-medium tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               FINTECH PARA MOTORISTAS
             </span>
@@ -193,7 +193,7 @@ export function AuthScreen({
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
                   <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
                 </div>
-                <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-xs">
+                <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm">
                   {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
                     <button
                       key={key}
@@ -224,19 +224,19 @@ export function AuthScreen({
                   >
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
+                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
                         <strong className="text-xl sm:text-2xl font-semibold text-emerald-400 tracking-tight">R$ 384,50</strong>
-                        <span className="text-xs text-emerald-500/80 mt-1 block">Margem: 72%</span>
+                        <span className="text-sm text-emerald-500/80 mt-1 block">Margem: 72%</span>
                       </div>
                       <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
+                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
                         <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight">R$ 534,00</strong>
-                        <span className="text-xs text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
+                        <span className="text-sm text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
                       </div>
                       <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
+                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
                         <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight">-R$ 149,50</strong>
-                        <span className="text-xs text-zinc-400 mt-1 block">Combustível + Reserva</span>
+                        <span className="text-sm text-zinc-400 mt-1 block">Combustível + Reserva</span>
                       </div>
                     </div>
 
@@ -286,7 +286,7 @@ export function AuthScreen({
                     <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
                       <div className="h-full bg-emerald-400 rounded-full" style={{ width: "87.5%" }} />
                     </div>
-                    <span className="text-xs text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
+                    <span className="text-sm text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -409,7 +409,7 @@ export function AuthScreen({
                   )}
                 </button>
 
-                <div className="flex items-center justify-center gap-4 mt-2 text-zinc-500 text-xs">
+                <div className="flex items-center justify-center gap-4 mt-2 text-zinc-500 text-sm">
                   <span>✓ 100% gratuito</span>
                   <span>·</span>
                   <span>✓ Sem cartão de crédito</span>
@@ -442,7 +442,7 @@ export function AuthScreen({
                 </p>
                 <div>
                   <strong className="text-white text-xs block font-semibold">Carlos Eduardo</strong>
-                  <span className="text-zinc-500 text-xs">Motorista Uber Black · São Paulo</span>
+                  <span className="text-zinc-500 text-sm">Motorista Uber Black · São Paulo</span>
                 </div>
               </div>
 
@@ -452,7 +452,7 @@ export function AuthScreen({
                 </p>
                 <div>
                   <strong className="text-white text-xs block font-semibold">Juliana Mendes</strong>
-                  <span className="text-zinc-500 text-xs">Motorista 99 · Belo Horizonte</span>
+                  <span className="text-zinc-500 text-sm">Motorista 99 · Belo Horizonte</span>
                 </div>
               </div>
 
@@ -462,7 +462,7 @@ export function AuthScreen({
                 </p>
                 <div>
                   <strong className="text-white text-xs block font-semibold">Rodrigo Fontes</strong>
-                  <span className="text-zinc-500 text-xs">Motorista Confort · Rio de Janeiro</span>
+                  <span className="text-zinc-500 text-sm">Motorista Confort · Rio de Janeiro</span>
                 </div>
               </div>
             </div>
