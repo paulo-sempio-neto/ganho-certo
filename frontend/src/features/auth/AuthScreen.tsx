@@ -125,18 +125,13 @@ export function AuthScreen({
       </div>
 
       {/* Brilho radial superior */}
-      <div 
-        className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] pointer-events-none z-0"
-        style={{
-          background: "radial-gradient(ellipse at center, rgba(16, 185, 129, 0.08) 0%, transparent 70%)",
-        }}
-      />
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] pointer-events-none z-0 bg-[radial-gradient(ellipse_at_center,var(--color-glass-focus-glow)_0%,transparent_70%)]" />
 
       <div className="relative z-10 flex flex-col w-full">
         {/* ── Top Header / Navbar ── */}
         <header className="w-full max-w-7xl mx-auto px-6 py-6 flex items-center justify-between border-b border-white/[0.04]">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shadow-[0_0_15px_var(--color-lux-glow)]">
               <span className="text-emerald-400 font-bold text-sm tracking-tighter">GC</span>
             </div>
             <span className="font-semibold text-lg text-white tracking-tight">GanhoCerto</span>
@@ -214,14 +209,14 @@ export function AuthScreen({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_rgba(0,0,0,0.6)] backdrop-blur-xl relative overflow-hidden"
+              className="w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] backdrop-blur-xl relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
               {/* Header do Mockup */}
               <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
                   <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
                 </div>
                 <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-[11px]">
@@ -440,7 +435,7 @@ export function AuthScreen({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full mt-2 py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all duration-200 shadow-[0_0_25px_rgba(255,255,255,0.12)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full mt-2 py-3 px-4 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all duration-200 shadow-[0_0_25px_var(--color-glass-border-hover)] flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
@@ -467,12 +462,12 @@ export function AuthScreen({
         </section>
 
         {/* ── Bento Grid Section: Recursos Essenciais ── */}
-        <section className="w-full bg-[#000000] py-24 px-6 border-t border-white/[0.04]">
+        <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">
           <BentoGridSection />
         </section>
 
         {/* ── Depoimentos Reais ── */}
-        <section className="w-full bg-[#030303] py-20 px-6 border-t border-white/[0.04]">
+        <section className="w-full bg-(--color-lux-canvas) py-20 px-6 border-t border-white/[0.04]">
           <div className="max-w-6xl mx-auto flex flex-col gap-12">
             <div className="text-center">
               <h2 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">
@@ -515,7 +510,7 @@ export function AuthScreen({
         </section>
 
         {/* ── Call To Action Final ── */}
-        <section className="w-full bg-[#000000] py-24 px-6 border-t border-white/[0.04]">
+        <section className="w-full bg-(--color-lux-void) py-24 px-6 border-t border-white/[0.04]">
           <div className="max-w-3xl mx-auto text-center flex flex-col items-center gap-6">
             <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-[-0.03em] leading-tight">
               Pronto para ter o controle total do seu volante?
@@ -529,7 +524,7 @@ export function AuthScreen({
                 setMode("register");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className="py-3.5 px-8 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all shadow-[0_0_35px_rgba(255,255,255,0.15)] flex items-center gap-2 cursor-pointer mt-2"
+              className="py-3.5 px-8 rounded-xl bg-white hover:bg-zinc-200 active:scale-[0.98] text-black font-semibold text-sm transition-all shadow-[0_0_35px_var(--color-glass-border-hover)] flex items-center gap-2 cursor-pointer mt-2"
             >
               Começar agora gratuitamente
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
