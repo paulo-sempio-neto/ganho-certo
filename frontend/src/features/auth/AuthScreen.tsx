@@ -1,19 +1,18 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig, useScroll } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
-import { GlowCard } from "../../components/GlowCard";
 import { RollText } from "../../components/RollText";
 import { SUPPORT_EMAIL } from "../../utils/support";
 import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
+import { DayTimeline } from "./DayTimeline";
 import { FinalCta } from "./FinalCta";
 import { IntroCurtain } from "./IntroCurtain";
 import { readIntroState, shouldPlayIntro } from "./intro";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
-import { SectionIndex } from "./SectionIndex";
 import { scrollToElement, scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
@@ -39,24 +38,7 @@ interface AuthScreenProps {
 
 const formSwing = tiltIn("y", -16);
 
-// Real moments of use, each backed by a feature in the app (no invented people or numbers).
-const momentsOfUse = [
-  {
-    moment: "No posto",
-    title: "Registre o gasto em segundos",
-    text: "Abasteceu? Lance o valor pelo celular ali mesmo, sem planilha e sem conta de cabeça.",
-  },
-  {
-    moment: "No fim do dia",
-    title: "Veja quanto sobrou de verdade",
-    text: "Faturamento menos combustível e despesas: o lucro real do dia, por hora e por km.",
-  },
-  {
-    moment: "Na semana",
-    title: "Saiba quanto falta para a meta",
-    text: "Acompanhe a meta da semana, quanto falta e o ritmo necessário para fechar o período.",
-  },
-];
+
 
 export function AuthScreen({
   mode,
@@ -339,37 +321,8 @@ export function AuthScreen({
           <BentoGrid />
         </section>
 
-        {/* ── Momentos de uso ── */}
-        <section className="w-full bg-(--color-lux-canvas) py-20 px-6 border-t border-white/[0.04]">
-          <motion.div
-            className="max-w-6xl mx-auto flex flex-col gap-12"
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={stagger(0.12, 0)}
-          >
-            <div className="flex flex-col items-center gap-4">
-              <SectionIndex index="03" label="Na rua, todo dia" />
-              <h2 className="text-center text-2xl sm:text-3xl font-medium text-white tracking-tight">
-                <MaskLine>Feito para o dia a dia de quem dirige</MaskLine>
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {momentsOfUse.map((item) => (
-                <GlowCard
-                  key={item.moment}
-                  className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.15] transition-colors duration-300 flex flex-col gap-3"
-                  variants={reveal}
-                >
-                  <span className="text-xs font-semibold uppercase tracking-widest text-emerald-400">{item.moment}</span>
-                  <h3 className="text-lg font-medium text-white tracking-tight">{item.title}</h3>
-                  <p className="text-zinc-400 text-sm leading-relaxed">{item.text}</p>
-                </GlowCard>
-              ))}
-            </div>
-          </motion.div>
-        </section>
+        {/* ── Um dia de trabalho, contado de lado ── */}
+        <DayTimeline />
 
         {/* ── Call To Action Final ── */}
         <FinalCta
