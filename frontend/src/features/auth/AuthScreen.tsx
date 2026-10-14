@@ -339,7 +339,9 @@ export function AuthScreen({
                     </label>
                     <input
                       id="name"
+                      name="name"
                       type="text"
+                      autoComplete="name"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -354,7 +356,9 @@ export function AuthScreen({
                   </label>
                   <input
                     id="email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -379,7 +383,9 @@ export function AuthScreen({
                   </div>
                   <input
                     id="password"
+                    name="password"
                     type="password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                     required
                     minLength={mode === "login" ? 1 : 6}
                     value={password}
