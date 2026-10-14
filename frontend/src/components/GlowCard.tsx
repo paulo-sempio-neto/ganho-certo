@@ -1,85 +1,48 @@
-import { useRef, type ReactNode, type MouseEvent } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { type PointerEvent, type ReactNode } from "react";
+import { motion, useMotionValue, useSpring, type Variants } from "framer-motion";
 
 interface GlowCardProps {
   children: ReactNode;
   className?: string;
+  variants?: Variants;
 }
+
+const follow = { stiffness: 300, damping: 30 };
 
 /**
- * Card that tracks cursor position and projects a radial glow underneath,
- * simulating "lighting up a physical dashboard panel."
+ * Card with a soft spotlight that follows a mouse pointer, like light passing
+ * over a physical panel. The light moves by transform and fades by opacity
+ * only, and touch input never triggers it.
  */
-export function GlowCard({ children, className = "" }: GlowCardProps) {
-  const ref = useRef<HTMLDivElement>(null);
+export function GlowCard({ children, className = "", variants }: GlowCardProps) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const glow = useMotionValue(0);
+  const springX = useSpring(x, follow);
+  const springY = useSpring(y, follow);
+  const opacity = useSpring(glow, follow);
 
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  const springX = useSpring(mouseX, { stiffness: 200, damping: 40 });
-  const springY = useSpring(mouseY, { stiffness: 200, damping: 40 });
-
-  const rotateX = useTransform(springY, [-0.5, 0.5], [3, -3]);
-  const rotateY = useTransform(springX, [-0.5, 0.5], [-3, 3]);
-
-  function handleMouseMove(e: MouseEvent<HTMLDivElement>) {
-    if (!ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    mouseX.set((e.clientX - rect.left) / rect.width - 0.5);
-    mouseY.set((e.clientY - rect.top) / rect.height - 0.5);
+  function handlePointerMove(event: PointerEvent<HTMLElement>) {
+    if (event.pointerType !== "mouse") return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    x.set(event.clientX - rect.left);
+    y.set(event.clientY - rect.top);
+    glow.set(1);
   }
-
-  function handleMouseLeave() {
-    mouseX.set(0);
-    mouseY.set(0);
-  }
-
-  const glowBackground = useTransform(
-    [springX, springY],
-    ([latestX, latestY]: number[]) => {
-      const px = ((latestX as number) + 0.5) * 100;
-      const py = ((latestY as number) + 0.5) * 100;
-      return `radial-gradient(600px circle at ${px}% ${py}%, rgba(255, 255, 255, 0.04), transparent 50%)`;
-    }
-  );
-
-  const borderBackground = useTransform(
-    [springX, springY],
-    ([latestX, latestY]: number[]) => {
-      const px = ((latestX as number) + 0.5) * 100;
-      const py = ((latestY as number) + 0.5) * 100;
-      return `radial-gradient(400px circle at ${px}% ${py}%, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 50%, transparent 80%)`;
-    }
-  );
 
   return (
-    <div className="relative group" style={{ perspective: "1000px" }}>
-      {/* Border glow layer */}
-      <motion.div
-        className="absolute -inset-px rounded-[1.6rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-        style={{ background: borderBackground }}
+    <motion.article
+      variants={variants}
+      className={`relative isolate overflow-hidden ${className}`}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={() => glow.set(0)}
+    >
+      <motion.span
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-[180px] -top-[180px] -z-10 h-[360px] w-[360px] rounded-full bg-[radial-gradient(closest-side,var(--color-glass-focus-glow),transparent)]"
+        style={{ x: springX, y: springY, opacity }}
       />
-      
-      <motion.div
-        ref={ref}
-        className={`glass-bento relative ${className}`}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
-        transition={{ type: "spring", stiffness: 200, damping: 30 }}
-      >
-        {/* Inner radial glow */}
-        <motion.div
-          className="absolute inset-0 rounded-[inherit] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{ background: glowBackground }}
-        />
-        
-        {/* Content */}
-        <div className="relative z-10">
-          {children}
-        </div>
-      </motion.div>
-    </div>
+      {children}
+    </motion.article>
   );
 }
-

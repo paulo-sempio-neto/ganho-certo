@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from "react";
 import { motion, useInView } from "framer-motion";
 
+import { GlowCard } from "../../components/GlowCard";
 import { divideAndRound, formatCents } from "../../utils/money";
 import { formatWorkTime } from "../../utils/formatters";
 import { projectWeeklyGoal, simulateDemoDay } from "./demoDay";
@@ -166,9 +167,9 @@ export function BentoGrid() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {bentoCards.map((card) => (
-          <motion.article
+          <GlowCard
             key={card.title}
-            className={`${card.className} p-6 sm:p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-emerald-500/30 transition-all duration-300 flex flex-col gap-6 group`}
+            className={`${card.className} p-6 sm:p-8 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.15] transition-colors duration-300 flex flex-col gap-6`}
             variants={reveal}
           >
             <div className="flex flex-col gap-4">
@@ -182,7 +183,7 @@ export function BentoGrid() {
             </div>
             <div className="flex flex-1 flex-col justify-center rounded-xl bg-white/[0.02] border border-white/[0.04] p-4">{card.visual}</div>
             <div className="pt-4 border-t border-white/[0.04] text-xs text-emerald-400 font-medium">{card.tagline}</div>
-          </motion.article>
+          </GlowCard>
         ))}
       </div>
     </motion.div>
