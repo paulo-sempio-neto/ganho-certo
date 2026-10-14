@@ -9,6 +9,7 @@ import { BentoGrid } from "./BentoGrid";
 import { FinalCta } from "./FinalCta";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollStory } from "./ScrollStory";
+import { scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
 import { reveal, spring, stagger, tiltIn, underlineDraw } from "./motion";
@@ -67,6 +68,7 @@ export function AuthScreen({
   onSubmit,
   onForgotPassword,
 }: AuthScreenProps) {
+  useSmoothScroll();
   const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [nameFocusRequest, setNameFocusRequest] = useState(0);
@@ -103,7 +105,7 @@ export function AuthScreen({
               type="button"
               onClick={() => {
                 setMode(mode === "login" ? "register" : "login");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                scrollToTop();
               }}
               className="text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-transparent hover:border-white/[0.08] cursor-pointer"
             >
@@ -345,7 +347,7 @@ export function AuthScreen({
         <FinalCta
           onStart={() => {
             setMode("register");
-            window.scrollTo({ top: 0, behavior: "smooth" });
+            scrollToTop();
             setNameFocusRequest((request) => request + 1);
           }}
         />
