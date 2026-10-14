@@ -19,9 +19,22 @@ function getPace(profitPerHourCents: bigint): { label: string; tone: string } {
 }
 
 /** Visual-only ratio (0..1) for bar lengths; money itself never leaves bigint cents. */
-function shareOfRevenue(cents: bigint, grossCents: bigint): number {
-  const permille = (cents * 1000n) / grossCents;
+function toRatio(part: bigint, whole: bigint): number {
+  const permille = (part * 1000n) / whole;
   return Math.min(Math.max(Number(permille) / 1000, 0), 1);
+}
+
+const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex"] as const;
+
+/** Bar heights (0..1) for the previous days and today, scaled to the best day. */
+function getWeekBars(todayCents: bigint) {
+  const days = [...DEMO_ASSUMPTIONS.previousDaysCents, todayCents];
+  const best = days.reduce((max, cents) => (cents > max ? cents : max), 1n);
+  return days.map((cents, index) => ({
+    label: index < WEEKDAY_LABELS.length ? WEEKDAY_LABELS[index] : "Hoje",
+    isToday: index === WEEKDAY_LABELS.length,
+    height: toRatio(cents, best),
+  }));
 }
 
 /** Interactive product mockup: drag the day's revenue and distance, read the real profit. */
@@ -34,6 +47,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
   const pace = getPace(day.profitPerHourCents);
   const profitTone = day.profitCents < 0n ? "text-rose-400" : "text-emerald-400";
   const grossLabel = formatCents(day.grossCents);
+  const week = getWeekBars(day.profitCents);
 
   return (
     <motion.div
@@ -165,7 +179,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
                     <motion.span
                       className={`block h-full w-full origin-left rounded-full ${cost.bar}`}
                       initial={{ scaleX: 0 }}
-                      animate={{ scaleX: shareOfRevenue(cost.cents, day.grossCents) }}
+                      animate={{ scaleX: toRatio(cost.cents, day.grossCents) }}
                       transition={spring.gentle}
                     />
                   </span>
@@ -192,10 +206,29 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
               </strong>
             </div>
             <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-              <div
+              <motion.div
                 className="h-full w-full origin-left rounded-full bg-emerald-400"
-                style={{ transform: `scaleX(${Number(goal.progressPermille) / 1000})` }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: Number(goal.progressPermille) / 1000 }}
+                transition={spring.gentle}
               />
+            </div>
+
+            {/* Profit per day of the week, today included */}
+            <div className="flex items-end gap-2" aria-hidden="true">
+              {week.map((weekDay) => (
+                <div key={weekDay.label} className="flex flex-1 flex-col items-center gap-1">
+                  <div className="flex h-12 w-full items-end justify-center">
+                    <motion.div
+                      className={`h-full w-3 sm:w-4 origin-bottom rounded-t-full rounded-b-sm ${weekDay.isToday ? (day.profitCents < 0n ? "bg-rose-400" : "bg-emerald-400") : "bg-white/[0.12]"}`}
+                      initial={{ scaleY: 0 }}
+                      animate={{ scaleY: weekDay.height }}
+                      transition={spring.gentle}
+                    />
+                  </div>
+                  <span className={`text-xs ${weekDay.isToday ? "text-zinc-200" : "text-zinc-500"}`}>{weekDay.label}</span>
+                </div>
+              ))}
             </div>
             <span className="text-sm text-emerald-400 font-medium">
               {goal.remainingCents === 0n

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { projectWeeklyGoal, simulateDemoDay } from "./demoDay";
+import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
 
 describe("simulateDemoDay", () => {
   it("subtracts fuel, maintenance and daily extras from gross revenue", () => {
@@ -29,6 +29,10 @@ describe("simulateDemoDay", () => {
 });
 
 describe("projectWeeklyGoal", () => {
+  it("starts from the profit of the previous days in the week", () => {
+    expect(DEMO_ASSUMPTIONS.weekSoFarCents).toBe(210_000n);
+  });
+
   it("estimates the extra driving time at today's pace", () => {
     expect(projectWeeklyGoal(simulateDemoDay(530, 195))).toEqual({
       progressCents: 248_097n,

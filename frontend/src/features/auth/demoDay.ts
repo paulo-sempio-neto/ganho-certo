@@ -1,5 +1,8 @@
 import { divideAndRound } from "../../utils/money";
 
+/** Profit already made on the five previous days of the illustrative week. */
+const PREVIOUS_DAYS_CENTS = [41_200n, 38_800n, 45_500n, 40_100n, 44_400n] as const;
+
 /** Illustrative assumptions behind the landing-page simulator. Not user data. */
 export const DEMO_ASSUMPTIONS = {
   fuelPricePerLiterCents: 619n,
@@ -8,7 +11,8 @@ export const DEMO_ASSUMPTIONS = {
   dailyExtrasCents: 1_200n,
   workedMinutes: 400n,
   weeklyGoalCents: 280_000n,
-  weekSoFarCents: 210_000n,
+  previousDaysCents: PREVIOUS_DAYS_CENTS,
+  weekSoFarCents: PREVIOUS_DAYS_CENTS.reduce((total, day) => total + day, 0n),
 } as const;
 
 export type DemoDay = {
