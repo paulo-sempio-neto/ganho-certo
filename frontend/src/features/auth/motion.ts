@@ -48,3 +48,24 @@ export const underlineDraw: Variants = {
   hidden: { scaleX: 0 },
   visible: { scaleX: 1, transition: { delay: 0.55, duration: 0.8, ease: [0.65, 0, 0.35, 1] } },
 };
+
+const swing = { type: "spring", stiffness: 60, damping: 15 } as const;
+
+/** Entrance where a panel swings into place around one axis, with real perspective. */
+export function tiltIn(axis: "x" | "y", degrees: number): Variants {
+  const from = axis === "x" ? { rotateX: degrees } : { rotateY: degrees };
+  const to = axis === "x" ? { rotateX: 0 } : { rotateY: 0 };
+  const rotation = axis === "x" ? { rotateX: swing } : { rotateY: swing };
+
+  return {
+    hidden: { opacity: 0, y: 32, transformPerspective: 1200, filter: "blur(6px)", ...from },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transformPerspective: 1200,
+      filter: "blur(0px)",
+      ...to,
+      transition: { y: spring.gentle, opacity: fade, filter: fade, ...rotation },
+    },
+  };
+}

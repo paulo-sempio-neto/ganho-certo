@@ -5,10 +5,12 @@ import { Odometer } from "../../components/Odometer";
 import { formatWorkTime } from "../../utils/formatters";
 import { formatCents } from "../../utils/money";
 import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
-import { panelSwap, reveal, spring } from "./motion";
+import { panelSwap, spring, tiltIn } from "./motion";
 import { ProfitGauge } from "./ProfitGauge";
 
 type CanvasTab = "visao" | "custos" | "metas";
+
+const canvasLift = tiltIn("x", 14);
 
 const GROSS_RANGE = { min: 150, max: 900, step: 10 } as const;
 const KM_RANGE = { min: 50, max: 400, step: 5 } as const;
@@ -53,7 +55,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
 
   return (
     <motion.div
-      variants={reveal}
+      variants={canvasLift}
       className={`${className} w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] lg:backdrop-blur-xl relative overflow-hidden`}
     >
       <div className="absolute top-0 right-0 w-64 h-64 bg-[radial-gradient(closest-side,var(--color-glass-focus-glow),transparent)] pointer-events-none" />

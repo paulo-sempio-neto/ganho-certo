@@ -8,7 +8,7 @@ import { ProductCanvas } from "./ProductCanvas";
 import { ScrollStory } from "./ScrollStory";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
-import { reveal, spring, stagger, underlineDraw } from "./motion";
+import { reveal, spring, stagger, tiltIn, underlineDraw } from "./motion";
 
 export type AuthMode = "login" | "register";
 
@@ -27,6 +27,8 @@ interface AuthScreenProps {
   onSubmit: (e: FormEvent<HTMLFormElement>) => void;
   onForgotPassword: () => void;
 }
+
+const formSwing = tiltIn("y", -16);
 
 export function AuthScreen({
   mode,
@@ -127,7 +129,7 @@ export function AuthScreen({
           </motion.div>
 
           {/* Formulário: logo após o título no celular, coluna direita no desktop */}
-          <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 flex justify-center" variants={reveal}>
+          <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 flex justify-center" variants={formSwing}>
             <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl lg:backdrop-blur-2xl">
               
               {/* Tab Selector */}
