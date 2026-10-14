@@ -5,6 +5,7 @@ import { GlowCard } from "../../components/GlowCard";
 import { divideAndRound, formatCents } from "../../utils/money";
 import { formatWorkTime } from "../../utils/formatters";
 import { projectWeeklyGoal, simulateDemoDay } from "./demoDay";
+import { MaskLine } from "./MaskLine";
 import { reveal, spring, stagger } from "./motion";
 
 // Same illustrative day as the hero simulator, so every number on the page agrees.
@@ -155,14 +156,15 @@ export function BentoGrid() {
       animate={isInView ? "visible" : "hidden"}
       variants={stagger()}
     >
-      <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={reveal}>
-        <span className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</span>
+      <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={stagger(0.1, 0)}>
+        <MaskLine className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</MaskLine>
         <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
-          Tudo o que você precisa para dominar suas finanças
+          <MaskLine>Tudo o que você precisa</MaskLine>
+          <MaskLine>para dominar suas finanças</MaskLine>
         </h2>
-        <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+        <motion.p className="text-zinc-400 text-sm sm:text-base leading-relaxed" variants={reveal}>
           Desenvolvido com base no dia a dia de centenas de motoristas para eliminar o estresse financeiro.
-        </p>
+        </motion.p>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
