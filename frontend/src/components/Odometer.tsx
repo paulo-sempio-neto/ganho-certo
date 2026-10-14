@@ -12,7 +12,7 @@ const roll = { type: "spring", stiffness: 140, damping: 20 } as const;
  */
 export function Odometer({ value, className = "" }: { value: string; className?: string }) {
   return (
-    <span className={`relative inline-flex ${className}`}>
+    <span className={`odometer relative inline-flex ${className}`}>
       <span className="sr-only">{value}</span>
       <span aria-hidden="true" className="inline-flex leading-none tabular-nums">
         {toOdometerCells(value).map((cell) =>

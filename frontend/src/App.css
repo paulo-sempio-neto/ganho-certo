@@ -1224,7 +1224,8 @@ textarea:focus {
   font-size: var(--text-xl);
 }
 
-.metric-card span {
+/* Label spans only: the odometer's digit spans inherit the figure styles instead. */
+.metric-card span:where(:not(.odometer, .odometer *)) {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
@@ -2463,7 +2464,6 @@ textarea:focus {
   min-width: 0;
   border-radius: inherit;
   background: var(--color-brand);
-  transition: width var(--duration-normal) var(--ease-out);
 }
 
 .goal-progress-status {
@@ -2967,3 +2967,22 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .dashboard-area:not([hidden]) > :nth-child(3) { animation-delay: calc(var(--stagger-step) * 2); }
 .dashboard-area:not([hidden]) > :nth-child(4) { animation-delay: calc(var(--stagger-step) * 3); }
 .dashboard-area:not([hidden]) > :nth-child(n + 5) { animation-delay: calc(var(--stagger-step) * 4); }
+
+/* ── Dark numerals: product typeface with tabular figures instead of the mono face ── */
+
+.lux :where(.metric-card strong, .session-metrics dd, .dashboard-layer dd,
+  .goal-progress-main strong, .recurring-projection-total strong, .weekday-card dd) {
+  font-family: var(--font-family);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Progress fills keep their width and grow into it by transform when they appear. */
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+}
+
+.goal-progress-bar i {
+  transform-origin: left center;
+  animation: bar-grow calc(var(--duration-enter) * 2) var(--ease-out) both;
+}

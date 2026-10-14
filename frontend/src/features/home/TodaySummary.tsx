@@ -1,4 +1,5 @@
 import { FeedbackMessage } from "../../components/FeedbackMessage";
+import { Odometer } from "../../components/Odometer";
 import type { FinancialDailySummary, FinancialGoal, FinancialGoalProgress } from "../../types/financial";
 import { formatDate, formatPercent, getProgressWidth } from "../../utils/formatters";
 import { formatMoney, moneyValueToCents } from "../../utils/money";
@@ -73,16 +74,16 @@ export function TodaySummary({
               data-result-kind="realized"
             >
               <span>Sobra após despesas registradas</span>
-              <strong>{day === null ? "—" : formatMoney(day.estimated_net_profit)}</strong>
+              <strong>{day === null ? "—" : <Odometer value={formatMoney(day.estimated_net_profit)} />}</strong>
               <small>Gastos ainda não registrados não estão descontados.</small>
             </article>
             <article className="metric-card">
               <span>Faturamento</span>
-              <strong>{day === null ? "—" : formatMoney(day.gross_revenue)}</strong>
+              <strong>{day === null ? "—" : <Odometer value={formatMoney(day.gross_revenue)} />}</strong>
             </article>
             <article className="metric-card">
               <span>Gastos registrados</span>
-              <strong>{day === null ? "—" : formatMoney(day.expenses)}</strong>
+              <strong>{day === null ? "—" : <Odometer value={formatMoney(day.expenses)} />}</strong>
             </article>
           </div>
         </>
