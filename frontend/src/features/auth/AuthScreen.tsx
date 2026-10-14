@@ -5,7 +5,8 @@ import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { ProductCanvas } from "./ProductCanvas";
-import { reveal, spring, stagger } from "./motion";
+import { MaskLine } from "./MaskLine";
+import { reveal, spring, stagger, underlineDraw } from "./motion";
 
 export type AuthMode = "login" | "register";
 
@@ -88,13 +89,22 @@ export function AuthScreen({
 
             <motion.h1
               className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
-              variants={reveal}
+              variants={stagger(0.14, 0)}
             >
-              Faturar é fácil. <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
-                Lucrar de verdade
-              </span>{" "}
-              é o que importa.
+              <MaskLine>Faturar é fácil.</MaskLine>
+              <MaskLine>
+                <span className="relative inline-block">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
+                    Lucrar de verdade
+                  </span>
+                  <motion.span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 -bottom-[0.02em] h-[0.06em] origin-left rounded-full bg-emerald-400/60"
+                    variants={underlineDraw}
+                  />
+                </span>{" "}
+                é o que importa.
+              </MaskLine>
             </motion.h1>
 
             <motion.p

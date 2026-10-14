@@ -36,3 +36,15 @@ export const panelSwap = {
   exit: { opacity: 0, y: -6 },
   transition: { duration: 0.2 },
 } as const;
+
+/** A line sliding up into view from behind its own mask (see MaskLine). */
+export const lineReveal: Variants = {
+  hidden: { y: "110%" },
+  visible: { y: "0%", transition: { type: "spring", stiffness: 90, damping: 18 } },
+};
+
+/** An underline drawn left to right once its line has landed. */
+export const underlineDraw: Variants = {
+  hidden: { scaleX: 0 },
+  visible: { scaleX: 1, transition: { delay: 0.55, duration: 0.8, ease: [0.65, 0, 0.35, 1] } },
+};
