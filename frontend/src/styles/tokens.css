@@ -171,4 +171,11 @@
   --color-lux-warning-surface: rgb(245 158 11 / 10%);
   --color-lux-danger: #fda4af;
   --color-lux-danger-surface: rgb(244 63 94 / 10%);
+  --color-lux-success-border: rgb(110 231 183 / 30%);
+  --color-lux-info-border: rgb(125 211 252 / 30%);
+  --color-lux-warning-border: rgb(252 211 77 / 30%);
+  --color-lux-danger-border: rgb(253 164 175 / 30%);
+  --shadow-lux-sm: 0 1px 0 0 rgb(255 255 255 / 4%) inset;
+  --shadow-lux-panel: 0 1px 0 0 rgb(255 255 255 / 4%) inset, 0 12px 32px -20px rgb(0 0 0 / 80%);
+  --shadow-lux-card: 0 1px 0 0 rgb(255 255 255 / 5%) inset, 0 24px 48px -28px rgb(0 0 0 / 90%);
 }

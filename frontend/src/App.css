@@ -2555,7 +2555,7 @@ textarea:focus {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
-    background: var(--color-surface);
+    background: var(--color-surface-raised);
     border-top: 1px solid var(--color-border);
     box-shadow: var(--shadow-card);
     padding: 0 max(var(--space-2), env(safe-area-inset-right, 0px))
@@ -2911,8 +2911,32 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   --color-warning-surface: var(--color-lux-warning-surface);
   --color-danger: var(--color-lux-danger);
   --color-danger-surface: var(--color-lux-danger-surface);
+  --color-success-border: var(--color-lux-success-border);
+  --color-info-border: var(--color-lux-info-border);
+  --color-warning-border: var(--color-lux-warning-border);
+  --color-danger-border: var(--color-lux-danger-border);
+  --color-control-border: var(--color-lux-border-strong);
+  --color-surface-raised: var(--color-lux-panel);
+  --color-brand-dark: var(--color-lux-void);
+  /* Aliases resolve where they are declared, so they are re-declared here. */
+  --color-realized: var(--color-success);
+  --color-realized-surface: var(--color-success-surface);
+  --color-estimated: var(--color-info);
+  --color-estimated-surface: var(--color-info-surface);
+  --color-projected: var(--color-warning);
+  --color-projected-surface: var(--color-warning-surface);
+  --shadow-sm: var(--shadow-lux-sm);
+  --shadow-panel: var(--shadow-lux-panel);
+  --shadow-card: var(--shadow-lux-card);
+  --shadow-elevated: var(--shadow-lux-card);
   background: var(--color-canvas);
   color: var(--color-text);
+}
+
+/* Keeps overscroll and the area around dark pages dark too. */
+:root:has(.lux) {
+  background: var(--color-lux-canvas);
+  color-scheme: dark;
 }
 
 .lux input[type="range"] {

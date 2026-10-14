@@ -2297,6 +2297,7 @@ function App() {
   }
 
   return (
+    <div className="lux min-h-screen">
     <main className={user ? "page page-dashboard" : "page"}>
       {!user ? (
         <section className="intro" aria-labelledby="page-title">
@@ -4575,6 +4576,7 @@ function App() {
         )}
       </section>
     </main>
+    </div>
   );
 }
 
