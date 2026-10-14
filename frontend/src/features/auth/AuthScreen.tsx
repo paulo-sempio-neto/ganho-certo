@@ -13,7 +13,7 @@ import { readIntroState, shouldPlayIntro } from "./intro";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
-import { scrollToTop, useSmoothScroll } from "./smoothScroll";
+import { scrollToElement, scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
 import { reveal, spring, stagger, tiltIn, underlineDraw } from "./motion";
@@ -76,6 +76,8 @@ export function AuthScreen({
   const { scrollYProgress: pageProgress } = useScroll();
   const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
   const [nameFocusRequest, setNameFocusRequest] = useState(0);
   // The opening plays once per session; the hero waits for the curtain to start lifting.
   const [playsIntro] = useState(() => shouldPlayIntro(readIntroState()));
@@ -115,7 +117,9 @@ export function AuthScreen({
               type="button"
               onClick={() => {
                 setMode(mode === "login" ? "register" : "login");
-                scrollToTop();
+                // The form sits below the headline: glide to it and put the cursor in the e-mail field.
+                if (formRef.current) scrollToElement(formRef.current);
+                emailInputRef.current?.focus({ preventScroll: true });
               }}
               className="link-draw text-xs sm:text-sm font-medium text-zinc-400 hover:text-white transition-colors py-1.5 cursor-pointer"
             >
@@ -133,13 +137,13 @@ export function AuthScreen({
 
         {/* ── Hero / Auth Split Section ── */}
         <motion.section
-          className="w-full max-w-7xl mx-auto px-6 pt-10 pb-20 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-8 items-center"
+          className="w-full max-w-7xl mx-auto px-6 pt-10 pb-20 lg:pt-14 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[auto_auto_1fr] gap-10 lg:gap-x-16 lg:gap-y-12 items-start"
           initial="hidden"
           animate={isIntroPlaying ? "hidden" : "visible"}
           variants={stagger(0.12, 0.1)}
         >
-          {/* Proposta de valor */}
-          <motion.div className="lg:col-span-7 flex flex-col gap-4" variants={stagger(0.15, 0)}>
+          {/* Proposta de valor: título editorial em largura total */}
+          <motion.div className="lg:col-span-12 flex flex-col gap-6" variants={stagger(0.15, 0)}>
             <motion.div
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit"
               variants={reveal}
@@ -148,11 +152,11 @@ export function AuthScreen({
             </motion.div>
 
             <motion.h1
-              className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
+              className="text-[2.6rem] sm:text-6xl md:text-7xl lg:text-8xl xl:text-[7.5rem] font-medium tracking-[-0.05em] text-white leading-[0.98]"
               variants={stagger(0.14, 0)}
             >
               <MaskLine>Faturar é fácil.</MaskLine>
-              <MaskLine>
+              <MaskLine className="lg:pl-[12%]">
                 <span className="relative inline-block">
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
                     Lucrar de verdade
@@ -162,22 +166,22 @@ export function AuthScreen({
                     className="absolute inset-x-0 -bottom-[0.02em] h-[0.06em] origin-left rounded-full bg-emerald-400/60"
                     variants={underlineDraw}
                   />
-                </span>{" "}
-                é o que importa.
+                </span>
               </MaskLine>
+              <MaskLine className="lg:text-right">é o que importa.</MaskLine>
             </motion.h1>
-
-            <motion.p
-              className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
-              variants={reveal}
-            >
-              Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
-            </motion.p>
           </motion.div>
 
+          <motion.p
+            className="lg:col-span-7 lg:row-start-2 text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
+            variants={reveal}
+          >
+            Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
+          </motion.p>
+
           {/* Formulário: logo após o título no celular, coluna direita no desktop */}
-          <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 flex justify-center" variants={formSwing}>
-            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl lg:backdrop-blur-2xl">
+          <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-2 lg:row-span-2 flex justify-center" variants={formSwing}>
+            <div ref={formRef} className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl lg:backdrop-blur-2xl">
               
               {/* Tab Selector */}
               <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6" role="group" aria-label="Tipo de acesso">
@@ -239,6 +243,7 @@ export function AuthScreen({
                     E-mail
                   </label>
                   <input
+                    ref={emailInputRef}
                     id="email"
                     name="email"
                     type="email"
@@ -319,7 +324,7 @@ export function AuthScreen({
             </div>
           </motion.div>
 
-          <ProductCanvas className="lg:col-span-7 lg:col-start-1 lg:row-start-2" />
+          <ProductCanvas className="lg:col-span-7 lg:col-start-1 lg:row-start-3" />
         </motion.section>
 
         {/* ── História no scroll: do faturamento ao lucro ── */}

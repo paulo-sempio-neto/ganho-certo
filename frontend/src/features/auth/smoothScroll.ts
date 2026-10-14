@@ -36,6 +36,16 @@ export function useSmoothScroll() {
   }, []);
 }
 
+/** Glides an element to the top of the viewport (minus an offset for the header). */
+export function scrollToElement(element: HTMLElement, offset = -96) {
+  if (lenis) {
+    lenis.scrollTo(element, { offset });
+    requestAnimationFrame((time) => lenis?.raf(time));
+  } else {
+    window.scrollTo({ top: element.getBoundingClientRect().top + window.scrollY + offset, behavior: "smooth" });
+  }
+}
+
 /** Glides back to the top through Lenis when it is running, natively otherwise. */
 export function scrollToTop() {
   if (lenis) {
