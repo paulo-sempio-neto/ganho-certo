@@ -6,6 +6,7 @@ import { divideAndRound, formatCents } from "../../utils/money";
 import { formatWorkTime } from "../../utils/formatters";
 import { projectWeeklyGoal, simulateDemoDay } from "./demoDay";
 import { MaskLine } from "./MaskLine";
+import { SectionIndex } from "./SectionIndex";
 import { reveal, spring, stagger } from "./motion";
 
 // Same illustrative day as the hero simulator, so every number on the page agrees.
@@ -157,7 +158,7 @@ export function BentoGrid() {
       variants={stagger()}
     >
       <motion.div className="text-center max-w-2xl mx-auto flex flex-col gap-3" variants={stagger(0.1, 0)}>
-        <MaskLine className="text-emerald-400 font-semibold text-xs tracking-widest uppercase">Tecnologia Feita para o Trânsito</MaskLine>
+        <SectionIndex index="02" label="Tecnologia feita para o trânsito" className="flex justify-center" />
         <h2 className="text-3xl sm:text-4xl font-medium text-white tracking-[-0.03em]">
           <MaskLine>Tudo o que você precisa</MaskLine>
           <MaskLine>para dominar suas finanças</MaskLine>

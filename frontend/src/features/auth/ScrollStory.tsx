@@ -12,6 +12,7 @@ import {
 import { Odometer } from "../../components/Odometer";
 import { formatCents } from "../../utils/money";
 import { MaskLine } from "./MaskLine";
+import { SectionIndex } from "./SectionIndex";
 import { STORY_FALLS, getStorySteps, simulateDemoDay, toStoryStage } from "./demoDay";
 import { stagger } from "./motion";
 
@@ -100,7 +101,7 @@ export function ScrollStory() {
               viewport={{ once: true, amount: 0.6 }}
               variants={stagger(0.12, 0)}
             >
-              <MaskLine className="text-xs font-semibold uppercase tracking-widest text-emerald-400">O dia de um motorista</MaskLine>
+              <SectionIndex index="01" label="O dia de um motorista" />
               <h2 className="text-4xl font-medium leading-[1.05] tracking-[-0.04em] text-white sm:text-5xl lg:text-6xl">
                 <MaskLine>Faturamento</MaskLine>
                 <MaskLine className="text-zinc-500">não é lucro.</MaskLine>

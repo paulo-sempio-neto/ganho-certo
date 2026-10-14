@@ -13,6 +13,7 @@ import { readIntroState, shouldPlayIntro } from "./intro";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
+import { SectionIndex } from "./SectionIndex";
 import { scrollToElement, scrollToTop, useSmoothScroll } from "./smoothScroll";
 import { useHideOnScrollDown } from "./useHideOnScrollDown";
 import { MaskLine } from "./MaskLine";
@@ -347,9 +348,12 @@ export function AuthScreen({
             viewport={{ once: true, amount: 0.3 }}
             variants={stagger(0.12, 0)}
           >
-            <h2 className="text-center text-2xl sm:text-3xl font-medium text-white tracking-tight">
-              <MaskLine>Feito para o dia a dia de quem dirige</MaskLine>
-            </h2>
+            <div className="flex flex-col items-center gap-4">
+              <SectionIndex index="03" label="Na rua, todo dia" />
+              <h2 className="text-center text-2xl sm:text-3xl font-medium text-white tracking-tight">
+                <MaskLine>Feito para o dia a dia de quem dirige</MaskLine>
+              </h2>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {momentsOfUse.map((item) => (

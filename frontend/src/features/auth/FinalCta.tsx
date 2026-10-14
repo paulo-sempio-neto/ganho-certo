@@ -3,6 +3,7 @@ import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion
 
 import { RollText } from "../../components/RollText";
 import { MaskLine } from "./MaskLine";
+import { SectionIndex } from "./SectionIndex";
 import { stagger } from "./motion";
 
 /**
@@ -28,6 +29,7 @@ export function FinalCta({ onStart }: { onStart: () => void }) {
         viewport={{ once: true, amount: 0.5 }}
         variants={stagger(0.12, 0)}
       >
+        <SectionIndex index="04" label="Comece agora" />
         <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-[-0.03em] leading-tight">
           <MaskLine>Pronto para ter o controle</MaskLine>
           <MaskLine>total do seu volante?</MaskLine>
