@@ -18,6 +18,12 @@ function getPace(profitPerHourCents: bigint): { label: string; tone: string } {
   return { label: "Excelente", tone: "text-emerald-400" };
 }
 
+/** Visual-only ratio (0..1) for bar lengths; money itself never leaves bigint cents. */
+function shareOfRevenue(cents: bigint, grossCents: bigint): number {
+  const permille = (cents * 1000n) / grossCents;
+  return Math.min(Math.max(Number(permille) / 1000, 0), 1);
+}
+
 /** Interactive product mockup: drag the day's revenue and distance, read the real profit. */
 export function ProductCanvas({ className = "" }: { className?: string }) {
   const [activeTab, setActiveTab] = useState<CanvasTab>("visao");
@@ -139,22 +145,34 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
           <motion.div
             key="custos"
             {...panelSwap}
-            className="flex flex-col gap-2.5"
+            className="flex flex-col gap-3"
           >
-            {[
-              { label: "Combustível", detail: "R$ 6,19/L · 11 km/L", cents: day.fuelCents, tone: "text-rose-400" },
-              { label: "Reserva de manutenção", detail: "R$ 0,14/km · óleo, pneus e freios", cents: day.maintenanceCents, tone: "text-amber-400" },
-              { label: "Alimentação e pedágios", detail: "Valor fixo do dia", cents: day.extrasCents, tone: "text-zinc-400" },
-            ].map((cost) => (
-              <div key={cost.label} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-sm">
-                <span className="flex flex-col">
-                  <span className="text-zinc-200">{cost.label}</span>
-                  <span className="text-zinc-500">{cost.detail}</span>
-                </span>
-                <span className={`font-semibold tabular-nums ${cost.tone}`}>-{formatCents(cost.cents)}</span>
-              </div>
-            ))}
-            <div className="flex items-center justify-between px-3 pt-1 text-sm">
+            <ul className="flex flex-col gap-3">
+              {[
+                { label: "Combustível", detail: "R$ 6,19/L · 11 km/L", cents: day.fuelCents, tone: "text-rose-400", bar: "bg-rose-400" },
+                { label: "Manutenção", detail: "R$ 0,14/km", cents: day.maintenanceCents, tone: "text-amber-400", bar: "bg-amber-400" },
+                { label: "Alimentação e pedágios", detail: "fixo", cents: day.extrasCents, tone: "text-zinc-400", bar: "bg-zinc-500" },
+              ].map((cost) => (
+                <li key={cost.label} className="flex flex-col gap-1.5 text-sm">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="text-zinc-200">
+                      {cost.label} <span className="hidden sm:inline text-zinc-500">· {cost.detail}</span>
+                    </span>
+                    <span className={`font-semibold tabular-nums ${cost.tone}`}>-{formatCents(cost.cents)}</span>
+                  </span>
+                  {/* Share of the day's revenue eaten by this cost */}
+                  <span className="h-1 rounded-full bg-white/[0.06] overflow-hidden" aria-hidden="true">
+                    <motion.span
+                      className={`block h-full w-full origin-left rounded-full ${cost.bar}`}
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: shareOfRevenue(cost.cents, day.grossCents) }}
+                      transition={spring.gentle}
+                    />
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] text-sm">
               <span className="text-zinc-400">Sobra no bolso</span>
               <strong className={`font-semibold tabular-nums ${profitTone}`}>{formatCents(day.profitCents)}</strong>
             </div>
