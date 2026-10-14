@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useState } from "react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig, useInView } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { AmbientBackground } from "./AmbientBackground";
 import { panelSwap, reveal, spring, stagger } from "./motion";
@@ -111,6 +111,7 @@ export function AuthScreen({
   const [activeTab, setActiveTab] = useState<"visao" | "custos" | "metas">("visao");
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
       <AmbientBackground />
 
@@ -504,5 +505,6 @@ export function AuthScreen({
         </footer>
       </div>
     </div>
+    </MotionConfig>
   );
 }
