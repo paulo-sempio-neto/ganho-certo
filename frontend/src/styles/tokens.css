@@ -17,6 +17,7 @@
   --color-border: #e2e6eb;
   --color-border-strong: #a6b0bb;
   --color-control-border: #84919f;
+  --color-control-border-hover: #5a6a7a;
 
   /* ── Brand ── */
   --color-brand: #147a4a;
@@ -160,8 +161,10 @@
   --color-lux-canvas: #030303;
   --color-lux-panel: #0a0a0b;
   --color-lux-text-muted: #a1a1aa;
-  --color-lux-text-soft: #71717a;
+  --color-lux-text-soft: #80808a;
   --color-lux-border-strong: rgb(255 255 255 / 22%);
+  --color-lux-control-border: rgb(255 255 255 / 36%);
+  --color-lux-control-border-hover: rgb(255 255 255 / 50%);
   --color-lux-glow: rgb(16 185 129 / 20%);
   --color-lux-beam: rgb(16 185 129 / 9%);
   --color-lux-beam-neutral: rgb(255 255 255 / 3%);

@@ -62,3 +62,77 @@ describe("design tokens", () => {
     });
   });
 });
+
+// ── Dark luxury scope ──
+// Translucent tokens are blended over the dark canvas, which is what a viewer actually sees.
+
+type Rgb = [number, number, number];
+
+function token(name: string): string {
+  const value = values.get(name)!;
+  return value.startsWith("var(") ? token(value.slice(4, -1)) : value;
+}
+
+function blend(name: string, backdrop: Rgb): Rgb {
+  const value = token(name);
+  if (value.startsWith("#")) {
+    return [1, 3, 5].map((offset) => parseInt(value.slice(offset, offset + 2), 16)) as Rgb;
+  }
+  const [, r, g, b, alpha] = value.match(/rgb\((\d+) (\d+) (\d+) \/ (\d+)%\)/)!.map(Number);
+  return [r, g, b].map((channel, index) => channel * (alpha / 100) + backdrop[index] * (1 - alpha / 100)) as Rgb;
+}
+
+function ratio(foreground: Rgb, background: Rgb): number {
+  const luminanceOf = (rgb: Rgb) => luminance(`#${rgb.map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")}`);
+  const [a, b] = [luminanceOf(foreground), luminanceOf(background)];
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+const canvas = blend("--color-lux-canvas", [0, 0, 0]);
+const darkSurfaces: Record<string, Rgb> = {
+  canvas,
+  panel: blend("--color-lux-panel", canvas),
+  surface: blend("--color-glass-bg-subtle", canvas),
+  "surface-subtle": blend("--color-glass-bg-tabs", canvas),
+};
+
+describe("dark luxury tokens", () => {
+  const luxScope = new Map<string, string>();
+  styles.walkRules(".lux", (rule) => rule.walkDecls(/^--/, (declaration) => { luxScope.set(declaration.prop, declaration.value); }));
+
+  it("maps the semantic tokens of the .lux scope to the dark values tested here", () => {
+    expect(luxScope.get("--color-text")).toBe("var(--color-glass-text)");
+    expect(luxScope.get("--color-text-muted")).toBe("var(--color-lux-text-muted)");
+    expect(luxScope.get("--color-text-soft")).toBe("var(--color-lux-text-soft)");
+    expect(luxScope.get("--color-control-border")).toBe("var(--color-lux-control-border)");
+    expect(luxScope.get("--color-focus")).toBe("var(--color-accent-emerald-light)");
+  });
+
+  it.each(["--color-glass-text", "--color-lux-text-muted", "--color-lux-text-soft"])(
+    "keeps %s readable on every dark surface",
+    (foreground) => {
+      for (const surface of Object.values(darkSurfaces)) {
+        expect(ratio(blend(foreground, surface), surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    },
+  );
+
+  it.each(["success", "info", "warning", "danger"])("keeps %s messages readable on their dark surface", (kind) => {
+    const surface = blend(`--color-lux-${kind}-surface`, canvas);
+    expect(ratio(blend(`--color-lux-${kind}`, surface), surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps dark buttons and links readable", () => {
+    const onBrand = blend("--color-lux-void", canvas);
+    expect(ratio(onBrand, blend("--color-accent-emerald", canvas))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(onBrand, blend("--color-accent-emerald-light", canvas))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(blend("--color-accent-emerald", darkSurfaces.surface), darkSurfaces.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps dark form controls and keyboard focus visible", () => {
+    for (const surface of [canvas, darkSurfaces.panel]) {
+      expect(ratio(blend("--color-lux-control-border", surface), surface)).toBeGreaterThanOrEqual(3);
+      expect(ratio(blend("--color-accent-emerald-light", surface), surface)).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
