@@ -145,157 +145,42 @@ export function AuthScreen({
 
         {/* ── Hero / Auth Split Section ── */}
         <motion.section
-          className="w-full max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center"
+          className="w-full max-w-7xl mx-auto px-6 pt-10 pb-20 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-8 items-center"
           initial="hidden"
           animate="visible"
           variants={stagger(0.12, 0.1)}
         >
-          
-          {/* Coluna Esquerda: Proposta de Valor e Mockup do Produto */}
-          <div className="lg:col-span-7 flex flex-col gap-8">
-            <motion.div className="flex flex-col gap-4" variants={stagger(0.15, 0)}>
-              <motion.div
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit"
-                variants={reveal}
-              >
-                <span className="text-emerald-400">●</span> Uber · 99 · inDrive · Entregas
-              </motion.div>
-
-              <motion.h1
-                className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
-                variants={reveal}
-              >
-                Faturar é fácil. <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
-                  Lucrar de verdade
-                </span>{" "}
-                é o que importa.
-              </motion.h1>
-
-              <motion.p
-                className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
-                variants={reveal}
-              >
-                Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
-              </motion.p>
-            </motion.div>
-
-            {/* Mockup Interativo do Painel GanhoCerto */}
+          {/* Proposta de valor */}
+          <motion.div className="lg:col-span-7 flex flex-col gap-4" variants={stagger(0.15, 0)}>
             <motion.div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-xs font-medium w-fit"
               variants={reveal}
-              className="w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] backdrop-blur-xl relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-
-              {/* Header do Mockup */}
-              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
-                  <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
-                </div>
-                <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm">
-                  {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setActiveTab(key)}
-                      className={`relative px-2.5 py-0.5 rounded transition-colors ${activeTab === key ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}
-                    >
-                      {activeTab === key && (
-                        <motion.span
-                          layoutId="mockup-tab-indicator"
-                          className="absolute inset-0 rounded bg-white/[0.1]"
-                          transition={spring.snappy}
-                        />
-                      )}
-                      <span className="relative z-10">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Conteúdo Dinâmico do Mockup */}
-              <AnimatePresence mode="wait">
-                {activeTab === "visao" && (
-                  <motion.div
-                    key="visao"
-                    {...panelSwap}
-                    className="flex flex-col gap-4"
-                  >
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
-                        <strong className="text-xl sm:text-2xl font-semibold text-emerald-400 tracking-tight">R$ 384,50</strong>
-                        <span className="text-sm text-emerald-500/80 mt-1 block">Margem: 72%</span>
-                      </div>
-                      <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
-                        <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight">R$ 534,00</strong>
-                        <span className="text-sm text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
-                      </div>
-                      <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                        <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
-                        <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight">-R$ 149,50</strong>
-                        <span className="text-sm text-zinc-400 mt-1 block">Combustível + Reserva</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex items-center justify-between text-xs">
-                      <span className="text-zinc-400 flex items-center gap-1.5">
-                        <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Rendimento médio: <strong className="text-white font-medium">R$ 57,60 / hora trabalhada</strong>
-                      </span>
-                      <span className="text-emerald-400 font-medium">Excelente</span>
-                    </div>
-                  </motion.div>
-                )}
-
-                {activeTab === "custos" && (
-                  <motion.div
-                    key="custos"
-                    {...panelSwap}
-                    className="flex flex-col gap-2.5"
-                  >
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-                      <span className="text-zinc-300">Combustível (Gasolina / GNV)</span>
-                      <span className="font-semibold text-rose-400">-R$ 110,00</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-                      <span className="text-zinc-300">Provisão de Manutenção (Óleo, Pneus)</span>
-                      <span className="font-semibold text-amber-400">-R$ 27,50</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-                      <span className="text-zinc-300">Alimentação e Pedágios</span>
-                      <span className="font-semibold text-zinc-400">-R$ 12,00</span>
-                    </div>
-                  </motion.div>
-                )}
-
-                {activeTab === "metas" && (
-                  <motion.div
-                    key="metas"
-                    {...panelSwap}
-                    className="flex flex-col gap-3"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-zinc-400">Meta Semanal de Lucro</span>
-                      <strong className="text-white font-semibold">R$ 2.450 de R$ 2.800</strong>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="h-full bg-emerald-400 rounded-full" style={{ width: "87.5%" }} />
-                    </div>
-                    <span className="text-sm text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <span className="text-emerald-400">●</span> Uber · 99 · inDrive · Entregas
             </motion.div>
-          </div>
 
-          {/* Coluna Direita: Formulário de Autenticação Limpo & Awwwards-Tier */}
-          <motion.div className="lg:col-span-5 flex justify-center" variants={reveal}>
-            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-8 shadow-2xl backdrop-blur-2xl">
+            <motion.h1
+              className="text-4xl sm:text-5xl lg:text-6xl font-medium tracking-[-0.04em] text-white leading-[1.1] text-balance"
+              variants={reveal}
+            >
+              Faturar é fácil. <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-300">
+                Lucrar de verdade
+              </span>{" "}
+              é o que importa.
+            </motion.h1>
+
+            <motion.p
+              className="text-zinc-400 text-base sm:text-lg font-normal leading-relaxed max-w-xl text-pretty"
+              variants={reveal}
+            >
+              Chega de se iludir com faturamento bruto. O GanhoCerto calcula automaticamente o combustível, o desgaste de pneus, manutenção e impostos para você saber seu lucro real por hora e por km.
+            </motion.p>
+          </motion.div>
+
+          {/* Formulário: logo após o título no celular, coluna direita no desktop */}
+          <motion.div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 flex justify-center" variants={reveal}>
+            <div className="w-full max-w-[420px] rounded-2xl bg-zinc-950/90 border border-white/[0.08] p-6 sm:p-8 shadow-2xl backdrop-blur-2xl">
               
               {/* Tab Selector */}
               <div className="grid grid-cols-2 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-6">
@@ -424,6 +309,118 @@ export function AuthScreen({
                 </ul>
               </form>
             </div>
+          </motion.div>
+
+          {/* Mockup Interativo do Painel GanhoCerto */}
+          <motion.div
+            variants={reveal}
+            className="lg:col-span-7 lg:col-start-1 lg:row-start-2 w-full rounded-2xl bg-zinc-950/80 border border-white/[0.08] p-6 shadow-[0_20px_50px_var(--color-glass-shadow)] backdrop-blur-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header do Mockup */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
+                <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
+              </div>
+              <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm">
+                {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setActiveTab(key)}
+                    className={`relative px-2.5 py-0.5 rounded transition-colors ${activeTab === key ? "text-white" : "text-zinc-500 hover:text-zinc-300"}`}
+                  >
+                    {activeTab === key && (
+                      <motion.span
+                        layoutId="mockup-tab-indicator"
+                        className="absolute inset-0 rounded bg-white/[0.1]"
+                        transition={spring.snappy}
+                      />
+                    )}
+                    <span className="relative z-10">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Conteúdo Dinâmico do Mockup */}
+            <AnimatePresence mode="wait">
+              {activeTab === "visao" && (
+                <motion.div
+                  key="visao"
+                  {...panelSwap}
+                  className="flex flex-col gap-4"
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                      <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
+                      <strong className="text-xl sm:text-2xl font-semibold text-emerald-400 tracking-tight">R$ 384,50</strong>
+                      <span className="text-sm text-emerald-500/80 mt-1 block">Margem: 72%</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                      <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
+                      <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight">R$ 534,00</strong>
+                      <span className="text-sm text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                      <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
+                      <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight">-R$ 149,50</strong>
+                      <span className="text-sm text-zinc-400 mt-1 block">Combustível + Reserva</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex items-center justify-between text-xs">
+                    <span className="text-zinc-400 flex items-center gap-1.5">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Rendimento médio: <strong className="text-white font-medium">R$ 57,60 / hora trabalhada</strong>
+                    </span>
+                    <span className="text-emerald-400 font-medium">Excelente</span>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === "custos" && (
+                <motion.div
+                  key="custos"
+                  {...panelSwap}
+                  className="flex flex-col gap-2.5"
+                >
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                    <span className="text-zinc-300">Combustível (Gasolina / GNV)</span>
+                    <span className="font-semibold text-rose-400">-R$ 110,00</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                    <span className="text-zinc-300">Provisão de Manutenção (Óleo, Pneus)</span>
+                    <span className="font-semibold text-amber-400">-R$ 27,50</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
+                    <span className="text-zinc-300">Alimentação e Pedágios</span>
+                    <span className="font-semibold text-zinc-400">-R$ 12,00</span>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === "metas" && (
+                <motion.div
+                  key="metas"
+                  {...panelSwap}
+                  className="flex flex-col gap-3"
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-400">Meta Semanal de Lucro</span>
+                    <strong className="text-white font-semibold">R$ 2.450 de R$ 2.800</strong>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: "87.5%" }} />
+                  </div>
+                  <span className="text-sm text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.section>
 
