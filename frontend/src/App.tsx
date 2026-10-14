@@ -25,6 +25,7 @@ import { listVehicles } from "./api/vehicles";
 import "./App.css";
 import { LazyCsvImportSection as CsvImportSection } from "./features/imports/LazyCsvImportSection";
 import { AuthShell } from "./features/auth/AuthShell";
+import { SessionSplash } from "./features/auth/SessionSplash";
 import { getGoalUpdatedAfterWorkMessage } from "./features/goals/goalMessages";
 import {
   VehiclesSection,
@@ -59,6 +60,7 @@ import type {
 } from "./types/financial";
 import { createLatestRequest } from "./utils/latestRequest";
 import { getBetaActivationNextStep } from "./utils/activation";
+import { isRestoringSession } from "./utils/session";
 import { getDefaultHistoryGrouping, getHistoryPeriodDates, toDateInputValue } from "./utils/dates";
 import { getDailyEntryDate, getDefaultDailyVehicleId, readLastDailyVehicle, writeLastDailyVehicle } from "./utils/dailyEntry";
 import { useFormValidation } from "./utils/formValidation";
@@ -2262,6 +2264,10 @@ function App() {
     vehicleCount: vehicles.length,
     workSessionCount: workSessions.length,
   });
+
+  if (isRestoringSession({ token, hasUser: user !== null, hasError: message !== "", isResetPasswordRoute })) {
+    return <SessionSplash />;
+  }
 
   if (!user && !isResetPasswordRoute && mode !== "forgot-password") {
     return (
