@@ -118,7 +118,7 @@ export function AuthScreen({
   const [activeTab, setActiveTab] = useState<"visao" | "custos" | "metas">("visao");
 
   return (
-    <div className="relative min-h-screen w-full bg-[#030303] text-zinc-100 selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
+    <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-hidden">
       {/* Background dinâmico suave */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen">
         <AnimatedBackground />
@@ -379,7 +379,7 @@ export function AuthScreen({
               <form onSubmit={onSubmit} className="flex flex-col gap-4">
                 {mode === "register" && (
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-zinc-300" htmlFor="name">
+                    <label htmlFor="name">
                       Nome completo
                     </label>
                     <input
@@ -389,13 +389,12 @@ export function AuthScreen({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Ex: Carlos Silva"
-                      className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
                     />
                   </div>
                 )}
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-zinc-300" htmlFor="email">
+                  <label htmlFor="email">
                     E-mail
                   </label>
                   <input
@@ -405,13 +404,12 @@ export function AuthScreen({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu@email.com"
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-300" htmlFor="password">
+                    <label htmlFor="password">
                       Senha
                     </label>
                     {mode === "login" && (
@@ -432,7 +430,6 @@ export function AuthScreen({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3.5 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.08] text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition-all"
                   />
                 </div>
 

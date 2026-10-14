@@ -2880,3 +2880,37 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   background: var(--color-glass-bg-tabs);
   border: 1px solid var(--color-glass-border);
 }
+
+/* ══════════════════════════════════════════
+   DARK LUXURY SCOPE (auth / landing)
+   Re-themes the semantic tokens so the global control, label and
+   feedback rules above render correctly on dark surfaces.
+   ══════════════════════════════════════════ */
+
+.lux {
+  color-scheme: dark;
+  --color-canvas: var(--color-lux-canvas);
+  --color-surface: var(--color-glass-bg-subtle);
+  --color-surface-subtle: var(--color-glass-bg-tabs);
+  --color-text: var(--color-glass-text);
+  --color-heading: var(--color-glass-white);
+  --color-text-muted: var(--color-lux-text-muted);
+  --color-text-soft: var(--color-lux-text-soft);
+  --color-border: var(--color-glass-border-hover);
+  --color-border-strong: var(--color-lux-border-strong);
+  --color-brand: var(--color-accent-emerald);
+  --color-brand-hover: var(--color-accent-emerald-light);
+  --color-brand-subtle: var(--color-lux-glow);
+  --color-on-brand: var(--color-lux-void);
+  --color-focus: var(--color-accent-emerald-light);
+  --color-success: var(--color-lux-success);
+  --color-success-surface: var(--color-lux-success-surface);
+  --color-info: var(--color-lux-info);
+  --color-info-surface: var(--color-lux-info-surface);
+  --color-warning: var(--color-lux-warning);
+  --color-warning-surface: var(--color-lux-warning-surface);
+  --color-danger: var(--color-lux-danger);
+  --color-danger-surface: var(--color-lux-danger-surface);
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
