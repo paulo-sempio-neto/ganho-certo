@@ -27,7 +27,6 @@ import { LazyCsvImportSection as CsvImportSection } from "./features/imports/Laz
 import { ChangePasswordForm } from "./features/auth/ChangePasswordForm";
 import { ForgotPasswordForm } from "./features/auth/ForgotPasswordForm";
 import { ResetPasswordForm } from "./features/auth/ResetPasswordForm";
-import { AuthScreen } from "./features/auth/AuthScreen";
 import { AccountPlanPanel } from "./features/account/AccountPlanPanel";
 import { getGoalUpdatedAfterWorkMessage } from "./features/goals/goalMessages";
 import { FinancialGoalsSection } from "./features/goals/FinancialGoalsSection";
@@ -88,6 +87,12 @@ import { ErrorMessage } from "./components/ErrorMessage";
 
 const TOKEN_STORAGE_KEY = "ganhocerto.accessToken";
 const RESET_PASSWORD_PATH = "/reset-password";
+
+const AuthScreen = lazy(() =>
+  import("./features/auth/AuthScreen").then((module) => ({
+    default: module.AuthScreen,
+  })),
+);
 
 const ResultSection = lazy(() =>
   import("./features/result/ResultSection").then((module) => ({
@@ -2244,6 +2249,7 @@ function App() {
 
   if (!user && !isResetPasswordRoute && mode !== "forgot-password") {
     return (
+      <Suspense fallback={<div className="lux min-h-screen" />}>
       <AuthScreen
         mode={mode as "login" | "register"}
         setMode={(m) => {
@@ -2268,6 +2274,7 @@ function App() {
           setPassword("");
         }}
       />
+      </Suspense>
     );
   }
 
