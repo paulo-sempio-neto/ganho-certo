@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { AnimatedCounter } from "../../components/AnimatedCounter";
 import { formatWorkTime } from "../../utils/formatters";
 import { formatCents } from "../../utils/money";
 import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
@@ -23,6 +24,9 @@ function toRatio(part: bigint, whole: bigint): number {
   const permille = (part * 1000n) / whole;
   return Math.min(Math.max(Number(permille) / 1000, 0), 1);
 }
+
+/** Formats an in-between spring frame (fractional cents) as money. */
+const formatCentsFrame = (cents: number) => formatCents(BigInt(Math.round(cents)));
 
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex"] as const;
 
@@ -126,17 +130,23 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                 <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro real</span>
-                <strong className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums ${profitTone}`}>{formatCents(day.profitCents)}</strong>
+                <strong className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums ${profitTone}`}>
+                  <AnimatedCounter target={Number(day.profitCents)} format={formatCentsFrame} spring={spring.gentle} />
+                </strong>
                 <span className="text-sm text-zinc-400 mt-1 block">Margem de {day.marginPercent.toString()}%</span>
               </div>
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                 <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight tabular-nums">{grossLabel}</strong>
+                <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight tabular-nums">
+                  <AnimatedCounter target={Number(day.grossCents)} format={formatCentsFrame} spring={spring.gentle} />
+                </strong>
                 <span className="text-sm text-zinc-400 mt-1 block">{km} km · {formatWorkTime(Number(DEMO_ASSUMPTIONS.workedMinutes))}</span>
               </div>
               <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                 <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Custos do dia</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight tabular-nums">-{formatCents(day.costsCents)}</strong>
+                <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight tabular-nums">
+                  <AnimatedCounter target={Number(day.costsCents)} prefix="-" format={formatCentsFrame} spring={spring.gentle} />
+                </strong>
                 <span className="text-sm text-zinc-400 mt-1 block">Combustível + manutenção</span>
               </div>
             </div>
