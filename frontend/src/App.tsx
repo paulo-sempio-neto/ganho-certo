@@ -1329,15 +1329,6 @@ function App() {
     if (attempted.current.goals !== goalRequestKey()) void loadFinancialGoals(token, false);
   }, [token, user?.id, coreReady, activeArea, todaySummary.date, financialRevision, isFinancialGoalsLoading, vehicles]);
 
-  function resetForm(nextMode: AuthMode) {
-    setMode(nextMode);
-    setName("");
-    setEmail("");
-    setPassword("");
-    setMessage("");
-    setSuccessMessage("");
-  }
-
   async function recordFirstResultViewed() {
     try {
       await requestApi<void>("/product-events/first-result-viewed", {
@@ -2336,17 +2327,8 @@ function App() {
 
   return (
     <div className="lux min-h-screen">
-    <main className={user ? "page page-dashboard" : "page"}>
-      {!user ? (
-        <section className="intro" aria-labelledby="page-title">
-          <p className="brand">GanhoCerto</p>
-          <h1 id="page-title">Seu faturamento não é seu lucro.</h1>
-          <p className="subtitle">Descubra quanto você realmente ganha dirigindo.</p>
-        </section>
-      ) : null}
-
-      <section className={user ? "auth-panel vehicle-panel" : "auth-panel"}>
-        {user ? (
+    <main className="page page-dashboard">
+      <section className="auth-panel vehicle-panel">
           <div className="session" onClick={handleNavigationClick}>
             <div className="session-header">
               <div>
@@ -4516,109 +4498,6 @@ function App() {
               </section>
             </section>
           </div>
-        ) : (
-          <>
-            {isResetPasswordRoute ? (
-              <ResetPasswordForm
-                token={resetPasswordToken}
-                onBackToLogin={handleBackToLogin}
-                onRequestNewLink={handleRequestNewResetLink}
-                onResetComplete={handleResetComplete}
-              />
-            ) : (
-              <>
-                {mode === "forgot-password" ? null : (
-                  <div className="tabs" role="group" aria-label="Autenticacao">
-                    <button
-                      className={mode === "login" ? "tab tab-active" : "tab"}
-                      aria-pressed={mode === "login"}
-                      type="button"
-                      onClick={() => resetForm("login")}
-                    >
-                      Login
-                    </button>
-                    <button
-                      className={mode === "register" ? "tab tab-active" : "tab"}
-                      aria-pressed={mode === "register"}
-                      type="button"
-                      onClick={() => resetForm("register")}
-                    >
-                      Cadastro
-                    </button>
-                  </div>
-                )}
-
-                {mode === "forgot-password" ? (
-                  <ForgotPasswordForm initialEmail={email} onBackToLogin={handleBackToLogin} />
-                ) : (
-                  <form className="auth-form" onSubmit={handleSubmit}>
-                    <h2>{mode === "login" ? "Entrar" : "Criar conta"}</h2>
-
-                    {mode === "register" ? (
-                      <label>
-                        Nome
-                        <input
-                          autoComplete="name"
-                          name="name"
-                          onChange={(event) => setName(event.target.value)}
-                          required
-                          type="text"
-                          value={name}
-                        />
-                      </label>
-                    ) : null}
-
-                    <label>
-                      Email
-                      <input
-                        autoComplete="email"
-                        name="email"
-                        onChange={(event) => setEmail(event.target.value)}
-                        required
-                        type="email"
-                        value={email}
-                      />
-                    </label>
-
-                    <label>
-                      Senha
-                      <input
-                        autoComplete={mode === "login" ? "current-password" : "new-password"}
-                        minLength={mode === "login" ? 1 : 6}
-                        name="password"
-                        onChange={(event) => setPassword(event.target.value)}
-                        required
-                        type="password"
-                        value={password}
-                      />
-                    </label>
-
-                    {message ? <FeedbackMessage kind="error">{message}</FeedbackMessage> : null}
-                    {successMessage ? <FeedbackMessage kind="success">{successMessage}</FeedbackMessage> : null}
-
-                    <button className="button" disabled={isLoading} type="submit">
-                      {isLoading ? "Enviando..." : mode === "login" ? "Entrar" : "Cadastrar"}
-                    </button>
-                    {mode === "login" ? (
-                      <button
-                        className="text-button inline-action"
-                        type="button"
-                        onClick={() => {
-                          setMode("forgot-password");
-                          setMessage("");
-                          setSuccessMessage("");
-                          setPassword("");
-                        }}
-                      >
-                        Esqueci minha senha
-                      </button>
-                    ) : null}
-                  </form>
-                )}
-              </>
-            )}
-          </>
-        )}
       </section>
     </main>
     </div>

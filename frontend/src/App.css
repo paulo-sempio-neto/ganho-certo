@@ -46,27 +46,6 @@
   min-width: 0;
 }
 
-@keyframes text-gradient {
-  0% { background-position: 0% center; }
-  100% { background-position: -200% center; }
-}
-
-.animate-text-gradient {
-  animation: text-gradient 6s linear infinite;
-}
-
-@keyframes marquee {
-  0% { transform: translateX(0%); }
-  100% { transform: translateX(-50%); }
-}
-
-.animate-marquee {
-  animation: marquee 40s linear infinite;
-}
-.animate-marquee:hover {
-  animation-play-state: paused;
-}
-
 :where(.metric-card strong, .session-metrics dd, .dashboard-layer dd,
   .goal-progress-main strong, .recurring-projection-total strong, .weekday-card dd) {
   font-variant-numeric: tabular-nums lining-nums;
@@ -197,56 +176,6 @@ textarea {
 
 /* ── Intro (Auth hero) ── */
 
-.intro {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: linear-gradient(145deg, var(--color-brand) 0%, var(--color-brand-dark) 100%);
-  padding: var(--space-12) 10vw;
-  position: relative;
-  overflow: hidden;
-  color: var(--color-on-brand);
-}
-
-.intro::before {
-  content: '';
-  position: absolute;
-  top: -20vh;
-  left: -20vh;
-  width: 100vh;
-  height: 100vh;
-  background: radial-gradient(circle, var(--color-intro-glow) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-.brand {
-  margin: 0 0 auto 0;
-  color: var(--color-on-brand);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-extrabold);
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-
-h1#page-title {
-  margin: auto 0 0 0;
-  color: var(--color-on-brand);
-  font-size: var(--text-display);
-  font-weight: var(--weight-extrabold);
-  line-height: 1.05;
-  letter-spacing: -0.04em;
-  max-width: 18ch;
-}
-
-.subtitle {
-  margin: var(--space-6) 0 auto 0;
-  max-width: 420px;
-  color: var(--color-intro-subtitle);
-  font-size: var(--text-xl);
-  line-height: 1.5;
-  font-weight: var(--weight-normal);
-}
-
 /* ── Auth Panel ── */
 
 .auth-panel {
@@ -262,41 +191,6 @@ h1#page-title {
 
 .vehicle-panel {
   max-height: none;
-}
-
-.tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-1);
-  margin-bottom: var(--space-6);
-  border-radius: var(--radius-control);
-  background: var(--color-surface-subtle);
-  padding: var(--space-1);
-}
-
-.tab {
-  min-height: var(--control-height-compact);
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-weight: var(--weight-semibold);
-  font-size: var(--text-sm);
-  transition: background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.tab-active {
-  background: var(--color-surface);
-  color: var(--color-heading);
-  box-shadow: var(--shadow-sm);
-  font-weight: var(--weight-bold);
-}
-
-.tab:not(.tab-active):hover {
-  background: var(--color-surface);
-  color: var(--color-text);
 }
 
 .auth-form,
@@ -820,27 +714,6 @@ textarea:focus {
 
 /* ── Daily Entry Nav Buttons ── */
 
-.daily-entry-nav-button,
-.quick-start-nav-button {
-  min-height: var(--control-height-compact);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-brand);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  padding: var(--space-2) var(--space-4);
-  transition: border-color var(--duration-fast) var(--ease-out),
-    background-color var(--duration-fast) var(--ease-out);
-}
-
-.daily-entry-nav-button:hover,
-.quick-start-nav-button:hover {
-  border-color: var(--color-brand);
-  background: var(--color-brand-subtle);
-}
-
 /* ── Daily Entry ── */
 
 .daily-entry {
@@ -887,10 +760,6 @@ textarea:focus {
   padding: var(--space-3);
 }
 
-.daily-time-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .daily-entry-note {
   margin: 0;
 }
@@ -909,7 +778,6 @@ textarea:focus {
 
 /* ── Activation & Action Prompts ── */
 
-.activation-panel,
 .action-prompt,
 .simple-goal-intro {
   display: grid;
@@ -920,28 +788,14 @@ textarea:focus {
   padding: var(--space-4);
 }
 
-.activation-panel h4,
-.activation-panel p,
 .action-prompt p,
 .simple-goal-intro p {
   margin: 0;
 }
 
-.activation-panel h4,
 .action-prompt strong,
 .simple-goal-intro strong {
   color: var(--color-heading);
-}
-
-.quick-action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-
-.quick-action-grid .button {
-  text-align: center;
-  text-decoration: none;
 }
 
 .action-prompt {
@@ -954,18 +808,8 @@ textarea:focus {
   background: var(--color-warning-surface);
 }
 
-.beta-next-step {
-  border-color: var(--color-control-border);
-  background: var(--color-surface-subtle);
-}
-
 /* ── Daily Entry Metrics ── */
 
-.daily-entry-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.metric-grid.daily-entry-primary-metrics,
 .metric-grid.result-summary-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -1013,10 +857,6 @@ textarea:focus {
   min-width: 0;
   gap: var(--space-6);
   padding-top: var(--space-4);
-}
-
-.secondary-metrics {
-  opacity: 0.88;
 }
 
 /* ── Daily Entry Actions ── */
@@ -1173,10 +1013,6 @@ textarea:focus {
   gap: var(--space-3);
 }
 
-.highlights {
-  grid-template-columns: 1.2fr 1fr 1fr;
-}
-
 .metric-card {
   display: grid;
   align-content: start;
@@ -1275,26 +1111,6 @@ textarea:focus {
   display: grid;
   gap: var(--space-4);
   padding-block: var(--space-4);
-}
-
-.economic-flow {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(220px, 1.4fr);
-}
-
-.economic-result-card {
-  border-width: 2px;
-}
-
-.economic-result-card strong {
-  font-size: var(--text-3xl);
-}
-
-.projected-result-card {
-  border-width: 2px;
-}
-
-.projected-result-card strong {
-  font-size: var(--text-3xl);
 }
 
 /* ── Calculation/Advanced Details ── */
@@ -1837,11 +1653,6 @@ textarea:focus {
   color: var(--color-heading);
   font-size: var(--text-base);
   font-weight: var(--weight-bold);
-}
-
-.daily-list {
-  display: grid;
-  gap: var(--space-3);
 }
 
 .daily-row {
@@ -2504,19 +2315,11 @@ textarea:focus {
   h1 {
     font-size: var(--text-display-compact);
   }
-  
-  h1#page-title {
-    font-size: 2.5rem;
-  }
 
   .page {
     grid-template-columns: 1fr;
     gap: 0;
     padding: 0;
-  }
-  
-  .intro {
-    padding: var(--space-10) var(--space-6);
   }
   
   .auth-panel {
@@ -2606,50 +2409,39 @@ textarea:focus {
   }
 
   .dashboard-nav a,
-  .result-context-nav a,
-  .daily-entry-nav-button {
+.result-context-nav a {
     text-align: center;
   }
 
   .vehicles-layout,
-  .user-data,
-  .dashboard-filters,
-  .metric-grid,
-  .highlights,
-  .economic-flow,
-  .dashboard-layers,
-  .recurring-projection-list,
-  .structural-list,
-  .form-grid,
-  .form-grid-three,
-  .session-metrics,
-  .import-summary,
-  .recurring-metrics,
-  .goal-metrics,
-  .goal-summary-metrics,
-  .history-comparison-grid,
-  .pattern-filters,
-  .pattern-summary-grid,
-  .weekday-card-grid,
-  .daily-time-grid,
-  .daily-entry-metrics,
-  .daily-entry-actions,
-  .metric-grid.daily-entry-primary-metrics,
-  .metric-grid.result-summary-grid,
-  .quick-action-grid,
-  .action-prompt,
-  .quick-start-progress,
-  .quick-start-metrics,
-  .quick-start-time {
+.user-data,
+.dashboard-filters,
+.metric-grid,
+.dashboard-layers,
+.recurring-projection-list,
+.structural-list,
+.form-grid,
+.form-grid-three,
+.session-metrics,
+.import-summary,
+.recurring-metrics,
+.goal-metrics,
+.goal-summary-metrics,
+.history-comparison-grid,
+.pattern-filters,
+.pattern-summary-grid,
+.weekday-card-grid,
+.daily-entry-actions,
+.metric-grid.result-summary-grid,
+.action-prompt,
+.quick-start-progress,
+.quick-start-metrics,
+.quick-start-time {
     grid-template-columns: 1fr;
   }
 
   .pattern-chart-labels {
     font-size: var(--text-xs);
-  }
-
-  .quick-start-nav-button {
-    flex: 1 1 calc(50% - 10px);
   }
 
   .session-header,
@@ -2775,114 +2567,13 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
    PREMIUM DESIGN SYSTEM — INSTITUTIONAL
    ══════════════════════════════════════════ */
 
-.headline-hero {
-  font-family: var(--font-family);
-  font-size: var(--text-display);
-  font-weight: 500;
-  line-height: 1.05;
-  letter-spacing: -0.055em;
-  text-wrap: balance;
-  color: var(--color-glass-text);
-}
-
-.headline-section {
-  font-family: var(--font-family);
-  font-size: var(--text-display-compact);
-  font-weight: 500;
-  line-height: 1.1;
-  letter-spacing: -0.04em;
-  text-wrap: balance;
-  color: var(--color-glass-text);
-}
-
-.text-accent {
-  background: linear-gradient(135deg, var(--color-accent-emerald-light) 0%, var(--color-accent-emerald) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
 /* ── Glass Card ── */
-
-.card-glass {
-  position: relative;
-  background: var(--color-glass-bg);
-  backdrop-filter: blur(40px) saturate(1.2);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-  border: 1px solid var(--color-glass-border);
-  border-radius: 16px;
-  box-shadow:
-    0 1px 0 0 var(--color-glass-bg-subtle) inset,
-    0 24px 48px -12px var(--color-glass-shadow);
-  overflow: hidden;
-}
-
-.card-glass::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 20%;
-  right: 20%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--color-glass-highlight), transparent);
-  pointer-events: none;
-}
 
 /* ── Feature Card ── */
 
-.card-feature {
-  background: var(--color-glass-bg);
-  border: 1px solid var(--color-glass-border);
-  border-radius: 12px;
-  padding: 2rem;
-  transition: border-color 0.3s ease, background 0.3s ease;
-}
-
-.card-feature:hover {
-  border-color: var(--color-glass-border-hover);
-  background: var(--color-glass-bg-subtle);
-}
-
 /* ── Input ── */
 
-.input-glass {
-  width: 100%;
-  padding: 12px 16px;
-  background: var(--color-glass-bg-subtle);
-  border: 1px solid var(--color-glass-border);
-  border-radius: 10px;
-  color: var(--color-glass-white);
-  font-family: var(--font-family);
-  font-size: 0.9375rem;
-  font-weight: 400;
-  transition: all 200ms ease;
-  outline: none;
-}
-
-.input-glass::placeholder {
-  color: var(--color-glass-placeholder);
-}
-
-.input-glass:hover {
-  border-color: var(--color-glass-border-hover);
-}
-
-.input-glass:focus {
-  border-color: var(--color-glass-border-focus);
-  box-shadow: 0 0 0 3px var(--color-glass-focus-glow);
-}
-
 /* ── Tabs ── */
-
-.tabs-glass {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 12px;
-  background: var(--color-glass-bg-tabs);
-  border: 1px solid var(--color-glass-border);
-}
 
 /* ══════════════════════════════════════════
    DARK LUXURY SCOPE (auth / landing)
