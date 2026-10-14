@@ -5,7 +5,6 @@ import {
   getStorySteps,
   projectWeeklyGoal,
   simulateDemoDay,
-  toGaugeAngle,
   toStoryStage,
 } from "./demoDay";
 
@@ -64,20 +63,6 @@ describe("projectWeeklyGoal", () => {
     expect(goal.remainingCents).toBe(0n);
     expect(goal.progressPermille).toBe(1000n);
     expect(goal.extraMinutes).toBe(0n);
-  });
-});
-
-describe("toGaugeAngle", () => {
-  it("sweeps the needle from -90 to 90 degrees across R$ 0 to R$ 80 per hour", () => {
-    expect(toGaugeAngle(0n)).toBe(-90);
-    expect(toGaugeAngle(4_000n)).toBe(0);
-    expect(toGaugeAngle(5_715n)).toBeCloseTo(38.52, 2);
-    expect(toGaugeAngle(8_000n)).toBe(90);
-  });
-
-  it("pins the needle at the ends for losses and very good days", () => {
-    expect(toGaugeAngle(-2_146n)).toBe(-90);
-    expect(toGaugeAngle(12_000n)).toBe(90);
   });
 });
 

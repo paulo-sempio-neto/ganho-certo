@@ -2,11 +2,12 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { Odometer } from "../../components/Odometer";
+import { ProfitGauge } from "../../components/ProfitGauge";
 import { formatWorkTime } from "../../utils/formatters";
 import { formatCents } from "../../utils/money";
+import { getProfitPace } from "../../utils/profitPace";
 import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
 import { panelSwap, spring, tiltIn } from "./motion";
-import { ProfitGauge } from "./ProfitGauge";
 
 type CanvasTab = "visao" | "custos" | "metas";
 
@@ -14,13 +15,6 @@ const canvasLift = tiltIn("x", 14);
 
 const GROSS_RANGE = { min: 150, max: 900, step: 10 } as const;
 const KM_RANGE = { min: 50, max: 400, step: 5 } as const;
-
-function getPace(profitPerHourCents: bigint): { label: string; tone: string } {
-  if (profitPerHourCents < 0n) return { label: "No prejuízo", tone: "text-rose-400" };
-  if (profitPerHourCents < 2_000n) return { label: "Abaixo da média", tone: "text-amber-400" };
-  if (profitPerHourCents < 4_000n) return { label: "Na média", tone: "text-zinc-300" };
-  return { label: "Excelente", tone: "text-emerald-400" };
-}
 
 /** Visual-only ratio (0..1) for bar lengths; money itself never leaves bigint cents. */
 function toRatio(part: bigint, whole: bigint): number {
@@ -48,7 +42,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
   const [km, setKm] = useState(195);
   const day = simulateDemoDay(grossReais, km);
   const goal = projectWeeklyGoal(day);
-  const pace = getPace(day.profitPerHourCents);
+  const pace = getProfitPace(day.profitPerHourCents);
   const profitTone = day.profitCents < 0n ? "text-rose-400" : "text-emerald-400";
   const grossLabel = formatCents(day.grossCents);
   const week = getWeekBars(day.profitCents);

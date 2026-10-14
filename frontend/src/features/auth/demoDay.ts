@@ -79,17 +79,6 @@ export function projectWeeklyGoal(day: DemoDay): DemoGoal {
   };
 }
 
-/** Top of the profit-per-hour gauge: R$ 80,00/h. */
-export const GAUGE_MAX_PER_HOUR_CENTS = 8_000n;
-
-/** Needle angle in degrees, from -90 (R$ 0/h or a loss) to 90 (gauge max or above). */
-export function toGaugeAngle(profitPerHourCents: bigint): number {
-  if (profitPerHourCents <= 0n) return -90;
-  if (profitPerHourCents >= GAUGE_MAX_PER_HOUR_CENTS) return 90;
-  const permille = (profitPerHourCents * 1000n) / GAUGE_MAX_PER_HOUR_CENTS;
-  return -90 + (Number(permille) * 180) / 1000;
-}
-
 /** Scroll ranges (0..1) in which fuel, maintenance and extras fall off the revenue bar. */
 export const STORY_FALLS = [
   [0.15, 0.38],

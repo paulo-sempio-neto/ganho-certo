@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
 
-import { Odometer } from "../../components/Odometer";
-import { formatCents } from "../../utils/money";
-import { toGaugeAngle } from "./demoDay";
+import { Odometer } from "./Odometer";
+import { formatCents } from "../utils/money";
+import { toGaugeAngle, type ProfitPace } from "../utils/profitPace";
 
 // Arc geometry in a 120x66 viewBox: centre (60, 60), radius 50.
 const CENTER_X = 60;
@@ -34,7 +34,7 @@ const ticks = [-90, -45, 0, 45, 90];
 
 type ProfitGaugeProps = {
   profitPerHourCents: bigint;
-  pace: { label: string; tone: string };
+  pace: ProfitPace;
 };
 
 /** Speedometer-style gauge for profit per hour; the needle is a rotated element, nothing else animates. */
