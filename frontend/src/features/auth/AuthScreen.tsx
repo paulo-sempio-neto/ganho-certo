@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { motion, MotionConfig, useScroll } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { GlowCard } from "../../components/GlowCard";
@@ -8,6 +8,8 @@ import { AmbientBackground } from "./AmbientBackground";
 import { BrandMark } from "./AuthShell";
 import { BentoGrid } from "./BentoGrid";
 import { FinalCta } from "./FinalCta";
+import { IntroCurtain } from "./IntroCurtain";
+import { readIntroState, shouldPlayIntro } from "./intro";
 import { ProductCanvas } from "./ProductCanvas";
 import { ScrollMarquee } from "./ScrollMarquee";
 import { ScrollStory } from "./ScrollStory";
@@ -75,6 +77,10 @@ export function AuthScreen({
   const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [nameFocusRequest, setNameFocusRequest] = useState(0);
+  // The opening plays once per session; the hero waits for the curtain to start lifting.
+  const [playsIntro] = useState(() => shouldPlayIntro(readIntroState()));
+  const [isIntroPlaying, setIsIntroPlaying] = useState(playsIntro);
+  const handleIntroReveal = useCallback(() => setIsIntroPlaying(false), []);
 
   // The closing CTA lands on the form with the cursor already in the first field.
   useEffect(() => {
@@ -85,6 +91,7 @@ export function AuthScreen({
     <MotionConfig reducedMotion="user">
     <div className="lux relative min-h-screen w-full selection:bg-emerald-500/20 selection:text-emerald-300 overflow-x-clip">
       <AmbientBackground />
+      {playsIntro ? <IntroCurtain onReveal={handleIntroReveal} /> : null}
 
       <div className="relative z-10 flex flex-col w-full">
         {/* ── Top Header / Navbar ── */}
@@ -128,7 +135,7 @@ export function AuthScreen({
         <motion.section
           className="w-full max-w-7xl mx-auto px-6 pt-10 pb-20 lg:pt-16 lg:pb-32 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-8 items-center"
           initial="hidden"
-          animate="visible"
+          animate={isIntroPlaying ? "hidden" : "visible"}
           variants={stagger(0.12, 0.1)}
         >
           {/* Proposta de valor */}
