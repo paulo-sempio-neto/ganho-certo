@@ -2914,3 +2914,13 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   background: var(--color-canvas);
   color: var(--color-text);
 }
+
+.lux input[type="range"] {
+  min-height: var(--space-6);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: var(--color-brand);
+  cursor: pointer;
+}

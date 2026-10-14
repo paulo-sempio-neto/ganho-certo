@@ -1,12 +1,33 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+
+import { formatWorkTime } from "../../utils/formatters";
+import { formatCents } from "../../utils/money";
+import { DEMO_ASSUMPTIONS, projectWeeklyGoal, simulateDemoDay } from "./demoDay";
 import { panelSwap, reveal, spring } from "./motion";
 
 type CanvasTab = "visao" | "custos" | "metas";
 
-/** Live product mockup shown next to the auth form. */
+const GROSS_RANGE = { min: 150, max: 900, step: 10 } as const;
+const KM_RANGE = { min: 50, max: 400, step: 5 } as const;
+
+function getPace(profitPerHourCents: bigint): { label: string; tone: string } {
+  if (profitPerHourCents < 0n) return { label: "No prejuízo", tone: "text-rose-400" };
+  if (profitPerHourCents < 2_000n) return { label: "Abaixo da média", tone: "text-amber-400" };
+  if (profitPerHourCents < 4_000n) return { label: "Na média", tone: "text-zinc-300" };
+  return { label: "Excelente", tone: "text-emerald-400" };
+}
+
+/** Interactive product mockup: drag the day's revenue and distance, read the real profit. */
 export function ProductCanvas({ className = "" }: { className?: string }) {
   const [activeTab, setActiveTab] = useState<CanvasTab>("visao");
+  const [grossReais, setGrossReais] = useState(530);
+  const [km, setKm] = useState(195);
+  const day = simulateDemoDay(grossReais, km);
+  const goal = projectWeeklyGoal(day);
+  const pace = getPace(day.profitPerHourCents);
+  const profitTone = day.profitCents < 0n ? "text-rose-400" : "text-emerald-400";
+  const grossLabel = formatCents(day.grossCents);
 
   return (
     <motion.div
@@ -19,7 +40,7 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
       <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-5">
         <div className="flex items-center gap-2.5">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_var(--color-accent-emerald)]" />
-          <span className="text-xs font-medium text-zinc-300">Jornada Ativa · Hoje</span>
+          <span className="text-xs font-medium text-zinc-300">Simule o seu dia</span>
         </div>
         <div className="flex gap-1.5 bg-white/[0.04] p-1 rounded-lg border border-white/[0.04] text-sm" role="group" aria-label="Visão do painel">
           {([["visao", "Resumo"], ["custos", "Custos"], ["metas", "Meta"]] as const).map(([key, label]) => (
@@ -43,6 +64,36 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
         </div>
       </div>
 
+      {/* Controles do simulador */}
+      <div className="grid sm:grid-cols-2 gap-x-6 gap-y-4 mb-5">
+        <label>
+          <span className="flex items-baseline justify-between gap-3 font-medium">
+            <span className="text-zinc-400">Faturamento do dia</span>
+            <output className="text-white tabular-nums">{grossLabel}</output>
+          </span>
+          <input
+            type="range"
+            {...GROSS_RANGE}
+            value={grossReais}
+            aria-valuetext={grossLabel}
+            onChange={(event) => setGrossReais(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          <span className="flex items-baseline justify-between gap-3 font-medium">
+            <span className="text-zinc-400">Km rodados</span>
+            <output className="text-white tabular-nums">{km} km</output>
+          </span>
+          <input
+            type="range"
+            {...KM_RANGE}
+            value={km}
+            aria-valuetext={`${km} quilômetros`}
+            onChange={(event) => setKm(Number(event.target.value))}
+          />
+        </label>
+      </div>
+
       {/* Conteúdo Dinâmico do Mockup */}
       <AnimatePresence mode="wait">
         {activeTab === "visao" && (
@@ -53,30 +104,33 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
           >
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro Líquido Real</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-emerald-400 tracking-tight">R$ 384,50</strong>
-                <span className="text-sm text-emerald-500/80 mt-1 block">Margem: 72%</span>
+                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Lucro real</span>
+                <strong className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums ${profitTone}`}>{formatCents(day.profitCents)}</strong>
+                <span className="text-sm text-zinc-400 mt-1 block">Margem de {day.marginPercent.toString()}%</span>
               </div>
               <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento Bruto</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight">R$ 534,00</strong>
-                <span className="text-sm text-zinc-400 mt-1 block">14 corridas · 6h 40m</span>
+                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Faturamento</span>
+                <strong className="text-xl sm:text-2xl font-semibold text-white tracking-tight tabular-nums">{grossLabel}</strong>
+                <span className="text-sm text-zinc-400 mt-1 block">{km} km · {formatWorkTime(Number(DEMO_ASSUMPTIONS.workedMinutes))}</span>
               </div>
               <div className="col-span-2 sm:col-span-1 p-3.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Despesas do Dia</span>
-                <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight">-R$ 149,50</strong>
-                <span className="text-sm text-zinc-400 mt-1 block">Combustível + Reserva</span>
+                <span className="text-sm font-medium text-zinc-500 uppercase tracking-wider block mb-1">Custos do dia</span>
+                <strong className="text-xl sm:text-2xl font-semibold text-rose-400 tracking-tight tabular-nums">-{formatCents(day.costsCents)}</strong>
+                <span className="text-sm text-zinc-400 mt-1 block">Combustível + manutenção</span>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex items-center justify-between text-xs">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-3 rounded-xl bg-emerald-500/[0.03] border border-emerald-500/10 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-zinc-400 flex flex-wrap items-center gap-1.5">
+                <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                Rendimento médio: <strong className="text-white font-medium">R$ 57,60 / hora trabalhada</strong>
+                Lucro por hora:
+                <strong className="text-white font-medium tabular-nums">{formatCents(day.profitPerHourCents)}/h</strong>
+                <span className="text-zinc-600" aria-hidden="true">·</span>
+                <strong className="text-white font-medium tabular-nums">{formatCents(day.profitPerKmCents)}/km</strong>
               </span>
-              <span className="text-emerald-400 font-medium">Excelente</span>
+              <span className={`font-medium ${pace.tone}`}>{pace.label}</span>
             </div>
           </motion.div>
         )}
@@ -87,17 +141,22 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
             {...panelSwap}
             className="flex flex-col gap-2.5"
           >
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-              <span className="text-zinc-300">Combustível (Gasolina / GNV)</span>
-              <span className="font-semibold text-rose-400">-R$ 110,00</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-              <span className="text-zinc-300">Provisão de Manutenção (Óleo, Pneus)</span>
-              <span className="font-semibold text-amber-400">-R$ 27,50</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-xs">
-              <span className="text-zinc-300">Alimentação e Pedágios</span>
-              <span className="font-semibold text-zinc-400">-R$ 12,00</span>
+            {[
+              { label: "Combustível", detail: "R$ 6,19/L · 11 km/L", cents: day.fuelCents, tone: "text-rose-400" },
+              { label: "Reserva de manutenção", detail: "R$ 0,14/km · óleo, pneus e freios", cents: day.maintenanceCents, tone: "text-amber-400" },
+              { label: "Alimentação e pedágios", detail: "Valor fixo do dia", cents: day.extrasCents, tone: "text-zinc-400" },
+            ].map((cost) => (
+              <div key={cost.label} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] text-sm">
+                <span className="flex flex-col">
+                  <span className="text-zinc-200">{cost.label}</span>
+                  <span className="text-zinc-500">{cost.detail}</span>
+                </span>
+                <span className={`font-semibold tabular-nums ${cost.tone}`}>-{formatCents(cost.cents)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-3 pt-1 text-sm">
+              <span className="text-zinc-400">Sobra no bolso</span>
+              <strong className={`font-semibold tabular-nums ${profitTone}`}>{formatCents(day.profitCents)}</strong>
             </div>
           </motion.div>
         )}
@@ -108,14 +167,25 @@ export function ProductCanvas({ className = "" }: { className?: string }) {
             {...panelSwap}
             className="flex flex-col gap-3"
           >
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400">Meta Semanal de Lucro</span>
-              <strong className="text-white font-semibold">R$ 2.450 de R$ 2.800</strong>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-zinc-400">Meta semanal de lucro</span>
+              <strong className="text-white font-semibold tabular-nums">
+                {formatCents(goal.progressCents)} de {formatCents(DEMO_ASSUMPTIONS.weeklyGoalCents)}
+              </strong>
             </div>
             <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-              <div className="h-full bg-emerald-400 rounded-full" style={{ width: "87.5%" }} />
+              <div
+                className="h-full w-full origin-left rounded-full bg-emerald-400"
+                style={{ transform: `scaleX(${Number(goal.progressPermille) / 1000})` }}
+              />
             </div>
-            <span className="text-sm text-emerald-400 font-medium">87.5% atingida · Faltam apenas R$ 350 para fechar a semana!</span>
+            <span className="text-sm text-emerald-400 font-medium">
+              {goal.remainingCents === 0n
+                ? "Meta da semana batida!"
+                : goal.extraMinutes === null
+                  ? `Faltam ${formatCents(goal.remainingCents)}. Com prejuízo hoje, rodar mais só aumenta a perda.`
+                  : `Faltam ${formatCents(goal.remainingCents)} · cerca de ${formatWorkTime(Number(goal.extraMinutes))} a mais no ritmo de hoje.`}
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
