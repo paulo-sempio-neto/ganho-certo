@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { motion, MotionConfig } from "framer-motion";
+import { motion, MotionConfig, useScroll } from "framer-motion";
 import { FeedbackMessage } from "../../components/FeedbackMessage";
 import { GlowCard } from "../../components/GlowCard";
 import { SUPPORT_EMAIL } from "../../utils/support";
@@ -69,6 +69,7 @@ export function AuthScreen({
   onForgotPassword,
 }: AuthScreenProps) {
   useSmoothScroll();
+  const { scrollYProgress: pageProgress } = useScroll();
   const [isHeaderHidden, setIsHeaderHidden] = useHideOnScrollDown();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [nameFocusRequest, setNameFocusRequest] = useState(0);
@@ -113,6 +114,12 @@ export function AuthScreen({
             </button>
           </div>
           </div>
+          {/* Reading progress: a hairline that fills with the page. */}
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-px origin-left bg-gradient-to-r from-emerald-500 via-emerald-300 to-teal-200"
+            style={{ scaleX: pageProgress }}
+          />
         </motion.header>
 
         {/* ── Hero / Auth Split Section ── */}
