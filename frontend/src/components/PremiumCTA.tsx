@@ -1,6 +1,5 @@
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { MagneticButton } from "./MagneticButton";
 
 interface PremiumCTAProps {
   children: ReactNode;
@@ -9,13 +8,18 @@ interface PremiumCTAProps {
   onClick?: () => void;
 }
 
+/**
+ * Premium call-to-action button with a sweep-shine hover effect.
+ *
+ * Uses a standard `<button>` instead of a magnetic wrapper so the click
+ * target stays stationary — no "chasing the button" anti-pattern.
+ */
 export function PremiumCTA({ children, disabled, type = "submit", onClick }: PremiumCTAProps) {
   return (
-    <MagneticButton
+    <motion.button
       type={type}
       disabled={disabled}
       onClick={onClick}
-      strength={0.25}
       className="
         group relative w-full mt-4 py-3.5 px-8
         rounded-lg overflow-hidden
@@ -24,6 +28,8 @@ export function PremiumCTA({ children, disabled, type = "submit", onClick }: Pre
         disabled:opacity-50 disabled:cursor-not-allowed
         cursor-pointer
       "
+      whileTap={{ scale: 0.98 }}
+      transition={{ scale: { type: "spring", stiffness: 400, damping: 17 } }}
     >
       {/* Multi-layer gradient background */}
       <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-700 transition-all duration-500" />
@@ -50,17 +56,13 @@ export function PremiumCTA({ children, disabled, type = "submit", onClick }: Pre
       {/* Button text */}
       <span className="relative z-10 flex items-center justify-center gap-2 drop-shadow-sm">
         {children}
-        <motion.svg 
+        <svg 
           className="w-5 h-5" 
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          initial={{ x: 0 }}
-          whileHover={{ x: 4 }}
-          transition={{ type: "spring", stiffness: 400, damping: 15 }}
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-        </motion.svg>
+        </svg>
       </span>
-    </MagneticButton>
+    </motion.button>
   );
 }
-
